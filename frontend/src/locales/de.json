@@ -62,6 +62,7 @@
   "approved": "Genehmigt",
   "rejected": "Abgelehnt",
   "server_logs": "Live-Logs",
+  "copy": "Kopieren",
   "server_config": "Server-Konfiguration",
   "restart_server": "Server neu starten",
   "restarting": "Neustart…",

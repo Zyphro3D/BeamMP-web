@@ -51,11 +51,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ beammp_username }),
     }),
-  setup: (username: string, password: string) =>
-    request('/api/auth/setup', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    }),
 
   // Per-instance — Mods
   mods:    (instanceId: string) => request<Mod[]>(`${i(instanceId)}/mods`),
