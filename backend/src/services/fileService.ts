@@ -46,11 +46,17 @@ export function ensureDir(dirPath: string): void {
   ensureDirSync(dirPath)
 }
 
-export function listDir(dirPath: string): string[] {
-  if (!fs.existsSync(dirPath)) return []
-  return fs.readdirSync(dirPath).filter(f => {
-    try { return fs.statSync(path.join(dirPath, f)).isFile() } catch { return false }
-  })
+// Async + withFileTypes: no per-entry stat() syscall, and — unlike a sync
+// listDir would — actually yields the event loop, so a Promise.all() of
+// several of these (consistency scan, several hundred mods) runs in
+// parallel instead of blocking every other request in the queue.
+export async function listDir(dirPath: string): Promise<string[]> {
+  try {
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
+    return entries.filter(e => e.isFile()).map(e => e.name)
+  } catch {
+    return []
+  }
 }
 
 // ── Watch log ──────────────────────────────────────────────────

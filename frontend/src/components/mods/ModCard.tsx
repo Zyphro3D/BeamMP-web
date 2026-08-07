@@ -18,7 +18,7 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
       <div className={`card overflow-hidden flex flex-col ${!mod.active ? 'opacity-60' : ''}`}>
         {/* Image */}
         {mod.image ? (
-          <img src={`/images/${mod.image}`} alt={mod.name}
+          <img src={`/images/${mod.image}`} alt={mod.name} loading="lazy"
             className="w-full h-28 object-contain bg-zinc-100 dark:bg-zinc-800/60" />
         ) : (
           <div className="w-full h-28 bg-surface flex items-center justify-center">

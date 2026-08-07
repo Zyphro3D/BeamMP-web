@@ -2,11 +2,12 @@ import type { FastifyInstance, FastifyReply } from 'fastify'
 import path from 'path'
 import fs from 'fs'
 import { db } from '../db'
-import { config, type InstanceConfig } from '../config'
+import { config } from '../config'
 import { requireAuth, requireAdmin } from '../middleware/auth'
 import { sendDiscordNotification } from '../services/discord'
 import { invalidateCache } from '../services/beammp'
 import { restartViaAgent } from '../services/agent'
+import { getInstance } from '../lib/getInstance'
 import { logActivity } from '../services/activity'
 import {
   readFile, writeFile, uploadFile, deleteFile,
@@ -23,14 +24,6 @@ const IMAGES = config.localImagesPath  // always local Docker volume
 // a typo there breaks connectivity or leaks the server's BeamMP AuthKey —
 // see cybersecurity-expert.md.
 const ALLOWED_CONFIG_KEYS = ['Name', 'Description', 'MaxPlayers', 'MaxCars', 'Private', 'LogChat', 'Tags', 'Debug']
-
-// ── Helper: resolve instance or 404 ───────────────────────────
-
-function getInstance(id: string, reply: FastifyReply): InstanceConfig | null {
-  const inst = config.instances.find(i => i.id === id)
-  if (!inst) { reply.code(404).send({ error: `Instance '${id}' not found` }); return null }
-  return inst
-}
 
 // ── Route registration ─────────────────────────────────────────
 

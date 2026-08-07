@@ -119,6 +119,12 @@ export function getOnlinePlayers(instanceId: string): string[] {
 const caches = new Map<string, { data: ServerStatus; ts: number }>()
 const CACHE_TTL_MS = 15_000
 
+// In-flight de-duplication: several SSE clients on the same instance can
+// hit a cache miss in the same tick (e.g. right after invalidateCache()).
+// Without this, each one would trigger its own public-API + local-API
+// cascade concurrently — a thundering herd proportional to viewer count.
+const inFlight = new Map<string, Promise<ServerStatus>>()
+
 async function getActiveMapFromDb(instanceId: string): Promise<{ map_id: string; name: string } | null> {
   try {
     const res = await db.query(
@@ -148,10 +154,19 @@ async function getConfigFallback(inst: InstanceConfig): Promise<{ maxPlayers: nu
 }
 
 export async function getServerStatus(inst: InstanceConfig): Promise<ServerStatus> {
-  const now = Date.now()
   const cached = caches.get(inst.id)
-  if (cached && now - cached.ts < CACHE_TTL_MS) return cached.data
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data
 
+  const pending = inFlight.get(inst.id)
+  if (pending) return pending
+
+  const promise = fetchServerStatus(inst).finally(() => inFlight.delete(inst.id))
+  inFlight.set(inst.id, promise)
+  return promise
+}
+
+async function fetchServerStatus(inst: InstanceConfig): Promise<ServerStatus> {
+  const now = Date.now()
   let publicListSaysOffline = false
 
   // ── 1. BeamMP public API (primary, when ip+port configured) ──

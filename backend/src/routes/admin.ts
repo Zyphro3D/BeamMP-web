@@ -6,6 +6,7 @@ import sharp from 'sharp'
 import { db } from '../db'
 import { config } from '../config'
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
+import { getInstance } from '../lib/getInstance'
 import { hashPassword } from './auth'
 import { listDir, moveFile, deleteFile, fileExists, ensureDir } from '../services/fileService'
 
@@ -173,8 +174,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       // instanceId optional for back-compat — defaults to the first instance,
       // same pattern as the legacy routes in public.ts.
       const instanceId = req.query.instanceId ?? config.instances[0].id
+      // Capped rather than paginated — this list is a "top players"
+      // leaderboard, not a directory; 200 is already generous for that.
+      // Keeps the response bounded on communities with years of history
+      // instead of shipping (and rendering) every player ever seen.
       const result = await db.query(
-        'SELECT * FROM known_players WHERE instance_id = $1 ORDER BY last_seen DESC NULLS LAST',
+        'SELECT * FROM known_players WHERE instance_id = $1 ORDER BY last_seen DESC NULLS LAST LIMIT 200',
         [instanceId]
       )
       return result.rows
@@ -239,8 +244,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     '/api/admin/i/:instanceId/consistency',
     { preHandler: requireAuth },
     async (req, reply: FastifyReply) => {
-      const inst = config.instances.find(i => i.id === req.params.instanceId)
-      if (!inst) return reply.code(404).send({ error: 'Instance not found' })
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
 
       const clientDir      = path.join(inst.beammp.resourcesPath, 'Client')
       const inactiveModDir = path.join(inst.beammp.resourcesPath, 'inactive_mod')
@@ -253,16 +258,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         [inst.id]
       )
 
-      // ── 2. Gather filesystem state ────────────────────────────
+      // ── 2. Gather filesystem state (parallel, non-blocking) ────
       const [clientFiles, inactiveModFiles, inactiveMapFiles, imageFiles] = await Promise.all([
-        Promise.resolve(listDir(clientDir)),
-        Promise.resolve(listDir(inactiveModDir)),
-        Promise.resolve(listDir(inactiveMapDir)),
-        Promise.resolve(
-          fs.existsSync(imagesDir)
-            ? fs.readdirSync(imagesDir).filter(f => fs.statSync(path.join(imagesDir, f)).isFile())
-            : []
-        ),
+        listDir(clientDir),
+        listDir(inactiveModDir),
+        listDir(inactiveMapDir),
+        listDir(imagesDir),
       ])
 
       const clientSet      = new Set(clientFiles)
@@ -462,8 +463,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     '/api/admin/i/:instanceId/consistency/fix',
     { preHandler: requireAdmin },
     async (req, reply: FastifyReply) => {
-      const inst = config.instances.find(i => i.id === req.params.instanceId)
-      if (!inst) return reply.code(404).send({ error: 'Instance not found' })
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
 
       const { fix, meta } = req.body
       const clientDir = path.join(inst.beammp.resourcesPath, 'Client')
@@ -567,8 +568,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     '/api/admin/i/:instanceId/scan-import',
     { preHandler: requireAdmin },
     async (req, reply) => {
-      const inst = config.instances.find(i => i.id === req.params.instanceId)
-      if (!inst) return reply.code(404).send({ error: 'Instance not found' })
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
 
       type ScanResult = {
         filename: string

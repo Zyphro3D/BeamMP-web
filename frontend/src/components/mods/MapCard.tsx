@@ -33,7 +33,7 @@ export function MapCard({ instanceId, map, activating, onActivate, onDelete, onT
 
         {/* Image */}
         {map.image ? (
-          <img src={`/images/${map.image}`} alt={map.name} className="w-full h-36 object-contain bg-zinc-100 dark:bg-zinc-800/60" />
+          <img src={`/images/${map.image}`} alt={map.name} loading="lazy" className="w-full h-36 object-contain bg-zinc-100 dark:bg-zinc-800/60" />
         ) : (
           <div className="w-full h-36 bg-surface flex flex-col items-center justify-center gap-2">
             <Map size={32} className="text-zinc-600 dark:text-zinc-500" />

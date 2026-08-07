@@ -127,6 +127,14 @@ export async function runMigrations(): Promise<void> {
       END $$;
     `)
 
+    // GET /api/admin/players sorts on (instance_id, last_seen) — the unique
+    // constraint above covers instance_id but not last_seen, so that query
+    // would otherwise fall back to a full scan + sort as the table grows.
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_known_players_instance_last_seen
+      ON known_players (instance_id, last_seen DESC NULLS LAST);
+    `)
+
     console.log('[db] Migrations OK')
   } finally {
     client.release()
