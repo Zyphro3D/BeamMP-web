@@ -230,5 +230,7 @@
   "color_dark_orange": "Naranja oscuro",
   "color_light_pink": "Rosa claro",
   "color_yellow": "Amarillo",
-  "color_white": "Blanco"
+  "color_white": "Blanco",
+  "reset_password": "Restablecer contraseña",
+  "close": "Cerrar"
 }

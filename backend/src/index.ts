@@ -17,7 +17,13 @@ import { adminRoutes }     from './routes/admin'
 import { startLogWatchers } from './services/logWatcher'
 import { hashPassword }     from './routes/auth'
 
-const app = Fastify({ logger: { level: 'info' }, trustProxy: true })
+// trustProxy: false by default — the panel is exposed directly by Docker
+// (no proxy in front unless the operator adds one, cf. README). With
+// trustProxy:true unconditionally, anyone could forge X-Forwarded-For to
+// get a fresh rate-limit bucket on every login attempt. TRUST_PROXY_HOPS=1
+// when there's exactly one reverse proxy (Caddy/Nginx) terminating in front.
+const trustProxyHops = process.env.TRUST_PROXY_HOPS ? parseInt(process.env.TRUST_PROXY_HOPS, 10) : false
+const app = Fastify({ logger: { level: 'info' }, trustProxy: trustProxyHops })
 
 async function main(): Promise<void> {
   // ── Startup security checks ────────────────────────────────────
@@ -64,7 +70,12 @@ async function main(): Promise<void> {
     contentSecurityPolicy: {
       directives: {
         defaultSrc:              ["'self'"],
-        scriptSrc:               ["'self'", "'unsafe-inline'"],
+        // No 'unsafe-inline' here — the Vite build emits a single external
+        // <script src> (verified in frontend/dist/index.html), never an
+        // inline <script>. styleSrc keeps it: React's style={{...}} props
+        // compile to real inline style="" attributes, and per-element
+        // nonces aren't practical for dynamically computed styles.
+        scriptSrc:               ["'self'"],
         styleSrc:                ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         imgSrc:                  ["'self'", 'data:', 'blob:'],
         connectSrc:              ["'self'"],

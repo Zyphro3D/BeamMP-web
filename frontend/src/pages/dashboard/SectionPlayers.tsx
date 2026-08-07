@@ -14,7 +14,8 @@ export function SectionPlayers({ instanceId }: { instanceId: string }) {
     api.adminPlayers(instanceId).then(setPlayers).finally(() => setLoading(false))
   }, [instanceId])
 
-  const sorted = [...players].sort((a, b) => b.total_seconds - a.total_seconds)
+  // Already ranked by total_seconds server-side (GET /api/admin/players) —
+  // re-sorting here would be redundant and could only ever mask a backend bug.
 
   return (
     <div className="space-y-4">
@@ -25,7 +26,7 @@ export function SectionPlayers({ instanceId }: { instanceId: string }) {
 
       {loading ? <p className="text-sm text-zinc-600">{t('loading')}</p> : (
         <div className="card divide-y divide-surface-border">
-          {sorted.map((p, i) => (
+          {players.map((p, i) => (
             <div key={p.id} className="flex items-center gap-3 px-4 py-3">
               <span className="text-zinc-700 text-xs font-mono w-6 text-right shrink-0">#{i+1}</span>
               <Avatar name={p.beammp_username} size={8} />
@@ -38,7 +39,7 @@ export function SectionPlayers({ instanceId }: { instanceId: string }) {
               </div>
             </div>
           ))}
-          {sorted.length === 0 && <p className="p-8 text-center text-zinc-700 text-sm">{t('no_player')}</p>}
+          {players.length === 0 && <p className="p-8 text-center text-zinc-700 text-sm">{t('no_player')}</p>}
         </div>
       )}
     </div>

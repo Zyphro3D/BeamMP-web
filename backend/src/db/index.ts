@@ -127,12 +127,16 @@ export async function runMigrations(): Promise<void> {
       END $$;
     `)
 
-    // GET /api/admin/players sorts on (instance_id, last_seen) — the unique
-    // constraint above covers instance_id but not last_seen, so that query
-    // would otherwise fall back to a full scan + sort as the table grows.
+    // GET /api/admin/players ranks "top players" by total_seconds (not
+    // last_seen — a veteran player who hasn't connected recently should
+    // still show up). The unique constraint above covers instance_id but
+    // not total_seconds, so this query would otherwise fall back to a full
+    // scan + sort as the table grows. Drops the earlier last_seen-based
+    // index (superseded, never a real usage pattern in prod) if present.
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_known_players_instance_last_seen
-      ON known_players (instance_id, last_seen DESC NULLS LAST);
+      DROP INDEX IF EXISTS idx_known_players_instance_last_seen;
+      CREATE INDEX IF NOT EXISTS idx_known_players_instance_total_seconds
+      ON known_players (instance_id, total_seconds DESC);
     `)
 
     console.log('[db] Migrations OK')

@@ -230,5 +230,7 @@
   "color_dark_orange": "Тёмно-оранжевый",
   "color_light_pink": "Светло-розовый",
   "color_yellow": "Жёлтый",
-  "color_white": "Белый"
+  "color_white": "Белый",
+  "reset_password": "Сбросить пароль",
+  "close": "Закрыть"
 }

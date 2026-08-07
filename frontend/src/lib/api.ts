@@ -118,9 +118,14 @@ export const api = {
   // Admin (global)
   requests: () => request<AccountRequest[]>('/api/admin/requests'),
   reviewRequest: (id: number, action: 'approve' | 'reject', password?: string) =>
-    request(`/api/admin/requests/${id}`, {
+    request<{ approved: string } | { rejected: string }>(`/api/admin/requests/${id}`, {
       method: 'POST',
       body: JSON.stringify({ action, password }),
+    }),
+  resetUserPassword: (id: number, password: string) =>
+    request<User>(`/api/admin/users/${id}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password }),
     }),
   adminPlayers: (instanceId: string) => request<KnownPlayer[]>(`/api/admin/players?instanceId=${encodeURIComponent(instanceId)}`),
   adminUsers:   () => request<User[]>('/api/admin/users'),
@@ -193,6 +198,7 @@ export interface User {
 
 export interface KnownPlayer {
   id: number
+  instance_id: string
   beammp_username: string
   connection_count: number
   first_seen: string

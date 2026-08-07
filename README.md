@@ -208,16 +208,20 @@ corrompu, migration de machine) est irréversible.
 ./scripts/backup-postgres.sh /mnt/nas    # ou un dossier externe au host Docker
 ```
 
-À planifier via cron sur l'hôte (pas dans le conteneur) :
+À planifier via cron sur l'hôte (pas dans le conteneur) — chemin absolu vers
+le script obligatoire (cron ne démarre pas dans le dossier du projet), et
+`/var/log/` n'est en général pas accessible en écriture pour un utilisateur
+non-root, d'où un fichier de log dans le dossier du projet plutôt que
+`/var/log/` :
 
 ```cron
-0 3 * * * cd /opt/app-docker/beammp-panel && ./scripts/backup-postgres.sh >> /var/log/beammp-panel-backup.log 2>&1
+0 3 * * * /opt/app-docker/beammp-panel/scripts/backup-postgres.sh >> /opt/app-docker/beammp-panel/backup.log 2>&1
 ```
 
-Restauration :
+Restauration (adapter `$POSTGRES_USER`/`$POSTGRES_DB` à votre `.env` si personnalisés) :
 
 ```bash
-gunzip -c backups/beammp-panel-20260101-030000.sql.gz | docker compose exec -T postgres psql -U beammp beammp
+gunzip -c backups/beammp-panel-20260101-030000.sql.gz | docker compose exec -T postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
 ```
 
 > Testez périodiquement une restauration réelle — une sauvegarde jamais restaurée n'est qu'une hypothèse.

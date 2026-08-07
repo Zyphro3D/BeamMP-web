@@ -101,6 +101,7 @@ export const config = {
     notifyJoin:      process.env.DISCORD_NOTIFY_JOIN      !== 'false',
     notifyLeave:     process.env.DISCORD_NOTIFY_LEAVE     !== 'false',
     notifyModUpload: process.env.DISCORD_NOTIFY_MOD_UPLOAD !== 'false',
+    notifyMapChange: process.env.DISCORD_NOTIFY_MAP_CHANGE !== 'false',
     notifyRestart:   process.env.DISCORD_NOTIFY_RESTART   !== 'false',
   },
 

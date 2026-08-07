@@ -96,7 +96,7 @@ export function SectionMods({ instanceId, mods, vehicles, onRefresh, loading, on
       {/* Zone quick-nav — sticky so both directions are always reachable */}
       <div className="flex gap-2 sticky top-0 z-20 bg-surface py-2 -mx-1 px-1">
         <button onClick={() => vehiclesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors">
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-500/30 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 transition-colors">
           <Car size={12} />{t('vehicles')} ({filteredVehicles.length})
         </button>
         <button onClick={() => modsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -110,7 +110,7 @@ export function SectionMods({ instanceId, mods, vehicles, onRefresh, loading, on
           {/* Véhicules zone */}
           <div ref={vehiclesRef}>
             <div className="flex items-center gap-2 mb-3">
-              <Car size={14} className="text-blue-400" />
+              <Car size={14} className="text-blue-700 dark:text-blue-400" />
               <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">{t('vehicles')}</h2>
               <span className="text-xs text-zinc-600">({filteredVehicles.length})</span>
             </div>

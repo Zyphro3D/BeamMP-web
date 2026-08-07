@@ -230,5 +230,7 @@
   "color_dark_orange": "Dunkelorange",
   "color_light_pink": "Hellrosa",
   "color_yellow": "Gelb",
-  "color_white": "Weiß"
+  "color_white": "Weiß",
+  "reset_password": "Passwort zurücksetzen",
+  "close": "Schließen"
 }

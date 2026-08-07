@@ -14,7 +14,14 @@ const CONFIG_KEY_DEFS = [
   { key: 'Debug',      labelKey: 'debug_label',       type: 'toggle' },
 ]
 
-export function SectionConfig({ instanceId }: { instanceId: string }) {
+interface SectionConfigProps {
+  instanceId: string
+  canRestart: boolean
+  restarting: boolean
+  onRestart: () => void
+}
+
+export function SectionConfig({ instanceId, canRestart, restarting, onRestart }: SectionConfigProps) {
   const { t } = useI18n()
   const [cfg, setCfg]     = useState<Record<string,string>>({})
   const [name, setName]   = useState('')
@@ -24,7 +31,6 @@ export function SectionConfig({ instanceId }: { instanceId: string }) {
   const [saved, setSaved]     = useState(false)
   const [error, setError]     = useState('')
   const [logs, setLogs]       = useState<string[]>([])
-  const [restarting, setRestarting] = useState(false)
   const logsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -54,21 +60,14 @@ export function SectionConfig({ instanceId }: { instanceId: string }) {
     finally { setSaving(false) }
   }
 
-  const restart = async () => {
-    if (!confirm(t('confirm_restart'))) return
-    setRestarting(true)
-    await api.restartServer(instanceId).catch(console.error)
-    setRestarting(false)
-  }
-
   const copyLogs = () => navigator.clipboard.writeText(logs.join('\n'))
 
   const logColor = (l: string) =>
-    l.includes('ERROR') ? 'text-red-400' :
-    l.includes('WARN') ? 'text-yellow-400' :
-    l.includes('Connected') ? 'text-green-400' :
-    l.includes('Disconnected') ? 'text-orange-400' :
-    'text-zinc-400'
+    l.includes('ERROR') ? 'text-red-600 dark:text-red-400' :
+    l.includes('WARN') ? 'text-yellow-600 dark:text-yellow-400' :
+    l.includes('Connected') ? 'text-green-600 dark:text-green-400' :
+    l.includes('Disconnected') ? 'text-orange-600 dark:text-orange-400' :
+    'text-zinc-600 dark:text-zinc-400'
 
   if (loading) return <p className="text-sm text-zinc-600">{t('loading')}</p>
 
@@ -123,8 +122,8 @@ export function SectionConfig({ instanceId }: { instanceId: string }) {
           {logs.length === 0 ? <span className="text-zinc-700">{t('no_log')}</span> :
             logs.map((l, i) => <div key={i} className={logColor(l)}>{l}</div>)}
         </div>
-        <div className="p-3 border-t border-surface-border shrink-0">
-          <button onClick={restart} disabled={restarting} className="btn-danger w-full justify-center">
+        <div className="p-3 border-t border-surface-border shrink-0" title={!canRestart ? t('restart_not_configured') : undefined}>
+          <button onClick={onRestart} disabled={restarting || !canRestart} className="btn-danger w-full justify-center disabled:opacity-40 disabled:cursor-not-allowed">
             <RotateCcw size={13} />
             {restarting ? t('restarting') : t('restart_server')}
           </button>

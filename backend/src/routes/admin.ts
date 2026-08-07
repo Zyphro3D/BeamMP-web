@@ -137,8 +137,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ error: 'Password required (min 8 chars)' })
         }
         const hash = await hashPassword(password)
+        // Least privilege: self-service accounts start as moderator
+        // (read-only). Promotion to admin is a deliberate SuperAdmin action
+        // via PATCH /api/admin/users/:id/role, not the default.
         const inserted = await db.query(
-          `INSERT INTO users (username, password, role) VALUES ($1, $2, 'admin')
+          `INSERT INTO users (username, password, role) VALUES ($1, $2, 'moderator')
            ON CONFLICT (username) DO NOTHING RETURNING id`,
           [request.beammp_username, hash]
         )
@@ -174,12 +177,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       // instanceId optional for back-compat — defaults to the first instance,
       // same pattern as the legacy routes in public.ts.
       const instanceId = req.query.instanceId ?? config.instances[0].id
-      // Capped rather than paginated — this list is a "top players"
-      // leaderboard, not a directory; 200 is already generous for that.
-      // Keeps the response bounded on communities with years of history
-      // instead of shipping (and rendering) every player ever seen.
+      // "Top players" = ranked by playtime, not by recency — sorting here
+      // and capping at 200 means the frontend never has to re-sort, and a
+      // veteran player who hasn't connected in a while doesn't fall out of
+      // the list just because 200 more-recent-but-shorter sessions exist.
       const result = await db.query(
-        'SELECT * FROM known_players WHERE instance_id = $1 ORDER BY last_seen DESC NULLS LAST LIMIT 200',
+        'SELECT * FROM known_players WHERE instance_id = $1 ORDER BY total_seconds DESC LIMIT 200',
         [instanceId]
       )
       return result.rows
@@ -208,6 +211,29 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       const result = await db.query(
         'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, role',
         [role, req.params.id]
+      )
+      if (!result.rows[0]) return reply.code(404).send({ error: 'Not found' })
+      return result.rows[0]
+    }
+  )
+
+  // Only way to fix a lost password before this was delete-then-recreate the
+  // account (losing created_at/history) or editing the DB directly.
+  app.patch<{
+    Params: { id: string }
+    Body: { password: string }
+  }>(
+    '/api/admin/users/:id/password',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const { password } = req.body
+      if (!password || password.length < 8) {
+        return reply.code(400).send({ error: 'Password required (min 8 chars)' })
+      }
+      const hash = await hashPassword(password)
+      const result = await db.query(
+        'UPDATE users SET password = $1 WHERE id = $2 RETURNING id, username, role',
+        [hash, req.params.id]
       )
       if (!result.rows[0]) return reply.code(404).send({ error: 'Not found' })
       return result.rows[0]
@@ -453,6 +479,17 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const resolvedRoot = path.resolve(root)
     const target = path.resolve(resolvedRoot, name)
     if (target !== resolvedRoot && !target.startsWith(resolvedRoot + path.sep)) return null
+
+    // Lexical containment isn't enough if a symlink inside the root points
+    // outside it — nothing in the app writes such a symlink today, but this
+    // is cheap insurance against that changing later.
+    try {
+      const realRoot   = fs.realpathSync(resolvedRoot)
+      const realTarget = fs.realpathSync(target)
+      if (realTarget !== realRoot && !realTarget.startsWith(realRoot + path.sep)) return null
+    } catch {
+      // Target doesn't exist yet — nothing to resolve, lexical check above stands.
+    }
     return target
   }
 
@@ -590,17 +627,21 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         { dir: path.join(rp, 'inactive_map'), active: false, dirKey: 'inactive_map' },
       ]
 
+      // One query for every already-known filename instead of one per file
+      // in the scan loop below — same pattern already used by the
+      // consistency-check endpoint.
+      const existingRows = await db.query(
+        'SELECT filename FROM mods WHERE instance_id = $1',
+        [inst.id]
+      )
+      const existingFilenames = new Set<string>(existingRows.rows.map(r => r.filename))
+
       for (const { dir, active, dirKey } of dirs) {
         if (!fs.existsSync(dir)) continue
         const files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.zip'))
 
         for (const filename of files) {
-          // Skip if already in DB
-          const existing = await db.query(
-            'SELECT id FROM mods WHERE instance_id = $1 AND filename = $2',
-            [inst.id, filename]
-          )
-          if (existing.rows.length > 0) {
+          if (existingFilenames.has(filename)) {
             results.push({ filename, hasImage: false, status: 'skipped' })
             continue
           }
@@ -620,6 +661,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
                ON CONFLICT (instance_id, filename) DO NOTHING`,
               [inst.id, analysis.name, analysis.type, filename, analysis.imageFilename, active]
             )
+            existingFilenames.add(filename)
 
             results.push({
               filename,

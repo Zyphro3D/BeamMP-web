@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { KeyRound, Trash2 } from 'lucide-react'
 import { api, type AccountRequest, type User } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { Avatar } from '../../components/ui/Avatar'
@@ -11,7 +11,9 @@ export function SectionAdmin() {
   const [requests, setRequests] = useState<AccountRequest[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [reviewing, setReviewing] = useState<AccountRequest | null>(null)
+  const [resettingUser, setResettingUser] = useState<User | null>(null)
   const [password, setPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [error, setError] = useState('')
   const me = getStoredUser()
 
@@ -30,6 +32,12 @@ export function SectionAdmin() {
   const removeUser = async (u: User) => {
     if (!confirm(t('confirm_delete_user'))) return
     await api.deleteUser(u.id).then(refresh).catch(err => setError(err instanceof Error ? err.message : t('error')))
+  }
+
+  const resetPassword = async () => {
+    if (!resettingUser) return; setError('')
+    try { await api.resetUserPassword(resettingUser.id, newPassword); setResettingUser(null); setNewPassword('') }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : t('error')) }
   }
 
   const pending = requests.filter(r => r.status === 'pending')
@@ -76,6 +84,11 @@ export function SectionAdmin() {
                 <option value="admin">admin</option>
                 <option value="moderator">moderator</option>
               </select>
+              <button onClick={() => { setResettingUser(u); setError('') }}
+                className="p-1.5 text-zinc-500 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                title={t('reset_password')} aria-label={t('reset_password')}>
+                <KeyRound size={13} />
+              </button>
               {me?.id !== u.id && (
                 <button onClick={() => removeUser(u)}
                   className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -104,6 +117,19 @@ export function SectionAdmin() {
               <button onClick={() => review('approve')} disabled={!password || password.length < 8} className="btn-accent flex-1 justify-center">{t('approve')}</button>
               <button onClick={() => review('reject')} className="btn-danger flex-1 justify-center">{t('reject')}</button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {resettingUser && (
+        <Modal title={`${t('reset_password')} — ${resettingUser.username}`} onClose={() => { setResettingUser(null); setNewPassword('') }}>
+          <div className="space-y-4">
+            {error && <p className="text-xs text-red-400">{error}</p>}
+            <div className="space-y-1">
+              <label htmlFor="new-password" className="text-xs text-zinc-400">{t('initial_password_min')}</label>
+              <input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder={t('initial_password_min')} className="input" />
+            </div>
+            <button onClick={resetPassword} disabled={!newPassword || newPassword.length < 8} className="btn-accent w-full justify-center">{t('save')}</button>
           </div>
         </Modal>
       )}

@@ -25,7 +25,7 @@ export function MapCard({ instanceId, map, activating, onActivate, onDelete, onT
         <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
           {map.active && <span className="badge-green text-[10px]">● {t('active')}</span>}
           {map.is_official && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-400 text-[10px] font-medium">
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-700 dark:text-blue-400 text-[10px] font-medium">
               <Shield size={9} />{t('official')}
             </span>
           )}
@@ -55,7 +55,7 @@ export function MapCard({ instanceId, map, activating, onActivate, onDelete, onT
           <div className="flex items-center gap-1 pt-1">
             {/* Toggle official */}
             <button onClick={() => onToggleOfficial(map)}
-              className={`p-1.5 rounded-lg transition-colors ${map.is_official ? 'text-blue-400 bg-blue-500/10 hover:bg-blue-500/20' : 'text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10'}`}
+              className={`p-1.5 rounded-lg transition-colors ${map.is_official ? 'text-blue-700 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20' : 'text-zinc-500 hover:text-blue-700 dark:hover:text-blue-400 hover:bg-blue-500/10'}`}
               title={map.is_official ? t('unmark_official') : t('mark_official')} aria-label={map.is_official ? t('unmark_official') : t('mark_official')}>
               <Shield size={12} />
             </button>

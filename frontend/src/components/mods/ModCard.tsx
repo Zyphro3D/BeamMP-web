@@ -45,7 +45,7 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
               title={t('edit_description')} aria-label={t('edit_description')}>
               <Pencil size={12} />
             </button>
-            <Toggle checked={mod.active} onChange={onToggle} />
+            <Toggle checked={mod.active} onChange={onToggle} label={mod.name} />
             <button onClick={onDelete}
               className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
               title={t('delete')} aria-label={t('delete')}>

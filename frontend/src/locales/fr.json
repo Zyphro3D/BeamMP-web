@@ -230,5 +230,7 @@
   "color_dark_orange": "Orange foncé",
   "color_light_pink": "Rose clair",
   "color_yellow": "Jaune",
-  "color_white": "Blanc"
+  "color_white": "Blanc",
+  "reset_password": "Réinitialiser le mot de passe",
+  "close": "Fermer"
 }

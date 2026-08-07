@@ -12,21 +12,21 @@ export function IssueRow({ issue, issueTypeLabel, fixing, fixError, onFix }: {
   const { t } = useI18n()
   return (
     <div className="p-3 flex items-start gap-3">
-      <div className={`mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+      <div className={`mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
         {issue.severity === 'error' ? <AlertCircle size={14} /> : <AlertTriangle size={14} />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
             issue.severity === 'error'
-              ? 'bg-red-500/15 text-red-400'
-              : 'bg-yellow-500/15 text-yellow-400'
+              ? 'bg-red-500/15 text-red-700 dark:text-red-400'
+              : 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400'
           }`}>
             {issueTypeLabel[issue.type]}
           </span>
         </div>
         <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-1">{issue.description}</p>
-        {fixError && <p className="text-[11px] text-red-400 mt-0.5">{fixError}</p>}
+        {fixError && <p className="text-[11px] text-red-600 dark:text-red-400 mt-0.5">{fixError}</p>}
       </div>
       {issue.fix && (
         <button onClick={onFix} disabled={fixing}

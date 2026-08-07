@@ -12,3 +12,4 @@ migrate/players.json
 migrate/users.json
 migrate/descriptions/
 backups/
+backup.log

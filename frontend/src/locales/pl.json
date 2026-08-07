@@ -230,5 +230,7 @@
   "color_dark_orange": "Ciemnopomarańczowy",
   "color_light_pink": "Jasnoróżowy",
   "color_yellow": "Żółty",
-  "color_white": "Biały"
+  "color_white": "Biały",
+  "reset_password": "Zresetuj hasło",
+  "close": "Zamknij"
 }

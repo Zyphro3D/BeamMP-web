@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Power } from 'lucide-react'
 import { api, type Mod, type InstanceInfo } from '../../lib/api'
 import { Sidebar, type AdminSection } from '../../components/layout/Sidebar'
+import { ErrorBanner } from '../../components/ui/ErrorBanner'
 import { getStoredUser } from '../../lib/auth'
 import { useI18n } from '../../context/I18nContext'
 import { SectionDashboard } from './SectionDashboard'
@@ -14,12 +15,28 @@ import { SectionConsistency } from './SectionConsistency'
 import { SectionScanImport } from './SectionScanImport'
 import { SectionAdmin } from './SectionAdmin'
 
+// One entry per AdminSection — a new section that forgets to appear here is
+// a type error, not a silent fallback to the wrong title (which is exactly
+// what happened to 'import' before this was a Record).
+const SECTION_TITLES: Record<AdminSection, string> = {
+  dashboard:   'nav_dashboard',
+  mods:        'section_mods',
+  maps:        'section_maps',
+  players:     'section_players',
+  upload:      'section_upload',
+  config:      'nav_config',
+  consistency: 'consistency_title',
+  import:      'nav_import',
+  admin:       'nav_admin',
+}
+
 export function Dashboard() {
   const { t } = useI18n()
   const [section, setSection]     = useState<AdminSection>('dashboard')
   const [mods, setMods]           = useState<Mod[]>([])
   const [loading, setLoading]     = useState(true)
   const [restarting, setRestarting] = useState(false)
+  const [restartError, setRestartError] = useState('')
   const [needsRestart, setNeedsRestart] = useState(false)
   const [instances, setInstances] = useState<InstanceInfo[]>([])
   const [instanceId, setInstanceId] = useState<string>('')
@@ -53,9 +70,15 @@ export function Dashboard() {
     if (!canRestart) return
     if (!confirm(t('confirm_restart'))) return
     setRestarting(true)
-    try { await api.restartServer(instanceId) } catch { /* ignore */ }
-    setRestarting(false)
-    setNeedsRestart(false)
+    setRestartError('')
+    try {
+      await api.restartServer(instanceId)
+      setNeedsRestart(false)
+    } catch (err: unknown) {
+      setRestartError(err instanceof Error ? err.message : t('error'))
+    } finally {
+      setRestarting(false)
+    }
   }
 
   if (!instanceId) return (
@@ -80,14 +103,7 @@ export function Dashboard() {
               </select>
             )}
             <h1 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 capitalize">
-              {section === 'dashboard'    ? t('nav_dashboard')
-                : section === 'mods'     ? t('section_mods')
-                : section === 'maps'     ? t('section_maps')
-                : section === 'players'  ? t('section_players')
-                : section === 'upload'   ? t('section_upload')
-                : section === 'config'   ? t('nav_config')
-                : section === 'consistency' ? t('consistency_title')
-                : t('nav_admin')}
+              {t(SECTION_TITLES[section])}
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -111,12 +127,17 @@ export function Dashboard() {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-5">
+          {restartError && (
+            <div className="mb-4">
+              <ErrorBanner message={restartError} onDismiss={() => setRestartError('')} />
+            </div>
+          )}
           {section === 'dashboard' && <SectionDashboard instanceId={instanceId} mods={mods} maps={maps} vehicles={vehicles} loading={loading} />}
           {section === 'mods'      && <SectionMods instanceId={instanceId} mods={modList} vehicles={vehicles} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'maps'      && <SectionMaps instanceId={instanceId} maps={maps} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'players'   && <SectionPlayers instanceId={instanceId} />}
           {section === 'upload'       && <SectionUpload instanceId={instanceId} onRefresh={refresh} />}
-          {section === 'config'       && <SectionConfig instanceId={instanceId} />}
+          {section === 'config'       && <SectionConfig instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={handleRestart} />}
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}
           {section === 'import'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionScanImport instanceId={instanceId} onRefresh={refresh} />}
           {section === 'admin'        && user?.role === 'superadmin' && <SectionAdmin />}

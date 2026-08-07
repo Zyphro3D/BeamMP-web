@@ -10,7 +10,7 @@ import { restartViaAgent } from '../services/agent'
 import { getInstance } from '../lib/getInstance'
 import { logActivity } from '../services/activity'
 import {
-  readFile, writeFile, uploadFile, deleteFile,
+  readFile, readFileAsync, writeFile, uploadFile, deleteFile,
   moveFile, fileExists, ensureDir,
 } from '../services/fileService'
 import sharp from 'sharp'
@@ -195,6 +195,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     '/api/i/:instanceId/mods/:id/official',
     { preHandler: requireAdmin },
     async (req, reply) => {
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
       const result = await db.query(
         'UPDATE mods SET is_official = NOT is_official WHERE id = $1 AND instance_id = $2 RETURNING *',
         [req.params.id, req.params.instanceId]
@@ -210,6 +212,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     '/api/i/:instanceId/mods/:id/description',
     { preHandler: requireAdmin },
     async (req, reply) => {
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
       const { lang, text } = req.body as { lang: string; text: string }
       if (!lang || !/^[a-z]{2,5}$/.test(lang)) {
         return reply.code(400).send({ error: 'lang must be a 2-5 char code (fr, en, de…)' })
@@ -325,6 +329,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
       invalidateCache(inst.id)
       logActivity(inst.id, 'map_change', `Carte changée → ${newMap.name}`)
+      await sendDiscordNotification('map_change', `Nouvelle carte active : **${newMap.name}**`)
       return { activated: map_id, needsRestart: true }
     }
   )
@@ -369,7 +374,10 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       for (const [key, rawValue] of Object.entries(req.body)) {
         // Strip \r\n — otherwise a value could inject a whole new TOML line
         // (e.g. a bogus AuthKey) past the key whitelist above.
-        const value   = String(rawValue).replace(/[\r\n]/g, '')
+        // U+2028/U+2029 are line terminators for JS's /m regex flag (used to
+        // re-match this key on a future PATCH) though not for TOML itself —
+        // stripped anyway so a relecture never desyncs from what's on disk.
+        const value   = String(rawValue).replace(/[\r\n\u2028\u2029]/g, '')
         const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
         const re = new RegExp(`^${key}\\s*=\\s*.+$`, 'm')
         if (re.test(content)) {
@@ -395,7 +403,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return
 
-      const content = readFile(inst.beammp.logPath)
+      const content = await readFileAsync(inst.beammp.logPath)
       if (!content) return { lines: [] }
       const parsed = parseInt(req.query.lines ?? '100', 10)
       const n = Number.isFinite(parsed) && parsed > 0 ? parsed : 100
@@ -411,7 +419,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { instanceId: string } }>(
     '/api/i/:instanceId/server/restart',
-    { preHandler: requireAdmin },
+    {
+      preHandler: requireAdmin,
+      // A compromised admin session (XSS, stolen cookie) shouldn't be able
+      // to flap the game server in a loop — same rationale as the login limit.
+      config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
+    },
     async (req, reply: FastifyReply) => {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return

@@ -1,6 +1,6 @@
 import { config } from '../config'
 
-type EventType = 'player_join' | 'player_leave' | 'mod_upload' | 'server_restart'
+type EventType = 'player_join' | 'player_leave' | 'mod_upload' | 'map_change' | 'server_restart'
 
 interface DiscordPayload {
   username: string
@@ -16,6 +16,7 @@ const COLORS = {
   player_join: 0x57f287,
   player_leave: 0xed4245,
   mod_upload: 0x5865f2,
+  map_change: 0x5865f2,
   server_restart: 0xfee75c,
 }
 
@@ -23,6 +24,7 @@ const TITLES = {
   player_join: '🟢 Joueur connecté',
   player_leave: '🔴 Joueur déconnecté',
   mod_upload: '📦 Nouveau mod uploadé',
+  map_change: '🗺️ Carte changée',
   server_restart: '🔄 Serveur redémarré',
 }
 
@@ -32,7 +34,7 @@ function getWebhookUrl(event: EventType): string {
   const d = config.discord
   if (event === 'server_restart') return d.webhookRestart || d.webhookUrl
   if (event === 'player_join' || event === 'player_leave') return d.webhookPlayers || d.webhookUrl
-  if (event === 'mod_upload') return d.webhookMods || d.webhookUrl
+  if (event === 'mod_upload' || event === 'map_change') return d.webhookMods || d.webhookUrl
   return d.webhookUrl
 }
 
@@ -47,6 +49,7 @@ export async function sendDiscordNotification(
   if (event === 'player_join'    && !config.discord.notifyJoin) return
   if (event === 'player_leave'   && !config.discord.notifyLeave) return
   if (event === 'mod_upload'     && !config.discord.notifyModUpload) return
+  if (event === 'map_change'     && !config.discord.notifyMapChange) return
   if (event === 'server_restart' && !config.discord.notifyRestart) return
 
   const payload: DiscordPayload = {

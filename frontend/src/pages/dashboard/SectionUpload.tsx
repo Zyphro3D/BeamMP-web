@@ -82,6 +82,24 @@ export function SectionUpload({ instanceId, onRefresh }: { instanceId: string; o
 
   const removeFromQueue = (idx: number) => setQueue(q => q.filter((_, i) => i !== idx))
 
+  // Each upload triggers a CPU-bound sharp() resize server-side — capped at
+  // 2 concurrent so dropping a large batch doesn't saturate the backend's
+  // single Node event loop for every other user of the panel.
+  const UPLOAD_CONCURRENCY = 2
+  const uploadAll = async () => {
+    const pendingIdx = queue.reduce<number[]>((acc, item, i) => {
+      if (item.status === 'pending') acc.push(i)
+      return acc
+    }, [])
+    let cursor = 0
+    const worker = async () => {
+      while (cursor < pendingIdx.length) {
+        await doUpload(pendingIdx[cursor++])
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, pendingIdx.length) }, worker))
+  }
+
   const pendingCount = queue.filter(q => q.status === 'pending').length
 
   return (
@@ -225,7 +243,7 @@ export function SectionUpload({ instanceId, onRefresh }: { instanceId: string; o
           ))}
 
           {pendingCount > 1 && (
-            <button onClick={() => queue.forEach((_, i) => doUpload(i))}
+            <button onClick={uploadAll}
               className="btn-accent w-full justify-center text-sm">
               <Upload size={14} />{t('upload_all')} ({pendingCount})
             </button>

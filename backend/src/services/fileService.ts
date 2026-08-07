@@ -18,6 +18,19 @@ export function readFile(filePath: string, binary = false): string | Buffer {
   return binary ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8')
 }
 
+// Async variant for GET /logs — polled every 5s while the Config tab is
+// open. The sync readFile() above is fine for one-off reads (config forms,
+// startup), but a blocking read+split of a large Server.log on a 5s timer,
+// multiplied by every admin with that tab open, stalls the event loop for
+// every other request in flight.
+export async function readFileAsync(filePath: string): Promise<string> {
+  try {
+    return await fs.promises.readFile(filePath, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
 export function writeFile(filePath: string, content: string): void {
   fs.writeFileSync(filePath, content, 'utf8')
 }

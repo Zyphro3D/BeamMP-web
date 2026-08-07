@@ -5,8 +5,10 @@ import { getStoredUser, clearAuth } from '../../lib/auth'
 import { useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { LangToggle } from '../ui/LangToggle'
+import { Avatar } from '../ui/Avatar'
 import { useI18n } from '../../context/I18nContext'
 import { api, type ServerInfo } from '../../lib/api'
+import { formatUptimeMs } from '../../lib/format'
 
 export type AdminSection =
   | 'dashboard' | 'mods' | 'maps' | 'players'
@@ -17,27 +19,6 @@ interface Props {
   onSection: (s: AdminSection) => void
   modCount?: number
   instanceId?: string
-}
-
-function formatUptime(ms?: number): string {
-  if (!ms) return '—'
-  const h = Math.floor(ms / 3600000)
-  const m = Math.floor((ms % 3600000) / 60000)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
-
-function Avatar({ name }: { name: string }) {
-  const colors = [
-    'bg-orange-500', 'bg-blue-500', 'bg-green-500',
-    'bg-purple-500', 'bg-pink-500', 'bg-cyan-500',
-  ]
-  const color = colors[name.charCodeAt(0) % colors.length]
-  return (
-    <div className={`w-7 h-7 rounded-full ${color} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
-      {name[0].toUpperCase()}
-    </div>
-  )
 }
 
 export function Sidebar({ section, onSection, modCount, instanceId = 'default' }: Props) {
@@ -100,7 +81,7 @@ export function Sidebar({ section, onSection, modCount, instanceId = 'default' }
         </div>
         {status.uptimeMs && status.uptimeMs > 0 && (
           <p className="text-[10px] text-zinc-400 dark:text-zinc-600 mt-0.5">
-            {t('uptime')} {formatUptime(status.uptimeMs)}
+            {t('uptime')} {formatUptimeMs(status.uptimeMs)}
           </p>
         )}
       </div>
