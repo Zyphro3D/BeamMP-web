@@ -1,0 +1,62 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      # Chemins dans le conteneur — indépendants des chemins hôte du .env.
+      # Les volumes ci-dessous mappent les chemins hôte (depuis .env) vers ces chemins fixes.
+      BEAMMP_RESOURCES_PATH: /beammp/resources
+      BEAMMP_LOG_PATH: /beammp/server.log
+      BEAMMP_CONFIG_PATH: /beammp/ServerConfig.toml
+    volumes:
+      - app_images:/app/images
+      - ${BEAMMP_RESOURCES_PATH}:/beammp/resources
+      - ${BEAMMP_LOG_PATH}:/beammp/server.log:ro
+      - ${BEAMMP_CONFIG_PATH}:/beammp/ServerConfig.toml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/info || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-beammp}
+      POSTGRES_USER:     ${POSTGRES_USER:-beammp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beammp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beammp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+volumes:
+  postgres_data:
+  app_images:

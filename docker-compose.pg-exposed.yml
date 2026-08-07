@@ -1,0 +1,8 @@
+# Expose PostgreSQL sur le port 5432 de l'hôte.
+# Utile pour lancer le script de migration depuis l'extérieur du conteneur.
+# Usage : docker compose -f docker-compose.yml -f docker-compose.pg-exposed.yml up -d
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"

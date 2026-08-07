@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ── Light mode (default) ── */
+  :root {
+    --surface:        #fafafa;
+    --surface-raised: #f4f4f5;
+    --surface-card:   #ffffff;
+    --surface-border: #e4e4e7;
+    color-scheme: light;
+  }
+
+  /* ── Dark mode ── */
+  .dark {
+    --surface:        #09090b;
+    --surface-raised: #111113;
+    --surface-card:   #18181b;
+    --surface-border: #27272a;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-surface font-sans antialiased text-zinc-800 dark:text-zinc-100;
+  }
+
+  * { @apply border-surface-border; }
+
+  ::-webkit-scrollbar { @apply w-1.5; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-zinc-300 dark:bg-zinc-700 rounded-full;
+  }
+}
+
+@layer components {
+  /* Cards */
+  .card {
+    @apply bg-surface-card border border-surface-border rounded-xl;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium text-sm transition-all
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-accent
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-accent {
+    @apply btn bg-accent text-white hover:bg-accent-hover active:scale-95;
+  }
+  .btn-ghost {
+    @apply btn
+           bg-zinc-100 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900
+           dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white
+           active:scale-95;
+  }
+  .btn-danger {
+    @apply btn
+           bg-red-500/10 text-red-600 hover:bg-red-500/20
+           dark:text-red-400
+           active:scale-95;
+  }
+
+  /* Inputs */
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-surface-border text-sm
+           bg-white text-zinc-900 placeholder-zinc-400
+           dark:bg-surface-raised dark:text-zinc-100 dark:placeholder-zinc-600
+           focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+  .badge-green  { @apply badge bg-green-500/15 text-green-700 dark:text-green-400; }
+  .badge-red    { @apply badge bg-red-500/15 text-red-700 dark:text-red-400; }
+  .badge-orange { @apply badge bg-accent/15 text-orange-700 dark:text-accent; }
+  .badge-blue   { @apply badge bg-blue-500/15 text-blue-700 dark:text-blue-400; }
+  .badge-zinc   { @apply badge bg-zinc-500/15 text-zinc-600 dark:text-zinc-400; }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+           text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100
+           dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/5
+           cursor-pointer;
+  }
+  .nav-item.active {
+    @apply bg-accent/15 text-accent;
+  }
+
+  /* Toggle switch */
+  .toggle {
+    @apply relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full
+           border-2 border-transparent transition-colors duration-200
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-accent;
+  }
+  .toggle-thumb {
+    @apply pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow
+           transition-transform duration-200;
+  }
+
+  /* Section label */
+  .section-label {
+    @apply px-3 text-[10px] font-semibold uppercase tracking-widest
+           text-zinc-400 dark:text-zinc-600 mb-1;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply card p-4 flex flex-col gap-1;
+  }
+}

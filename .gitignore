@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Fichiers de migration V1 (données personnelles, ne pas versionner)
+migrate/dump.sql
+migrate/mods.tsv
+migrate/players.tsv
+migrate/mods.json
+migrate/players.json
+migrate/users.json
+migrate/descriptions/
