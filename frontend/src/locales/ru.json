@@ -147,6 +147,8 @@
   "max_cars_label": "Макс. машин/игрок",
   "private_label": "Приватный сервер",
   "log_chat_label": "Логировать чат",
+  "tags_label": "Теги",
+  "debug_label": "Режим отладки",
   "theme_light": "Светлая тема",
   "theme_dark": "Тёмная тема",
   "logout": "Выйти",
@@ -186,7 +188,6 @@
   "active_map_label": "Активная карта",
   "page_title_mods": "Управление модами",
   "new_line": "↵ новая строка",
-
   "nav_import": "Импорт",
   "import_title": "Scan & Import",
   "import_desc": "Сканирует Client/, inactive_mod/ и inactive_map/ и автоматически создаёт записи в базе данных для незарегистрированных модов/карт.",

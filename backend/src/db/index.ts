@@ -19,11 +19,13 @@ export async function runMigrations(): Promise<void> {
 
       CREATE TABLE IF NOT EXISTS known_players (
         id               SERIAL PRIMARY KEY,
-        beammp_username  VARCHAR(100) UNIQUE NOT NULL,
+        instance_id      VARCHAR(50)  NOT NULL DEFAULT 'default',
+        beammp_username  VARCHAR(100) NOT NULL,
         connection_count INTEGER NOT NULL DEFAULT 0,
         first_seen       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         last_seen        TIMESTAMPTZ,
-        total_seconds    INTEGER NOT NULL DEFAULT 0
+        total_seconds    INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (instance_id, beammp_username)
       );
 
       CREATE TABLE IF NOT EXISTS account_requests (
@@ -94,6 +96,33 @@ export async function runMigrations(): Promise<void> {
         ) THEN
           ALTER TABLE mods ADD COLUMN is_official BOOLEAN NOT NULL DEFAULT false;
           RAISE NOTICE 'is_official column added to mods';
+        END IF;
+
+        -- add instance_id to known_players if missing (pre-existing installs)
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'known_players' AND column_name = 'instance_id'
+        ) THEN
+          ALTER TABLE known_players ADD COLUMN instance_id VARCHAR(50) NOT NULL DEFAULT 'default';
+          RAISE NOTICE 'instance_id column added to known_players';
+        END IF;
+
+        -- known_players used to be unique on beammp_username alone — now
+        -- unique per (instance_id, beammp_username), same pattern as mods.
+        IF EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name = 'known_players' AND constraint_name = 'known_players_beammp_username_key'
+        ) THEN
+          ALTER TABLE known_players DROP CONSTRAINT known_players_beammp_username_key;
+          RAISE NOTICE 'Dropped old unique constraint known_players_beammp_username_key';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name = 'known_players' AND constraint_name = 'known_players_instance_id_beammp_username_key'
+        ) THEN
+          ALTER TABLE known_players ADD CONSTRAINT known_players_instance_id_beammp_username_key UNIQUE (instance_id, beammp_username);
+          RAISE NOTICE 'Added unique constraint known_players_instance_id_beammp_username_key';
         END IF;
       END $$;
     `)

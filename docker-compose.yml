@@ -23,7 +23,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/info || exit 1"]
+      # 127.0.0.1, pas localhost : busybox wget résout localhost en ::1 dans
+      # l'image alpine, alors que Fastify n'écoute qu'en IPv4 — avec
+      # "localhost" le healthcheck échoue en boucle même quand l'app tourne.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/info || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

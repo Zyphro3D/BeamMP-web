@@ -3,9 +3,10 @@ import path from 'path'
 import fs from 'fs'
 import { db } from '../db'
 import { config, type InstanceConfig } from '../config'
-import { requireAuth } from '../middleware/auth'
+import { requireAuth, requireAdmin } from '../middleware/auth'
 import { sendDiscordNotification } from '../services/discord'
 import { invalidateCache } from '../services/beammp'
+import { restartViaAgent } from '../services/agent'
 import { logActivity } from '../services/activity'
 import {
   readFile, writeFile, uploadFile, deleteFile,
@@ -14,6 +15,14 @@ import {
 import sharp from 'sharp'
 
 const IMAGES = config.localImagesPath  // always local Docker volume
+
+// Whitelist shared by GET (filter) and PATCH (validate) so the panel can
+// never leak or write a ServerConfig.toml key outside this list. Tags/Debug
+// are safe to expose (cosmetic / diagnostic). Port, AuthKey, IP,
+// ResourceFolder, InformationPacket and AllowGuests stay OUT deliberately:
+// a typo there breaks connectivity or leaks the server's BeamMP AuthKey —
+// see cybersecurity-expert.md.
+const ALLOWED_CONFIG_KEYS = ['Name', 'Description', 'MaxPlayers', 'MaxCars', 'Private', 'LogChat', 'Tags', 'Debug']
 
 // ── Helper: resolve instance or 404 ───────────────────────────
 
@@ -43,7 +52,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { instanceId: string } }>(
     '/api/i/:instanceId/mods/upload',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return
@@ -81,6 +90,17 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       if (!safeFilename || safeFilename.startsWith('.')) {
         return reply.code(400).send({ error: 'Nom de fichier invalide' })
       }
+
+      // Check the DB *before* touching the filesystem — writing first would
+      // silently overwrite an existing mod's file on a filename collision.
+      const existingMod = await db.query(
+        'SELECT id FROM mods WHERE instance_id = $1 AND filename = $2',
+        [inst.id, safeFilename]
+      )
+      if (existingMod.rows.length > 0) {
+        return reply.code(409).send({ error: `Un mod avec le fichier "${safeFilename}" existe déjà` })
+      }
+
       const destPath = path.join(destDir, safeFilename)
       uploadFile(destPath, buffer)
 
@@ -110,10 +130,19 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { instanceId: string; id: string } }>(
     '/api/i/:instanceId/mods/:id/toggle',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return
+
+      // Maps have exactly one "active" slot managed by /maps/activate — a
+      // plain toggle would leave the DB with 0 or 2+ active maps, exactly
+      // the inconsistency the consistency-scan endpoint exists to catch.
+      const typeCheck = await db.query('SELECT type FROM mods WHERE id = $1 AND instance_id = $2', [req.params.id, inst.id])
+      if (!typeCheck.rows[0]) return reply.code(404).send({ error: 'Not found' })
+      if (typeCheck.rows[0].type === 'map') {
+        return reply.code(400).send({ error: 'Use /maps/activate to change the active map instead of toggling it' })
+      }
 
       const result = await db.query(
         'UPDATE mods SET active = NOT active WHERE id = $1 AND instance_id = $2 RETURNING *',
@@ -126,7 +155,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       // Les maps officielles n'ont pas de fichier à déplacer
       const hasFile = !mod.is_official && mod.filename && !mod.filename.startsWith('__official__:')
 
-      if (mod.type !== 'map' && hasFile) {
+      if (hasFile) {
         // Mods/véhicules : déplacer entre Client/ et inactive_mod/
         const activeDir   = path.join(inst.beammp.resourcesPath, 'Client')
         const inactiveDir = path.join(inst.beammp.resourcesPath, 'inactive_mod')
@@ -147,7 +176,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: { instanceId: string; id: string } }>(
     '/api/i/:instanceId/mods/:id',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return
@@ -171,7 +200,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{ Params: { instanceId: string; id: string } }>(
     '/api/i/:instanceId/mods/:id/official',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const result = await db.query(
         'UPDATE mods SET is_official = NOT is_official WHERE id = $1 AND instance_id = $2 RETURNING *',
@@ -186,7 +215,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{ Params: { instanceId: string; id: string } }>(
     '/api/i/:instanceId/mods/:id/description',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const { lang, text } = req.body as { lang: string; text: string }
       if (!lang || !/^[a-z]{2,5}$/.test(lang)) {
@@ -210,7 +239,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { instanceId: string; id: string } }>(
     '/api/i/:instanceId/mods/:id/image',
-    { preHandler: requireAuth },
+    {
+      preHandler: requireAdmin,
+      // `id` feeds a filesystem path below — force it numeric so it can never
+      // carry a path-traversal segment.
+      schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9]+$' } } } },
+    },
     async (req, reply) => {
       const data = await req.file()
       if (!data) return reply.code(400).send({ error: 'No file' })
@@ -222,7 +256,14 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       if (!fs.existsSync(IMAGES)) fs.mkdirSync(IMAGES, { recursive: true })
       fs.writeFileSync(path.join(IMAGES, imgName), webp)
 
-      await db.query('UPDATE mods SET image = $1 WHERE id = $2', [imgName, req.params.id])
+      const result = await db.query(
+        'UPDATE mods SET image = $1 WHERE id = $2 AND instance_id = $3 RETURNING id',
+        [imgName, req.params.id, req.params.instanceId]
+      )
+      if (!result.rows[0]) {
+        fs.unlinkSync(path.join(IMAGES, imgName))
+        return reply.code(404).send({ error: 'Not found' })
+      }
       return { image: imgName }
     }
   )
@@ -231,7 +272,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { instanceId: string }; Body: { map_id: string } }>(
     '/api/i/:instanceId/maps/activate',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return
@@ -309,7 +350,9 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const entries: Record<string, string> = {}
       for (const line of content.split('\n')) {
         const m = line.match(/^(\w+)\s*=\s*(.+)$/)
-        if (m) entries[m[1]] = m[2].replace(/^[\"']|[\"']$/g, '').trim()
+        // Same whitelist as the PATCH below — ServerConfig.toml can hold a
+        // BeamMP AuthKey or other values that must never reach the client.
+        if (m && ALLOWED_CONFIG_KEYS.includes(m[1])) entries[m[1]] = m[2].replace(/^[\"']|[\"']$/g, '').trim()
       }
       return entries
     }
@@ -317,12 +360,11 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{ Params: { instanceId: string }; Body: Record<string, string> }>(
     '/api/i/:instanceId/config',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return
 
-      const ALLOWED_CONFIG_KEYS = ['Name', 'Description', 'MaxPlayers', 'MaxCars', 'Private', 'LogChat']
       for (const key of Object.keys(req.body)) {
         if (!ALLOWED_CONFIG_KEYS.includes(key)) {
           return reply.code(400).send({ error: `Clé de configuration non autorisée : ${key}` })
@@ -331,10 +373,19 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
       let content = readFile(inst.beammp.configPath)
       if (!content) return reply.code(404).send({ error: 'ServerConfig.toml not found' })
-      for (const [key, value] of Object.entries(req.body)) {
-        const escaped = String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      for (const [key, rawValue] of Object.entries(req.body)) {
+        // Strip \r\n — otherwise a value could inject a whole new TOML line
+        // (e.g. a bogus AuthKey) past the key whitelist above.
+        const value   = String(rawValue).replace(/[\r\n]/g, '')
+        const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
         const re = new RegExp(`^${key}\\s*=\\s*.+$`, 'm')
-        if (re.test(content)) content = content.replace(re, `${key} = "${escaped}"`)
+        if (re.test(content)) {
+          content = content.replace(re, `${key} = "${escaped}"`)
+        } else {
+          // Key absent from the file — append it instead of silently no-op'ing
+          // (the caller gets { updated: true } either way, it must be true).
+          content = content.trimEnd() + `\n${key} = "${escaped}"\n`
+        }
       }
       writeFile(inst.beammp.configPath, content)
       invalidateCache(inst.id)
@@ -346,31 +397,45 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { instanceId: string }; Querystring: { lines?: string } }>(
     '/api/i/:instanceId/logs',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const inst = getInstance(req.params.instanceId, reply)
       if (!inst) return
 
       const content = readFile(inst.beammp.logPath)
       if (!content) return { lines: [] }
-      const n = parseInt(req.query.lines ?? '100', 10)
+      const parsed = parseInt(req.query.lines ?? '100', 10)
+      const n = Number.isFinite(parsed) && parsed > 0 ? parsed : 100
       const all = content.split('\n').filter(Boolean)
       return { lines: all.slice(-n) }
     }
   )
 
   // ── Server restart ───────────────────────────────────────────
-  // Redémarrer le serveur depuis le panel n'est pas supporté en mode local Docker.
-  // Utilisez : docker compose restart   (si BeamMP tourne aussi en Docker)
-  //            systemctl restart beammp (si BeamMP tourne comme service systemd)
+  // Passe par beammp-agent (daemon systemd sur l'hôte, hors Docker) —
+  // seul moyen d'atteindre systemctl depuis un conteneur. 501 si l'agent
+  // n'est pas configuré pour cette instance (BEAMMP_AGENT_*/AGENT_SERVICE).
 
   app.post<{ Params: { instanceId: string } }>(
     '/api/i/:instanceId/server/restart',
-    { preHandler: requireAuth },
-    async (_req, reply: FastifyReply) => {
-      return reply.code(501).send({
-        error: 'Restart not available in local Docker mode — restart the BeamMP server manually on the host',
-      })
+    { preHandler: requireAdmin },
+    async (req, reply: FastifyReply) => {
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
+      if (!inst.agent) {
+        return reply.code(501).send({
+          error: 'beammp-agent non configuré pour cette instance — voir BEAMMP_AGENT_URL/TOKEN/SERVICE dans .env',
+        })
+      }
+
+      const result = await restartViaAgent(inst)
+      if (!result.ok) {
+        return reply.code(502).send({ error: result.error })
+      }
+
+      logActivity(inst.id, 'server_restart', 'Serveur redémarré')
+      await sendDiscordNotification('server_restart', `Le serveur **${inst.name}** a été redémarré`)
+      return { restarted: true }
     }
   )
 }

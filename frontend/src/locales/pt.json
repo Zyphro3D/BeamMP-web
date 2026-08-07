@@ -147,6 +147,8 @@
   "max_cars_label": "Máx. carros/jogador",
   "private_label": "Servidor privado",
   "log_chat_label": "Registar chat",
+  "tags_label": "Tags",
+  "debug_label": "Modo debug",
   "theme_light": "Modo claro",
   "theme_dark": "Modo escuro",
   "logout": "Sair",
@@ -186,7 +188,6 @@
   "active_map_label": "Mapa ativo",
   "page_title_mods": "Gestão de mods",
   "new_line": "↵ nova linha",
-
   "nav_import": "Importar",
   "import_title": "Scan & Import",
   "import_desc": "Verifica Client/, inactive_mod/ e inactive_map/ e cria automaticamente entradas no banco de dados para mods/mapas não registrados.",

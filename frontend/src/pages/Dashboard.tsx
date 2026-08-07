@@ -157,7 +157,7 @@ export function Dashboard() {
           {section === 'dashboard' && <SectionDashboard instanceId={instanceId} mods={mods} maps={maps} vehicles={vehicles} loading={loading} />}
           {section === 'mods'      && <SectionMods instanceId={instanceId} mods={modList} vehicles={vehicles} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'maps'      && <SectionMaps instanceId={instanceId} maps={maps} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
-          {section === 'players'   && <SectionPlayers />}
+          {section === 'players'   && <SectionPlayers instanceId={instanceId} />}
           {section === 'upload'       && <SectionUpload instanceId={instanceId} onRefresh={refresh} />}
           {section === 'config'       && <SectionConfig instanceId={instanceId} />}
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}
@@ -847,12 +847,15 @@ function MapCard({ instanceId, map, activating, onActivate, onDelete, onToggleOf
 
 // ─── Players ─────────────────────────────────────────────────────────────────
 
-function SectionPlayers() {
+function SectionPlayers({ instanceId }: { instanceId: string }) {
   const { t } = useI18n()
   const [players, setPlayers] = useState<KnownPlayer[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { api.adminPlayers().then(setPlayers).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    setLoading(true)
+    api.adminPlayers(instanceId).then(setPlayers).finally(() => setLoading(false))
+  }, [instanceId])
 
   const sorted = [...players].sort((a, b) => b.total_seconds - a.total_seconds)
 
@@ -1121,6 +1124,8 @@ const CONFIG_KEY_DEFS = [
   { key: 'MaxCars',    labelKey: 'max_cars_label',    type: 'number' },
   { key: 'Private',    labelKey: 'private_label',     type: 'toggle' },
   { key: 'LogChat',    labelKey: 'log_chat_label',    type: 'toggle' },
+  { key: 'Tags',       labelKey: 'tags_label',        type: 'text' },
+  { key: 'Debug',      labelKey: 'debug_label',       type: 'toggle' },
 ]
 
 function SectionConfig({ instanceId }: { instanceId: string }) {

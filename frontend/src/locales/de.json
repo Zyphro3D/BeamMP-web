@@ -147,6 +147,8 @@
   "max_cars_label": "Max. Autos/Spieler",
   "private_label": "Privater Server",
   "log_chat_label": "Chat protokollieren",
+  "tags_label": "Tags",
+  "debug_label": "Debug-Modus",
   "theme_light": "Helles Design",
   "theme_dark": "Dunkles Design",
   "logout": "Abmelden",
@@ -186,7 +188,6 @@
   "active_map_label": "Aktive Karte",
   "page_title_mods": "Mod-Verwaltung",
   "new_line": "↵ neue Zeile",
-
   "nav_import": "Import",
   "import_title": "Scan & Import",
   "import_desc": "Scannt Client/, inactive_mod/ und inactive_map/ und legt automatisch Datenbankeinträge für noch nicht registrierte Mods/Karten an.",

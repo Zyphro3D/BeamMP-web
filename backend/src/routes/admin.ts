@@ -5,7 +5,7 @@ import StreamZip from 'node-stream-zip'
 import sharp from 'sharp'
 import { db } from '../db'
 import { config } from '../config'
-import { requireAuth, requireSuperAdmin } from '../middleware/auth'
+import { requireAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { hashPassword } from './auth'
 import { listDir, moveFile, deleteFile, fileExists, ensureDir } from '../services/fileService'
 
@@ -136,11 +136,16 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ error: 'Password required (min 8 chars)' })
         }
         const hash = await hashPassword(password)
-        await db.query(
+        const inserted = await db.query(
           `INSERT INTO users (username, password, role) VALUES ($1, $2, 'admin')
-           ON CONFLICT (username) DO NOTHING`,
+           ON CONFLICT (username) DO NOTHING RETURNING id`,
           [request.beammp_username, hash]
         )
+        if (inserted.rows.length === 0) {
+          // Username already taken — the ON CONFLICT swallowed the insert.
+          // Don't mark the request approved, the player still can't log in.
+          return reply.code(409).send({ error: `Le nom d'utilisateur "${request.beammp_username}" est déjà pris` })
+        }
         await db.query(
           `UPDATE account_requests
            SET status = 'approved', reviewed_by = $1, reviewed_at = NOW()
@@ -161,12 +166,20 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   )
 
   // ── Known players ─────────────────────────────────────────────
-  app.get('/api/admin/players', { preHandler: requireSuperAdmin }, async () => {
-    const result = await db.query(
-      'SELECT * FROM known_players ORDER BY last_seen DESC NULLS LAST'
-    )
-    return result.rows
-  })
+  app.get<{ Querystring: { instanceId?: string } }>(
+    '/api/admin/players',
+    { preHandler: requireSuperAdmin },
+    async (req) => {
+      // instanceId optional for back-compat — defaults to the first instance,
+      // same pattern as the legacy routes in public.ts.
+      const instanceId = req.query.instanceId ?? config.instances[0].id
+      const result = await db.query(
+        'SELECT * FROM known_players WHERE instance_id = $1 ORDER BY last_seen DESC NULLS LAST',
+        [instanceId]
+      )
+      return result.rows
+    }
+  )
 
   // ── User management ───────────────────────────────────────────
   app.get('/api/admin/users', { preHandler: requireSuperAdmin }, async () => {
@@ -420,13 +433,34 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   )
 
   // ── Apply a single consistency fix ───────────────────────────
+  //
+  // Security note: `meta` is client-supplied and must never be trusted to
+  // build filesystem paths directly (path traversal). Filenames for known
+  // DB records are always re-derived server-side from `modId`. For orphan
+  // files (no DB record to anchor on), the supplied name is reduced to a
+  // safe basename and the resulting path is verified to stay within the
+  // expected root before any filesystem operation.
+
+  function safeBasename(name: unknown): string | null {
+    if (typeof name !== 'string' || !name) return null
+    const base = path.basename(name)
+    if (!base || base !== name || base === '.' || base === '..') return null
+    return base
+  }
+
+  function resolveWithin(root: string, name: string): string | null {
+    const resolvedRoot = path.resolve(root)
+    const target = path.resolve(resolvedRoot, name)
+    if (target !== resolvedRoot && !target.startsWith(resolvedRoot + path.sep)) return null
+    return target
+  }
 
   app.post<{
     Params: { instanceId: string }
     Body: { fix: string; meta: Record<string, string | number | boolean> }
   }>(
     '/api/admin/i/:instanceId/consistency/fix',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply: FastifyReply) => {
       const inst = config.instances.find(i => i.id === req.params.instanceId)
       if (!inst) return reply.code(404).send({ error: 'Instance not found' })
@@ -437,26 +471,33 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       switch (fix) {
 
         case 'move_to_client': {
-          const { filename, modId, inactiveDirName } = meta as { filename: string; modId: number; inactiveDirName: string }
-          const srcDir = path.join(inst.beammp.resourcesPath, inactiveDirName ?? 'inactive_mod')
-          const src    = path.join(srcDir, filename)
-          const dest   = path.join(clientDir, filename)
+          const { modId } = meta as { modId: number }
+          const modRow = await db.query('SELECT * FROM mods WHERE id = $1 AND instance_id = $2', [modId, inst.id])
+          const mod = modRow.rows[0]
+          if (!mod) return reply.code(404).send({ error: 'Mod not found' })
+          const inactiveDirName = mod.type === 'map' ? 'inactive_map' : 'inactive_mod'
+          const src  = path.join(inst.beammp.resourcesPath, inactiveDirName, mod.filename)
+          const dest = path.join(clientDir, mod.filename)
           if (fileExists(src)) moveFile(src, dest)
-          await db.query('UPDATE mods SET active = true WHERE id = $1', [modId])
-          return { fixed: true, action: 'move_to_client', filename }
+          await db.query('UPDATE mods SET active = true WHERE id = $1 AND instance_id = $2', [modId, inst.id])
+          return { fixed: true, action: 'move_to_client', filename: mod.filename }
         }
 
         case 'move_to_inactive': {
-          const { filename, modId, inactiveDirName } = meta as { filename: string; modId: number; inactiveDirName: string }
-          const destDir = path.join(inst.beammp.resourcesPath, inactiveDirName ?? 'inactive_mod')
-          const src     = path.join(clientDir, filename)
-          const dest    = path.join(destDir, filename)
+          const { modId } = meta as { modId: number }
+          const modRow = await db.query('SELECT * FROM mods WHERE id = $1 AND instance_id = $2', [modId, inst.id])
+          const mod = modRow.rows[0]
+          if (!mod) return reply.code(404).send({ error: 'Mod not found' })
+          const inactiveDirName = mod.type === 'map' ? 'inactive_map' : 'inactive_mod'
+          const destDir = path.join(inst.beammp.resourcesPath, inactiveDirName)
+          const src     = path.join(clientDir, mod.filename)
+          const dest    = path.join(destDir, mod.filename)
           if (fileExists(src)) {
             ensureDir(destDir)
             moveFile(src, dest)
           }
-          await db.query('UPDATE mods SET active = false WHERE id = $1', [modId])
-          return { fixed: true, action: 'move_to_inactive', filename }
+          await db.query('UPDATE mods SET active = false WHERE id = $1 AND instance_id = $2', [modId, inst.id])
+          return { fixed: true, action: 'move_to_inactive', filename: mod.filename }
         }
 
         case 'delete_db_record': {
@@ -488,17 +529,24 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
             inactive_mod: 'inactive_mod',
             inactive_map: 'inactive_map',
           }
-          const dir      = locationMap[location] ?? 'inactive_mod'
-          const filePath = path.join(inst.beammp.resourcesPath, dir, filename)
+          const dir = locationMap[location]
+          if (!dir) return reply.code(400).send({ error: `Unknown location: ${location}` })
+          const safeName = safeBasename(filename)
+          if (!safeName) return reply.code(400).send({ error: 'Invalid filename' })
+          const filePath = resolveWithin(path.join(inst.beammp.resourcesPath, dir), safeName)
+          if (!filePath) return reply.code(400).send({ error: 'Invalid path' })
           deleteFile(filePath)
-          return { fixed: true, action: 'delete_orphan_file', filename }
+          return { fixed: true, action: 'delete_orphan_file', filename: safeName }
         }
 
         case 'delete_orphan_image': {
           const { image } = meta as { image: string }
-          const imgPath = path.join(config.localImagesPath, image)
+          const safeName = safeBasename(image)
+          if (!safeName) return reply.code(400).send({ error: 'Invalid filename' })
+          const imgPath = resolveWithin(config.localImagesPath, safeName)
+          if (!imgPath) return reply.code(400).send({ error: 'Invalid path' })
           if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath)
-          return { fixed: true, action: 'delete_orphan_image', image }
+          return { fixed: true, action: 'delete_orphan_image', image: safeName }
         }
 
         default:
@@ -517,7 +565,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { instanceId: string } }>(
     '/api/admin/i/:instanceId/scan-import',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const inst = config.instances.find(i => i.id === req.params.instanceId)
       if (!inst) return reply.code(404).send({ error: 'Instance not found' })

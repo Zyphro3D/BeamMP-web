@@ -13,10 +13,30 @@ export interface InstanceConfig {
     logPath:       string
     configPath:    string
   }
+  /**
+   * beammp-agent (voir /opt/beammp-agent/beammp-agent.py) — daemon HTTP sur
+   * l'hôte qui redémarre le service systemd du serveur BeamMP. `null` tant
+   * que les 3 variables ne sont pas toutes renseignées : la route de
+   * redémarrage reste alors désactivée plutôt que d'échouer au runtime.
+   */
+  agent: {
+    url:     string
+    token:   string
+    service: string
+  } | null
 }
 
 function parseInstances(): InstanceConfig[] {
   const raw = process.env.INSTANCES
+
+  // beammp-agent : une instance de l'agent par hôte (BEAMMP_AGENT_URL/TOKEN
+  // globaux), mais un service systemd distinct possible par instance BeamMP.
+  const agentUrl   = process.env.BEAMMP_AGENT_URL   ?? ''
+  const agentToken = process.env.BEAMMP_AGENT_TOKEN ?? ''
+
+  function buildAgent(service: string): InstanceConfig['agent'] {
+    return agentUrl && agentToken && service ? { url: agentUrl, token: agentToken, service } : null
+  }
 
   // Instance unique (pas de variable INSTANCES)
   if (!raw) {
@@ -32,6 +52,7 @@ function parseInstances(): InstanceConfig[] {
         logPath:       process.env.BEAMMP_LOG_PATH        ?? '/beammp/server.log',
         configPath:    process.env.BEAMMP_CONFIG_PATH     ?? '/beammp/ServerConfig.toml',
       },
+      agent: buildAgent(process.env.BEAMMP_AGENT_SERVICE ?? ''),
     }]
   }
 
@@ -50,6 +71,7 @@ function parseInstances(): InstanceConfig[] {
         logPath:       process.env[`${P}BEAMMP_LOG_PATH`]         ?? '/beammp/server.log',
         configPath:    process.env[`${P}BEAMMP_CONFIG_PATH`]      ?? '/beammp/ServerConfig.toml',
       },
+      agent: buildAgent(process.env[`${P}AGENT_SERVICE`] ?? ''),
     }
   })
 }

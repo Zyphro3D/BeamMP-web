@@ -152,6 +152,8 @@ export async function getServerStatus(inst: InstanceConfig): Promise<ServerStatu
   const cached = caches.get(inst.id)
   if (cached && now - cached.ts < CACHE_TTL_MS) return cached.data
 
+  let publicListSaysOffline = false
+
   // ── 1. BeamMP public API (primary, when ip+port configured) ──
   if (inst.serverIp && inst.serverPort) {
     try {
@@ -178,15 +180,11 @@ export async function getServerStatus(inst: InstanceConfig): Promise<ServerStatu
         return data
       }
 
-      // Server not in list → offline (but API responded)
-      if (list.length > 0) {
-        const data: ServerStatus = {
-          online: false, playerCount: 0, maxPlayers: 0, players: [],
-          map: '', mapName: '', serverName: inst.name,
-        }
-        caches.set(inst.id, { data, ts: now })
-        return data
-      }
+      // Server not in the public list — don't trust that alone (transient
+      // glitch, private server, just-started server all look the same from
+      // here). Remember it and keep falling through to levels 2/3; only
+      // used as the final word if nothing else answers either.
+      if (list.length > 0) publicListSaysOffline = true
     } catch { /* fall through */ }
   }
 
@@ -219,8 +217,11 @@ export async function getServerStatus(inst: InstanceConfig): Promise<ServerStatu
   const activeMap   = await getActiveMapFromDb(inst.id)
   const { maxPlayers, serverName } = await getConfigFallback(inst)
 
+  // Levels 1 and 2 both failed to confirm the server is up. Only now do we
+  // let the public API's "not in the list" verdict win outright; otherwise
+  // fall back to the log-activity heuristic as before.
   const hasRecentActivity = (Date.now() - lastActivity) < 5 * 60 * 1000
-  const online = players.size > 0 || hasRecentActivity
+  const online = !publicListSaysOffline && (players.size > 0 || hasRecentActivity)
 
   const data: ServerStatus = {
     online,

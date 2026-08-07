@@ -147,6 +147,8 @@
   "max_cars_label": "Máx. coches/jugador",
   "private_label": "Servidor privado",
   "log_chat_label": "Registrar chat",
+  "tags_label": "Etiquetas",
+  "debug_label": "Modo depuración",
   "theme_light": "Modo claro",
   "theme_dark": "Modo oscuro",
   "logout": "Cerrar sesión",
@@ -186,7 +188,6 @@
   "active_map_label": "Mapa activo",
   "page_title_mods": "Gestión de mods",
   "new_line": "↵ nueva línea",
-
   "nav_import": "Importar",
   "import_title": "Scan & Import",
   "import_desc": "Escanea Client/, inactive_mod/ e inactive_map/ y crea entradas en la base de datos para los mods/mapas no registrados.",

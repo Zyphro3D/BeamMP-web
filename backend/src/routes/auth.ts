@@ -93,6 +93,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { beammp_username: string } }>(
     '/api/auth/request-account',
     {
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
       schema: {
         body: {
           type: 'object',

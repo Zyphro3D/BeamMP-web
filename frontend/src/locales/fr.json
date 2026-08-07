@@ -2,7 +2,6 @@
   "online": "En ligne",
   "offline": "Hors ligne",
   "uptime": "Uptime",
-
   "nav_management": "Gestion",
   "nav_administration": "Administration",
   "nav_dashboard": "Tableau de bord",
@@ -15,7 +14,6 @@
   "nav_admin": "Admin",
   "nav_consistency": "Cohérence BDD",
   "nav_logout": "Déconnexion",
-
   "players": "Joueurs",
   "map": "Carte",
   "vehicles": "Véhicules",
@@ -26,7 +24,6 @@
   "connexion": "Connexion",
   "dashboard": "Tableau de bord",
   "request_account": "Demander un compte",
-
   "loading": "Chargement…",
   "search": "Rechercher…",
   "all": "Tous",
@@ -55,7 +52,6 @@
   "no_log": "Aucun log",
   "no_known_player": "Aucun joueur connu",
   "no_description": "Aucune description",
-
   "top_players": "Top joueurs · temps de jeu total",
   "connections": "connexions",
   "account_requests": "Demandes de compte",
@@ -71,7 +67,6 @@
   "restarting": "Redémarrage…",
   "recent_activity": "Activité récente",
   "carte_active": "Carte active",
-
   "username": "Nom d'utilisateur",
   "password": "Mot de passe",
   "login_btn": "Se connecter",
@@ -80,12 +75,10 @@
   "request_hint": "Entrez votre nom d'utilisateur BeamMP exact. Vous devez avoir joué sur le serveur au moins une fois.",
   "send_request": "Envoyer la demande",
   "sending": "Envoi…",
-
   "description": "Description",
   "edit_description": "Modifier les descriptions",
   "add_lang": "Ajouter",
   "lang_code": "Code langue (fr, en, de…)",
-
   "mod_name": "Nom",
   "mod_type": "Type",
   "mod_file": "Fichier (.zip)",
@@ -96,7 +89,6 @@
   "image_label": "Image de présentation",
   "change_image": "Changer",
   "choose_image": "Choisir une image",
-
   "saving": "Sauvegarde…",
   "saved": "✓ Sauvegardé",
   "save_config": "Sauvegarder les modifications",
@@ -112,7 +104,6 @@
   "confirm_restart": "Redémarrer le serveur ?",
   "restart_required": "Restart requis !",
   "restart_not_configured": "Restart non configuré — voir BEAMMP_AGENT_SERVICE dans .env",
-
   "error": "Erreur",
   "sort_az": "A → Z",
   "sort_za": "Z → A",
@@ -149,7 +140,6 @@
   "to_fix": "à corriger",
   "warnings_label": "Avertissements",
   "optional_label": "optionnel",
-
   "server_name_label": "Nom du serveur",
   "server_name_placeholder": "Mon serveur BeamMP",
   "description_placeholder": "Description… (^p = nouvelle ligne)",
@@ -157,11 +147,12 @@
   "max_cars_label": "Max voitures/joueur",
   "private_label": "Serveur privé",
   "log_chat_label": "Log du chat",
+  "tags_label": "Tags",
+  "debug_label": "Mode debug",
   "theme_light": "Mode clair",
   "theme_dark": "Mode sombre",
   "logout": "Déconnexion",
   "login_link": "Se connecter",
-
   "admin_title": "Administration",
   "requests_tab": "Demandes",
   "known_players_tab": "Joueurs connus",
@@ -181,7 +172,6 @@
   "first_seen_label": "Premier vu :",
   "last_seen_label": "Dernier vu :",
   "request_from": "Demande de",
-
   "no_activity": "Aucune activité",
   "no_image": "Pas d'image",
   "official": "Officielle",
@@ -198,7 +188,6 @@
   "active_map_label": "Carte active",
   "page_title_mods": "Gestion des mods",
   "new_line": "↵ ligne",
-
   "nav_import": "Import",
   "import_title": "Scan & Import",
   "import_desc": "Analyse les dossiers Client/, inactive_mod/ et inactive_map/ et crée automatiquement les entrées en base de données pour chaque mod/carte non encore enregistré. Extrait le nom depuis info.json et l'image de prévisualisation depuis le zip.",

@@ -12,7 +12,7 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     config.instances.map(i => ({
       id:         i.id,
       name:       i.name,
-      canRestart: false,
+      canRestart: i.agent !== null,
     }))
   )
 

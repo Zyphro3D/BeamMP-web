@@ -127,7 +127,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ action, password }),
     }),
-  adminPlayers: () => request<KnownPlayer[]>('/api/admin/players'),
+  adminPlayers: (instanceId: string) => request<KnownPlayer[]>(`/api/admin/players?instanceId=${encodeURIComponent(instanceId)}`),
   adminUsers:   () => request<User[]>('/api/admin/users'),
   updateUserRole: (id: number, role: string) =>
     request<User>(`/api/admin/users/${id}/role`, {
