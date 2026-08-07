@@ -124,7 +124,8 @@ async function main(): Promise<void> {
   })
 
   // ── Version header on every API response ──────────────────────
-  const PANEL_VERSION = '1.0.0'
+  // Keep in sync with CHANGELOG.md's latest entry.
+  const PANEL_VERSION = '1.1.0'
   app.addHook('onSend', async (_, reply) => {
     reply.header('X-BeamMP-Panel-Version', PANEL_VERSION)
   })

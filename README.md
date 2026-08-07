@@ -16,11 +16,13 @@ Fonctionne sur **Linux** et **Windows** (Docker Desktop).
 5. [Premier démarrage](#premier-démarrage)
 6. [Reverse proxy HTTPS](#reverse-proxy-https)
 7. [Multi-instance](#multi-instance)
-8. [Mise à jour](#mise-à-jour)
-9. [Sauvegarde](#sauvegarde)
-10. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
-11. [Variables d'environnement](#variables-denvironnement)
-12. [Rôles et comptes](#rôles-et-comptes)
+8. [Redémarrage du serveur](#redémarrage-du-serveur)
+9. [Mise à jour](#mise-à-jour)
+10. [Sauvegarde](#sauvegarde)
+11. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
+12. [Variables d'environnement](#variables-denvironnement)
+13. [Rôles et comptes](#rôles-et-comptes)
+14. [Sécurité](#sécurité)
 
 ---
 
@@ -159,6 +161,7 @@ INSTANCE_MAIN_SERVER_PORT=30814
 INSTANCE_MAIN_BEAMMP_RESOURCES_PATH=/beammp/main/resources
 INSTANCE_MAIN_BEAMMP_LOG_PATH=/beammp/main/server.log
 INSTANCE_MAIN_BEAMMP_CONFIG_PATH=/beammp/main/ServerConfig.toml
+INSTANCE_MAIN_AGENT_SERVICE=beammp-main.service
 
 INSTANCE_EVENT_NAME=Serveur Évènement
 INSTANCE_EVENT_SERVER_IP=1.2.3.4
@@ -166,7 +169,12 @@ INSTANCE_EVENT_SERVER_PORT=30815
 INSTANCE_EVENT_BEAMMP_RESOURCES_PATH=/beammp/event/resources
 INSTANCE_EVENT_BEAMMP_LOG_PATH=/beammp/event/server.log
 INSTANCE_EVENT_BEAMMP_CONFIG_PATH=/beammp/event/ServerConfig.toml
+INSTANCE_EVENT_AGENT_SERVICE=beammp-event.service
 ```
+
+`BEAMMP_AGENT_URL`/`BEAMMP_AGENT_TOKEN` restent globaux (un seul agent par
+hôte) — seul `AGENT_SERVICE` varie par instance, pour cibler le bon service
+systemd au redémarrage.
 
 ### Volumes `docker-compose.yml`
 
@@ -185,6 +193,66 @@ volumes:
 
 ---
 
+## Redémarrage du serveur
+
+Le panel tourne en conteneur Docker et n'a pas accès à `systemctl` de l'hôte —
+le bouton "Redémarrer le serveur" passe donc par **beammp-agent**, un petit
+daemon Python (aucune dépendance) installé sur l'hôte, hors Docker.
+
+### Installation
+
+```bash
+sudo mkdir -p /opt/beammp-agent
+sudo cp beammp-agent.py /opt/beammp-agent/
+sudo cp beammp-agent.service /etc/systemd/system/
+sudo chmod +x /opt/beammp-agent/beammp-agent.py
+```
+
+Créer `/etc/beammp-agent.env` (**jamais** dans le unit file, qui est lisible
+par tout le monde par défaut) :
+
+```bash
+sudo sh -c 'echo "RESTART_TOKEN=$(openssl rand -hex 32)" > /etc/beammp-agent.env'
+sudo chmod 600 /etc/beammp-agent.env
+sudo chown root:root /etc/beammp-agent.env
+```
+
+Éditer `/etc/systemd/system/beammp-agent.service` :
+
+- `ALLOWED_SERVICES` — nom(s) du/des service(s) systemd du serveur BeamMP
+  (whitelist stricte, l'agent refuse tout service hors de cette liste)
+- `AGENT_HOST` — **ne pas** utiliser `0.0.0.0` ni l'IP LAN de la machine.
+  Utiliser l'IP de la passerelle du réseau Docker du projet
+  (`docker network inspect beammp-panel_default` → `Gateway`, typiquement
+  `172.18.0.1` ou `172.17.0.1`) : l'agent reste joignable depuis le
+  conteneur du panel via sa route par défaut, mais injoignable depuis le
+  réseau local.
+
+```bash
+sudo chmod 600 /etc/systemd/system/beammp-agent.service   # contient des infos internes, pas de secret
+sudo systemctl daemon-reload
+sudo systemctl enable --now beammp-agent
+curl http://<AGENT_HOST>:4445/health   # depuis l'hôte, doit répondre {"ok": true, ...}
+```
+
+Renseigner dans le `.env` du panel :
+
+```env
+BEAMMP_AGENT_URL=http://172.18.0.1:4445
+BEAMMP_AGENT_TOKEN=<le même RESTART_TOKEN que /etc/beammp-agent.env>
+BEAMMP_AGENT_SERVICE=beammp.service
+```
+
+Sans ces trois variables, le bouton de redémarrage reste désactivé (tooltip
+"Restart non configuré") plutôt que d'échouer au clic.
+
+> Si le réseau Docker du projet est un jour supprimé et recréé
+> (`docker compose down` puis `up`, pas un simple `restart`), l'IP de
+> passerelle peut changer — revérifier `AGENT_HOST` et `BEAMMP_AGENT_URL`
+> ensemble dans ce cas.
+
+---
+
 ## Mise à jour
 
 ```bash
@@ -194,6 +262,8 @@ docker compose up -d --build
 
 Les données PostgreSQL sont conservées dans le volume `postgres_data`.
 Les migrations de schéma s'appliquent automatiquement au démarrage.
+
+Voir [CHANGELOG.md](./CHANGELOG.md) pour le détail des versions.
 
 ---
 
@@ -295,12 +365,16 @@ Après migration : réinitialiser les mots de passe via *Administration → Util
 
 | Variable | Défaut | Obligatoire | Description |
 |---|---|---|---|
-| `APP_PORT` | `3000` | | Port d'écoute du panel |
+| `APP_PORT` | `3000` | | Port d'écoute du panel (côté hôte — voir aussi `PORT` ci-dessous) |
 | `JWT_SECRET` | — | **Oui** | Clé secrète JWT — min 32 chars (`openssl rand -hex 32`) |
 | `COOKIE_SECURE` | `false` | | Mettre `true` derrière un reverse proxy HTTPS |
 | `ALLOWED_ORIGIN` | — | | URL du panel pour CORS si domaine différent |
+| `TRUST_PROXY_HOPS` | — | | Nombre de reverse proxy en amont (ex. `1`). Laisser vide si le panel est exposé directement — sinon le rate-limit de login peut être contourné en forgeant `X-Forwarded-For` |
 | `SUPERADMIN_USERNAME` | — | | Login du superadmin (premier démarrage uniquement) |
 | `SUPERADMIN_PASSWORD` | — | | Mot de passe min 8 chars (premier démarrage uniquement) |
+| `PORT` | `3000` | | Avancé — port interne au conteneur. Ne pas confondre avec `APP_PORT` |
+| `IMAGES_PATH` | `/app/images` | | Avancé — chemin interne au conteneur pour les images de mods |
+| `INSTANCE_NAME` | `BeamMP Server` | | Nom affiché en mode instance unique |
 
 ### Base de données
 
@@ -324,6 +398,14 @@ Après migration : réinitialiser les mots de passe via *Administration → Util
 | `BEAMMP_API_HOST` | `localhost` | Host de l'API HTTP BeamMP (optionnel) |
 | `BEAMMP_API_PORT` | `4444` | Port de l'API HTTP BeamMP |
 
+### Agent de redémarrage (optionnel — voir [Redémarrage du serveur](#redémarrage-du-serveur))
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `BEAMMP_AGENT_URL` | — | URL de beammp-agent sur l'hôte (IP de la passerelle Docker, pas `0.0.0.0`/IP LAN) |
+| `BEAMMP_AGENT_TOKEN` | — | Doit correspondre à `RESTART_TOKEN` dans `/etc/beammp-agent.env` |
+| `BEAMMP_AGENT_SERVICE` | — | Nom du service systemd à redémarrer (doit être dans `ALLOWED_SERVICES` côté agent) |
+
 ### Discord (optionnel)
 
 | Variable | Défaut | Description |
@@ -331,11 +413,12 @@ Après migration : réinitialiser les mots de passe via *Administration → Util
 | `DISCORD_WEBHOOK_URL` | — | Webhook global (fallback) |
 | `DISCORD_WEBHOOK_RESTART` | — | Webhook redémarrages |
 | `DISCORD_WEBHOOK_PLAYERS` | — | Webhook connexions joueurs |
-| `DISCORD_WEBHOOK_MODS` | — | Webhook uploads mods |
+| `DISCORD_WEBHOOK_MODS` | — | Webhook uploads mods et changements de carte |
 | `DISCORD_SERVER_URL` | — | Lien invitation Discord dans le panel |
-| `DISCORD_NOTIFY_JOIN` | `true` | Notifier connexions |
+| `DISCORD_NOTIFY_JOIN` | `true` | Notifier connexions (avec rang par ancienneté — Bronze/Argent/Or/Platine) |
 | `DISCORD_NOTIFY_LEAVE` | `true` | Notifier déconnexions |
-| `DISCORD_NOTIFY_MOD_UPLOAD` | `true` | Notifier uploads |
+| `DISCORD_NOTIFY_MOD_UPLOAD` | `true` | Notifier uploads de mods |
+| `DISCORD_NOTIFY_MAP_CHANGE` | `true` | Notifier les changements de carte active |
 | `DISCORD_NOTIFY_RESTART` | `true` | Notifier redémarrages |
 
 ### Public
@@ -351,25 +434,48 @@ Après migration : réinitialiser les mots de passe via *Administration → Util
 
 | Rôle | Permissions |
 |---|---|
-| `superadmin` | Tout — gestion utilisateurs, validation de comptes, import |
-| `admin` | Mods, maps, configuration, logs, cohérence BDD, import |
-| `moderator` | Consultation uniquement |
+| `superadmin` | Tout — gestion utilisateurs, validation de comptes, réinitialisation de mot de passe, import |
+| `admin` | Mods, maps, configuration, logs, cohérence BDD, import, redémarrage serveur |
+| `moderator` | Consultation uniquement — pas d'accès aux logs serveur, aucune action de mutation |
+
+Un changement de rôle ou une suppression de compte prend effet **immédiatement**
+sur les sessions déjà ouvertes (le rôle est revérifié en base à chaque requête,
+pas seulement lu depuis le cookie de session) — pas besoin d'attendre l'expiration
+du cookie (7 jours) ni de déconnecter l'utilisateur.
 
 ### Création de compte joueur
 
 1. Le joueur se connecte au serveur BeamMP → enregistré automatiquement
 2. Il visite le panel → **"Demander un compte"** → saisit son pseudo BeamMP exact
-3. Le SuperAdmin valide la demande dans *Administration* → définit un mot de passe initial
+3. Le SuperAdmin valide la demande dans *Administration* → définit un mot de passe initial.
+   Le compte est créé en rôle `moderator` par défaut (moindre privilège) ;
+   promotion en `admin` via une action explicite du SuperAdmin.
 4. Le joueur peut se connecter
+
+### Mot de passe perdu
+
+Un SuperAdmin peut réinitialiser le mot de passe de n'importe quel compte
+existant depuis *Administration → Utilisateurs* (icône clé), sans avoir à
+supprimer puis recréer le compte.
 
 ---
 
 ## Sécurité
 
-- Sessions httpOnly + SameSite=Strict (pas de token en localStorage)
+- Sessions httpOnly + SameSite=Strict (pas de token en localStorage), rôle
+  revérifié en base à chaque requête (pas de session périmée après un
+  changement de rôle ou une suppression de compte)
 - Cookie `Secure` activé via `COOKIE_SECURE=true` derrière HTTPS
 - Mots de passe bcrypt coût 12 — migration transparente depuis les anciens hashes scrypt
 - Uploads validés par magic bytes (signature ZIP `PK\x03\x04`)
 - Conteneur non-root (UID 1000)
-- Headers de sécurité via `@fastify/helmet`
-- Rate limiting sur `/api/auth/login` (5 req/min par IP)
+- Headers de sécurité via `@fastify/helmet`, CSP sans `unsafe-inline` sur les scripts
+- Rate limiting sur `/api/auth/login` (5 req/min par IP), `/api/auth/request-account`
+  et le redémarrage serveur (3 req/min) — voir `TRUST_PROXY_HOPS` si le panel
+  est derrière un reverse proxy, sinon le rate-limit reste basé sur l'IP directe
+- Toutes les opérations fichier (upload, cohérence, import) sanitisent les
+  noms de fichiers et vérifient que le chemin résolu reste dans le dossier attendu
+- beammp-agent (redémarrage) : token dans un fichier dédié en 600 (jamais dans
+  le unit systemd, lisible par défaut), lié à l'IP de la passerelle Docker du
+  projet (pas `0.0.0.0` ni l'IP LAN), aucun endpoint fichier exposé au-delà
+  du strict nécessaire
