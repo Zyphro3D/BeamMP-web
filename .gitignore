@@ -11,3 +11,4 @@ migrate/mods.json
 migrate/players.json
 migrate/users.json
 migrate/descriptions/
+backups/

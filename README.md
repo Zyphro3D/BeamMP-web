@@ -17,9 +17,10 @@ Fonctionne sur **Linux** et **Windows** (Docker Desktop).
 6. [Reverse proxy HTTPS](#reverse-proxy-https)
 7. [Multi-instance](#multi-instance)
 8. [Mise à jour](#mise-à-jour)
-9. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
-10. [Variables d'environnement](#variables-denvironnement)
-11. [Rôles et comptes](#rôles-et-comptes)
+9. [Sauvegarde](#sauvegarde)
+10. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
+11. [Variables d'environnement](#variables-denvironnement)
+12. [Rôles et comptes](#rôles-et-comptes)
 
 ---
 
@@ -193,6 +194,33 @@ docker compose up -d --build
 
 Les données PostgreSQL sont conservées dans le volume `postgres_data`.
 Les migrations de schéma s'appliquent automatiquement au démarrage.
+
+---
+
+## Sauvegarde
+
+Le volume `postgres_data` est la seule copie des comptes, joueurs connus, mods et
+historique — sans sauvegarde, sa perte (erreur `docker volume rm`, disque
+corrompu, migration de machine) est irréversible.
+
+```bash
+./scripts/backup-postgres.sh            # dump vers ./backups/, gardé 14 jours
+./scripts/backup-postgres.sh /mnt/nas    # ou un dossier externe au host Docker
+```
+
+À planifier via cron sur l'hôte (pas dans le conteneur) :
+
+```cron
+0 3 * * * cd /opt/app-docker/beammp-panel && ./scripts/backup-postgres.sh >> /var/log/beammp-panel-backup.log 2>&1
+```
+
+Restauration :
+
+```bash
+gunzip -c backups/beammp-panel-20260101-030000.sql.gz | docker compose exec -T postgres psql -U beammp beammp
+```
+
+> Testez périodiquement une restauration réelle — une sauvegarde jamais restaurée n'est qu'une hypothèse.
 
 ---
 
