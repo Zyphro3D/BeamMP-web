@@ -138,6 +138,18 @@ l'infrastructure de redémarrage.
 - Entrée cron de sauvegarde avec chemin relatif (cron ne démarre pas dans
   le dossier du projet) et destination de log `/var/log/` non accessible
   en écriture pour un utilisateur non-root.
+- **Détection du type "véhicule" au Scan & Import** — un zip contenant le
+  moindre fichier sous `vehicles/` (y compris `vehicles/common/`, dossier
+  de pièces partagées entre véhicules) était classé `vehicle`, ce qui
+  classait aussi bien des packs de jantes/pneus/moteurs que des packs de
+  configuration comme des véhicules sélectionnables. Un zip n'est
+  désormais classé `vehicle` que s'il contient un `vehicles/<nom>/info.json`
+  propre à ce dossier (signal fiable qu'il définit un véhicule, par
+  opposition à `info_<variante>.json` qui ne fait qu'ajouter des
+  configurations à un véhicule existant). 30 des 199 lignes `mods` déjà
+  classées `vehicle` en base ont été corrigées rétroactivement (script
+  ponctuel, pas de migration automatique — le heuristique ne s'applique
+  qu'aux futurs imports).
 
 ## [1.0.0] — antérieur
 

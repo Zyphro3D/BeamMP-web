@@ -58,8 +58,14 @@ async function analyzeZip(
 
     // ── Type detection ──────────────────────────────────────────
     let type: 'mod' | 'vehicle' | 'map' = defaultDir === 'inactive_map' ? 'map' : 'mod'
-    if (lower.some(e => e.startsWith('levels/')))   type = 'map'
-    else if (lower.some(e => e.startsWith('vehicles/'))) type = 'vehicle'
+    if (lower.some(e => e.startsWith('levels/'))) type = 'map'
+    // `vehicles/common/...` holds shared parts (wheels, engines, textures) reusable by any
+    // vehicle, and packs that only add parts/configs to an EXISTING stock vehicle (engine
+    // swaps, wheel packs) reuse that vehicle's folder name too — neither defines a new
+    // vehicle. BeamNG only ships a bare `info.json` (not `info_<variant>.json`) at the root
+    // of a vehicle's own folder, so its presence is what actually signals "this zip defines
+    // a selectable vehicle".
+    else if (lower.some(e => /^vehicles\/(?!common\/)[^/]+\/info\.json$/.test(e))) type = 'vehicle'
 
     // ── Name from info.json ─────────────────────────────────────
     let name = cleanFilename(baseName)
