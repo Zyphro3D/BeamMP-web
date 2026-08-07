@@ -149,14 +149,14 @@ export function SectionMods({ instanceId, mods, vehicles, onRefresh, loading, on
         <Modal title={t('upload_mod')} onClose={() => setShowUpload(false)}>
           <form onSubmit={handleUpload} className="space-y-3">
             {upError && <p className="text-xs text-red-400">{upError}</p>}
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('mod_name')}</label><input name="name" required className="input" /></div>
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('mod_type')}</label>
-              <select name="type" required className="input">
+            <div className="space-y-1"><label htmlFor="mod-name" className="text-xs text-zinc-400">{t('mod_name')}</label><input id="mod-name" name="name" required className="input" /></div>
+            <div className="space-y-1"><label htmlFor="mod-type" className="text-xs text-zinc-400">{t('mod_type')}</label>
+              <select id="mod-type" name="type" required className="input">
                 <option value="mod">Mod</option><option value="vehicle">{t('vehicle')}</option>
               </select>
             </div>
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('description')}</label><input name="description" className="input" /></div>
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('mod_file')}</label><input name="file" type="file" accept=".zip,.pak" required className="input py-1.5 text-xs" /></div>
+            <div className="space-y-1"><label htmlFor="mod-description" className="text-xs text-zinc-400">{t('description')}</label><input id="mod-description" name="description" className="input" /></div>
+            <div className="space-y-1"><label htmlFor="mod-file" className="text-xs text-zinc-400">{t('mod_file')}</label><input id="mod-file" name="file" type="file" accept=".zip,.pak" required className="input py-1.5 text-xs" /></div>
             <button type="submit" disabled={uploading} className="btn-accent w-full justify-center">{uploading ? t('uploading_progress') : t('upload')}</button>
           </form>
         </Modal>

@@ -13,6 +13,7 @@ export function Home() {
   const [instanceId, setInstanceId] = useState('default')
   const status = useServerStatus(instanceId)
   const [mods, setMods] = useState<Mod[]>([])
+  const [modsLoading, setModsLoading] = useState(true)
   const [info, setInfo] = useState<ServerInfo | null>(null)
   const auth = isAuthenticated()
   const { t, lang } = useI18n()
@@ -22,9 +23,9 @@ export function Home() {
     api.instances().then(list => {
       const id = list[0]?.id ?? 'default'
       setInstanceId(id)
-      api.activeMods(id).then(setMods).catch(() => {})
+      api.activeMods(id).then(setMods).catch(() => {}).finally(() => setModsLoading(false))
     }).catch(() => {
-      api.activeMods('default').then(setMods).catch(() => {})
+      api.activeMods('default').then(setMods).catch(() => {}).finally(() => setModsLoading(false))
     })
     api.info().then(setInfo).catch(() => {})
   }, [])
@@ -130,7 +131,7 @@ export function Home() {
               <Package size={14} className="text-accent" />
               <span className="text-[11px] text-zinc-400 uppercase tracking-wider">{t('vehicles')}</span>
             </div>
-            <p className="text-2xl font-bold">{vehicles.length}</p>
+            <p className="text-2xl font-bold">{modsLoading ? '—' : vehicles.length}</p>
           </div>
 
           <div className="card p-4">
@@ -138,7 +139,7 @@ export function Home() {
               <Package size={14} className="text-accent" />
               <span className="text-[11px] text-zinc-400 uppercase tracking-wider">{t('mods')}</span>
             </div>
-            <p className="text-2xl font-bold">{otherMods.length}</p>
+            <p className="text-2xl font-bold">{modsLoading ? '—' : otherMods.length}</p>
           </div>
         </div>
 

@@ -20,7 +20,7 @@ export function SectionConsistency({ instanceId }: { instanceId: string }) {
       const r = await api.checkConsistency(instanceId)
       setReport(r)
     } catch (err: unknown) {
-      setErrors({ _scan: err instanceof Error ? err.message : 'Erreur lors du scan' })
+      setErrors({ _scan: err instanceof Error ? err.message : t('scan_error') })
     } finally {
       setLoading(false)
     }
@@ -33,7 +33,7 @@ export function SectionConsistency({ instanceId }: { instanceId: string }) {
       await api.fixConsistency(instanceId, issue.fix, issue.meta)
       setFixed(s => new Set(s).add(issue.id))
     } catch (err: unknown) {
-      setErrors(e => ({ ...e, [issue.id]: err instanceof Error ? err.message : 'Erreur' }))
+      setErrors(e => ({ ...e, [issue.id]: err instanceof Error ? err.message : t('error') }))
     } finally {
       setFixing(s => { const n = new Set(s); n.delete(issue.id); return n })
     }

@@ -30,7 +30,7 @@ export function Login() {
       saveAuth(user)
       navigate('/dashboard')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erreur')
+      setError(err instanceof Error ? err.message : t('error'))
     } finally {
       setLoading(false)
     }
@@ -46,7 +46,7 @@ export function Login() {
       const res = await api.requestAccount(fd.get('beammp_username') as string)
       setSuccess(res.message)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erreur')
+      setError(err instanceof Error ? err.message : t('error'))
     } finally {
       setLoading(false)
     }
@@ -93,12 +93,12 @@ export function Login() {
           {tab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('username')}</label>
-                <input name="username" required className="input" autoFocus />
+                <label htmlFor="login-username" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('username')}</label>
+                <input id="login-username" name="username" required className="input" autoFocus />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('password')}</label>
-                <input name="password" type="password" required className="input" />
+                <label htmlFor="login-password" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('password')}</label>
+                <input id="login-password" name="password" type="password" required className="input" />
               </div>
               <button type="submit" disabled={loading} className="btn-accent w-full justify-center">
                 {loading ? t('logging_in') : t('login_btn')}
@@ -110,8 +110,8 @@ export function Login() {
             <form onSubmit={handleRequest} className="space-y-4">
               <p className="text-xs text-zinc-500 leading-relaxed">{t('request_hint')}</p>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('beammp_username')}</label>
-                <input name="beammp_username" required className="input" autoFocus />
+                <label htmlFor="request-beammp-username" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('beammp_username')}</label>
+                <input id="request-beammp-username" name="beammp_username" required className="input" autoFocus />
               </div>
               <button type="submit" disabled={loading || !!success} className="btn-accent w-full justify-center">
                 {loading ? t('sending') : t('send_request')}

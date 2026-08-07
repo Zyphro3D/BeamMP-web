@@ -29,7 +29,7 @@ export function DescriptionEditor({ instanceId, mod, onClose, onSaved }: { insta
       onSaved()
       onClose()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erreur')
+      setError(e instanceof Error ? e.message : t('error'))
     } finally {
       setSaving(false)
     }
@@ -43,8 +43,9 @@ export function DescriptionEditor({ instanceId, mod, onClose, onSaved }: { insta
         )}
         {langs.map(({ lang, text }, i) => (
           <div key={lang} className="space-y-1">
-            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{lang}</label>
+            <label htmlFor={`desc-${lang}`} className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{lang}</label>
             <textarea
+              id={`desc-${lang}`}
               value={text}
               onChange={e => setLangs(ls => ls.map((l, j) => j === i ? { ...l, text: e.target.value } : l))}
               className="input resize-none h-24 text-sm"
@@ -57,6 +58,7 @@ export function DescriptionEditor({ instanceId, mod, onClose, onSaved }: { insta
             value={newLang}
             onChange={e => setNewLang(e.target.value)}
             placeholder={t('lang_code')}
+            aria-label={t('lang_code')}
             className="input text-xs flex-1"
             maxLength={5}
             onKeyDown={e => e.key === 'Enter' && addLang()}

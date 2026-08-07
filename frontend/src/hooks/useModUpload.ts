@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, type Mod } from '../lib/api'
+import { useI18n } from '../context/I18nContext'
 
 /**
  * Flux d'upload partagé par SectionMods et SectionMaps (formulaire simple :
@@ -9,6 +10,7 @@ import { api, type Mod } from '../lib/api'
  * ajustement plutôt qu'une vraie déduplication.
  */
 export function useModUpload(instanceId: string, onSuccess?: (mod: Mod) => void) {
+  const { t } = useI18n()
   const [uploading, setUploading] = useState(false)
   const [error, setError]         = useState('')
 
@@ -20,7 +22,7 @@ export function useModUpload(instanceId: string, onSuccess?: (mod: Mod) => void)
       onSuccess?.(mod)
       return mod
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erreur')
+      setError(err instanceof Error ? err.message : t('error'))
       return null
     } finally {
       setUploading(false)

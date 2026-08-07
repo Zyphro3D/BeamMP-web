@@ -25,7 +25,7 @@ export function IssueRow({ issue, issueTypeLabel, fixing, fixError, onFix }: {
             {issueTypeLabel[issue.type]}
           </span>
         </div>
-        <p className="text-xs text-zinc-300 mt-1">{issue.description}</p>
+        <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-1">{issue.description}</p>
         {fixError && <p className="text-[11px] text-red-400 mt-0.5">{fixError}</p>}
       </div>
       {issue.fix && (

@@ -50,7 +50,7 @@ export function SectionConfig({ instanceId }: { instanceId: string }) {
       }
     }
     try { await api.updateConfig(instanceId, updates); setSaved(true); setTimeout(() => setSaved(false), 2000) }
-    catch (err: unknown) { setError(err instanceof Error ? err.message : 'Erreur') }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : t('error')) }
     finally { setSaving(false) }
   }
 
@@ -81,14 +81,14 @@ export function SectionConfig({ instanceId }: { instanceId: string }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nom du serveur avec éditeur BeamMP */}
           <div className="space-y-1.5">
-            <label className="text-xs text-zinc-400">{t('server_name_label')}</label>
-            <BeamMPTextEditor name="Name" value={name} onChange={setName} placeholder={t('server_name_placeholder')} />
+            <label htmlFor="config-name" className="text-xs text-zinc-400">{t('server_name_label')}</label>
+            <BeamMPTextEditor id="config-name" name="Name" value={name} onChange={setName} placeholder={t('server_name_placeholder')} />
           </div>
 
           {/* Description avec éditeur BeamMP (multiline) */}
           <div className="space-y-1.5">
-            <label className="text-xs text-zinc-400">{t('description')}</label>
-            <BeamMPTextEditor name="Description" value={desc2} onChange={setDesc2} multiline placeholder={t('description_placeholder')} />
+            <label htmlFor="config-description" className="text-xs text-zinc-400">{t('description')}</label>
+            <BeamMPTextEditor id="config-description" name="Description" value={desc2} onChange={setDesc2} multiline placeholder={t('description_placeholder')} />
           </div>
 
           {CONFIG_KEY_DEFS.map(({key, labelKey, type}) => (

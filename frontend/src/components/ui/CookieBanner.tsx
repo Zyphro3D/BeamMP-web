@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Cookie } from 'lucide-react'
+import { useI18n } from '../../context/I18nContext'
 
 export function CookieBanner() {
+  const { t } = useI18n()
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -19,13 +21,13 @@ export function CookieBanner() {
       <div className="flex items-start gap-3">
         <Cookie size={18} className="text-accent shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm font-medium text-zinc-100">Cookies</p>
+          <p className="text-sm font-medium text-zinc-100">{t('cookie_title')}</p>
           <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-            Ce site utilise des cookies essentiels pour la session. Aucune donnée n'est partagée avec des tiers.
+            {t('cookie_desc')}
           </p>
           <div className="flex gap-2 mt-3">
-            <button onClick={accept} className="btn-accent text-xs py-1.5">Accepter</button>
-            <button onClick={decline} className="btn-ghost text-xs py-1.5">Refuser</button>
+            <button onClick={accept} className="btn-accent text-xs py-1.5">{t('cookie_accept')}</button>
+            <button onClick={decline} className="btn-ghost text-xs py-1.5">{t('cookie_decline')}</button>
           </div>
         </div>
       </div>

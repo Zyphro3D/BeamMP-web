@@ -67,7 +67,7 @@ export function SectionScanImport({ instanceId, onRefresh }: { instanceId: strin
         <>
           <div className="grid grid-cols-4 gap-3">
             {[
-              { label: t('import_total'),    value: report.total,    color: 'text-zinc-300' },
+              { label: t('import_total'),    value: report.total,    color: 'text-zinc-700 dark:text-zinc-300' },
               { label: t('import_imported'), value: report.imported, color: 'text-green-400' },
               { label: t('import_skipped'),  value: report.skipped,  color: 'text-zinc-500' },
               { label: t('import_errors'),   value: report.errors,   color: 'text-red-400'  },
@@ -99,7 +99,7 @@ export function SectionScanImport({ instanceId, onRefresh }: { instanceId: strin
                   {report.results.map((r, idx) => (
                     <tr key={idx} className="border-b border-surface-border/50 last:border-0">
                       <td className="p-3 font-mono text-zinc-400 max-w-[180px] truncate">{r.filename}</td>
-                      <td className="p-3 text-zinc-300">{r.name ?? '—'}</td>
+                      <td className="p-3 text-zinc-700 dark:text-zinc-300">{r.name ?? '—'}</td>
                       <td className="p-3 text-zinc-500">{typeLabel(r.type)}</td>
                       <td className="p-3">
                         {r.hasImage

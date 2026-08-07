@@ -68,7 +68,7 @@ export function SectionUpload({ instanceId, onRefresh }: { instanceId: string; o
       update(idx, { status: 'done', modId: mod.id })
       onRefresh()
     } catch (err: unknown) {
-      update(idx, { status: 'error', error: err instanceof Error ? err.message : 'Erreur' })
+      update(idx, { status: 'error', error: err instanceof Error ? err.message : t('error') })
     }
   }
 
@@ -126,14 +126,14 @@ export function SectionUpload({ instanceId, onRefresh }: { instanceId: string; o
                 <div className="grid grid-cols-2 gap-3">
                   {/* Nom */}
                   <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_display_name')} <span className="text-red-400">*</span></label>
-                    <input value={item.name} onChange={e => update(idx, { name: e.target.value })}
+                    <label htmlFor={`upload-name-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_display_name')} <span className="text-red-400">*</span></label>
+                    <input id={`upload-name-${idx}`} value={item.name} onChange={e => update(idx, { name: e.target.value })}
                       className="input text-xs w-full" placeholder={t('mod_name')} />
                   </div>
                   {/* Type */}
                   <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_type')} <span className="text-red-400">*</span></label>
-                    <select value={item.type} onChange={e => update(idx, { type: e.target.value as UploadItem['type'] })}
+                    <label htmlFor={`upload-type-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_type')} <span className="text-red-400">*</span></label>
+                    <select id={`upload-type-${idx}`} value={item.type} onChange={e => update(idx, { type: e.target.value as UploadItem['type'] })}
                       className="input text-xs w-full">
                       <option value="mod">{t('mod')}</option>
                       <option value="vehicle">{t('vehicle')}</option>
@@ -143,15 +143,15 @@ export function SectionUpload({ instanceId, onRefresh }: { instanceId: string; o
                   {/* Map ID (only for map type) */}
                   {item.type === 'map' && (
                     <div className="col-span-2 space-y-1">
-                      <label className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('map_id_label')} <span className="text-red-400">*</span></label>
-                      <input value={item.mapId} onChange={e => update(idx, { mapId: e.target.value })}
+                      <label htmlFor={`upload-mapid-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('map_id_label')} <span className="text-red-400">*</span></label>
+                      <input id={`upload-mapid-${idx}`} value={item.mapId} onChange={e => update(idx, { mapId: e.target.value })}
                         className="input text-xs w-full font-mono" placeholder="/levels/nomdelacarte/info.json" />
                     </div>
                   )}
                   {/* Description */}
                   <div className="col-span-2 space-y-1">
-                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('description')}</label>
-                    <textarea value={item.description} onChange={e => update(idx, { description: e.target.value })}
+                    <label htmlFor={`upload-desc-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('description')}</label>
+                    <textarea id={`upload-desc-${idx}`} value={item.description} onChange={e => update(idx, { description: e.target.value })}
                       className="input text-xs w-full resize-none" rows={2} placeholder={t('no_description')} />
                   </div>
                   {/* Image */}

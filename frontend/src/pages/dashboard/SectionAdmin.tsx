@@ -24,12 +24,12 @@ export function SectionAdmin() {
   const review = async (action: 'approve'|'reject') => {
     if (!reviewing) return; setError('')
     try { await api.reviewRequest(reviewing.id, action, action === 'approve' ? password : undefined); setReviewing(null); setPassword(''); refresh() }
-    catch (err: unknown) { setError(err instanceof Error ? err.message : 'Erreur') }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : t('error')) }
   }
 
   const removeUser = async (u: User) => {
     if (!confirm(t('confirm_delete_user'))) return
-    await api.deleteUser(u.id).then(refresh).catch(err => setError(err instanceof Error ? err.message : 'Erreur'))
+    await api.deleteUser(u.id).then(refresh).catch(err => setError(err instanceof Error ? err.message : t('error')))
   }
 
   const pending = requests.filter(r => r.status === 'pending')
@@ -71,7 +71,7 @@ export function SectionAdmin() {
               </div>
               <select value={u.role}
                 onChange={e => api.updateUserRole(u.id, e.target.value).then(refresh).catch(() => {})}
-                className="text-[11px] bg-surface border border-surface-border rounded-md px-2 py-1 text-zinc-300">
+                className="text-[11px] bg-surface border border-surface-border rounded-md px-2 py-1 text-zinc-700 dark:text-zinc-300">
                 <option value="superadmin">superadmin</option>
                 <option value="admin">admin</option>
                 <option value="moderator">moderator</option>
@@ -92,7 +92,7 @@ export function SectionAdmin() {
         <Modal title={`${t('request_from')} ${reviewing.beammp_username}`} onClose={() => { setReviewing(null); setPassword('') }}>
           <div className="space-y-4">
             <div className="text-xs text-zinc-500 space-y-1">
-              <p>{t('connections_label')} <strong className="text-zinc-300">{reviewing.connection_count ?? 0}</strong></p>
+              <p>{t('connections_label')} <strong className="text-zinc-700 dark:text-zinc-300">{reviewing.connection_count ?? 0}</strong></p>
               {reviewing.last_seen && <p>{t('last_seen_label')} {new Date(reviewing.last_seen).toLocaleDateString()}</p>}
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}

@@ -112,10 +112,10 @@ export function SectionMaps({ instanceId, maps, onRefresh, loading, onNeedsResta
         <Modal title={t('add_map')} onClose={() => setShowUpload(false)}>
           <form onSubmit={handleUpload} className="space-y-3">
             {upError && <p className="text-xs text-red-400">{upError}</p>}
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('mod_display_name')}</label><input name="name" required className="input" /></div>
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('map_id_label')}</label><input name="map_id" required className="input font-mono text-xs" placeholder="/levels/mapname/info.json" /></div>
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('description')}</label><input name="description" className="input" /></div>
-            <div className="space-y-1"><label className="text-xs text-zinc-400">{t('mod_file')}</label><input name="file" type="file" accept=".zip" required className="input py-1.5 text-xs" /></div>
+            <div className="space-y-1"><label htmlFor="map-name" className="text-xs text-zinc-400">{t('mod_display_name')}</label><input id="map-name" name="name" required className="input" /></div>
+            <div className="space-y-1"><label htmlFor="map-id" className="text-xs text-zinc-400">{t('map_id_label')}</label><input id="map-id" name="map_id" required className="input font-mono text-xs" placeholder="/levels/mapname/info.json" /></div>
+            <div className="space-y-1"><label htmlFor="map-description" className="text-xs text-zinc-400">{t('description')}</label><input id="map-description" name="description" className="input" /></div>
+            <div className="space-y-1"><label htmlFor="map-file" className="text-xs text-zinc-400">{t('mod_file')}</label><input id="map-file" name="file" type="file" accept=".zip" required className="input py-1.5 text-xs" /></div>
             <button type="submit" disabled={uploading} className="btn-accent w-full justify-center">{uploading ? t('uploading_progress') : t('add')}</button>
           </form>
         </Modal>
