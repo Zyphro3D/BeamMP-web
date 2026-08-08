@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Car, Package, Pencil, Trash2 } from 'lucide-react'
-import type { Mod } from '../../lib/api'
+import { useRef, useState } from 'react'
+import { Car, Image as ImageIcon, Package, Pencil, Trash2 } from 'lucide-react'
+import { api, type Mod } from '../../lib/api'
 import { Toggle } from '../ui/Toggle'
 import { useI18n } from '../../context/I18nContext'
 import { desc } from '../../lib/desc'
@@ -11,7 +11,21 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
 }) {
   const { t, lang } = useI18n()
   const [editingDesc, setEditingDesc] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const modDesc = desc(mod.description, lang)
+
+  const handleImageChange = async (file: File | undefined) => {
+    if (!file) return
+    setUploadingImg(true)
+    try {
+      await api.uploadModImage(instanceId, mod.id, file)
+      onRefresh()
+    } finally {
+      setUploadingImg(false)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+  }
 
   return (
     <>
@@ -40,6 +54,13 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
               {t(mod.active ? 'active' : 'inactive')}
             </span>
             <div className="flex-1" />
+            <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
+              onChange={e => handleImageChange(e.target.files?.[0])} />
+            <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImg}
+              className="p-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+              title={t('change_image')} aria-label={t('change_image')}>
+              <ImageIcon size={12} />
+            </button>
             <button onClick={() => setEditingDesc(true)}
               className="p-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-lg transition-colors"
               title={t('edit_description')} aria-label={t('edit_description')}>

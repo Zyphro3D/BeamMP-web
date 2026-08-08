@@ -8,6 +8,8 @@ import { sendDiscordNotification } from '../services/discord'
 import { invalidateCache } from '../services/beammp'
 import { restartViaAgent } from '../services/agent'
 import { getInstance } from '../lib/getInstance'
+import { extractZipPreviewImage } from '../lib/zipPreview'
+import StreamZip from 'node-stream-zip'
 import { logActivity } from '../services/activity'
 import {
   readFile, readFileAsync, writeFile, uploadFile, deleteFile,
@@ -97,6 +99,20 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const destPath = path.join(destDir, safeFilename)
       uploadFile(destPath, buffer)
 
+      // Best-effort: reuse the same preview-image conventions as Scan & Import
+      // so a manual upload doesn't require a follow-up image edit when the zip
+      // already ships one (preview.jpg, icon.png, vehicles/<name>/*.jpg, …).
+      let imageFilename: string | null = null
+      try {
+        const zip = new StreamZip.async({ file: destPath })
+        try {
+          const entries = await zip.entries()
+          imageFilename = await extractZipPreviewImage(zip, Object.keys(entries), IMAGES, path.parse(safeFilename).name)
+        } finally {
+          await zip.close()
+        }
+      } catch { /* not a browsable archive — no preview, non-critical */ }
+
       const descJson = desc ? JSON.stringify({ fr: desc }) : null
 
       // Maps: only one can be active at a time — new maps start inactive if one already exists
@@ -110,9 +126,9 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const result = await db.query(
-        `INSERT INTO mods (instance_id, name, type, filename, description, active, map_id)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7) RETURNING *`,
-        [inst.id, name, type, safeFilename, descJson, startActive, map_id]
+        `INSERT INTO mods (instance_id, name, type, filename, description, active, map_id, image)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8) RETURNING *`,
+        [inst.id, name, type, safeFilename, descJson, startActive, map_id, imageFilename]
       )
 
       logActivity(inst.id, 'mod_upload', `Mod uploadé · ${name}`)

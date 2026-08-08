@@ -117,6 +117,17 @@ la fonctionnalité **Scan & Import** (sidebar → Import) pour les enregistrer a
 en base de données. Le scan extrait le nom depuis `info.json` et l'image de prévisualisation
 depuis le zip.
 
+**Images des mods/véhicules/cartes :**
+
+- **Automatique** — à l'upload (formulaire simple ou Scan & Import), le panel cherche une
+  image de prévisualisation dans l'archive (`preview.jpg`, `icon.png`, la texture par défaut
+  d'un véhicule, une image sous `levels/<nom>/`…) et la génère en `.webp`. Aucune garantie
+  de résultat : de nombreux mods ne fournissent pas d'image exploitable dans ce sens.
+- **Manuelle** — l'icône image sur chaque carte (mods, véhicules, cartes) permet de choisir
+  sa propre image à tout moment, y compris pour en remplacer une déjà présente.
+- **Par défaut** — sans image (ni automatique ni manuelle), une icône générique par type
+  (véhicule/mod/carte) s'affiche à la place.
+
 ---
 
 ## Reverse proxy HTTPS

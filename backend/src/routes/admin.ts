@@ -2,11 +2,11 @@ import type { FastifyInstance, FastifyReply } from 'fastify'
 import path from 'path'
 import fs from 'fs'
 import StreamZip from 'node-stream-zip'
-import sharp from 'sharp'
 import { db } from '../db'
 import { config } from '../config'
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { getInstance } from '../lib/getInstance'
+import { extractZipPreviewImage } from '../lib/zipPreview'
 import { hashPassword } from './auth'
 import { listDir, moveFile, deleteFile, fileExists, ensureDir } from '../services/fileService'
 
@@ -17,25 +17,6 @@ function cleanFilename(filename: string): string {
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-function findPreviewEntry(entries: string[]): string | null {
-  const lower = entries.map(e => e.toLowerCase())
-  const patterns: Array<(e: string) => boolean> = [
-    e => /\/preview\.(jpg|jpeg|png|webp)$/.test(e),
-    e => /\/icon\.(jpg|jpeg|png|webp)$/.test(e),
-    // vehicle default skin — exclude license plates and templates
-    e => /\/default\.(jpg|jpeg)$/.test(e) && !e.includes('licenseplate') && !e.includes('template'),
-    // any jpg/png directly inside vehicles/<name>/
-    e => /^vehicles\/[^/]+\/[^/]+\.jpg$/.test(e) && !e.includes('licenseplate'),
-    // any jpg/png directly inside levels/<name>/
-    e => /^levels\/[^/]+\/[^/]+\.(jpg|png)$/.test(e),
-  ]
-  for (const pattern of patterns) {
-    const idx = lower.findIndex(e => pattern(e))
-    if (idx >= 0) return entries[idx]
-  }
-  return null
 }
 
 interface ZipAnalysis {
@@ -85,20 +66,7 @@ async function analyzeZip(
     }
 
     // ── Preview image ───────────────────────────────────────────
-    let imageFilename: string | null = null
-    const previewEntry = findPreviewEntry(entryNames)
-    if (previewEntry) {
-      try {
-        const imgData = await zip.entryData(previewEntry)
-        const destName = `${baseName.replace(/[^a-zA-Z0-9._-]/g, '_')}.webp`
-        const destPath = path.join(imagesDir, destName)
-        await sharp(imgData)
-          .resize(400, 300, { fit: 'cover' })
-          .webp({ quality: 85 })
-          .toFile(destPath)
-        imageFilename = destName
-      } catch { /* no image, not critical */ }
-    }
+    const imageFilename = await extractZipPreviewImage(zip, entryNames, imagesDir, baseName)
 
     return { name, type, imageFilename }
   } finally {

@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Map, Pencil, Shield, Trash2 } from 'lucide-react'
-import type { Mod } from '../../lib/api'
+import { useRef, useState } from 'react'
+import { Image as ImageIcon, Map, Pencil, Shield, Trash2 } from 'lucide-react'
+import { api, type Mod } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { desc } from '../../lib/desc'
 import { DescriptionEditor } from './DescriptionEditor'
@@ -16,7 +16,21 @@ export function MapCard({ instanceId, map, activating, onActivate, onDelete, onT
 }) {
   const { lang, t } = useI18n()
   const [editingDesc, setEditingDesc] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const mapDesc = desc(map.description, lang)
+
+  const handleImageChange = async (file: File | undefined) => {
+    if (!file) return
+    setUploadingImg(true)
+    try {
+      await api.uploadModImage(instanceId, map.id, file)
+      onRefresh()
+    } finally {
+      setUploadingImg(false)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+  }
 
   return (
     <>
@@ -64,6 +78,14 @@ export function MapCard({ instanceId, map, activating, onActivate, onDelete, onT
               className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-white/5 rounded-lg transition-colors"
               title={t('edit_description')} aria-label={t('edit_description')}>
               <Pencil size={12} />
+            </button>
+            {/* Change image */}
+            <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
+              onChange={e => handleImageChange(e.target.files?.[0])} />
+            <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImg}
+              className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+              title={t('change_image')} aria-label={t('change_image')}>
+              <ImageIcon size={12} />
             </button>
             <div className="flex-1" />
             {/* Delete (hidden for official) */}

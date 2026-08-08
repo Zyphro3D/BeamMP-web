@@ -151,7 +151,26 @@ l'infrastructure de redémarrage.
   ponctuel, pas de migration automatique — le heuristique ne s'applique
   qu'aux futurs imports).
 
-## [1.0.0] — antérieur
+## [Non publié]
+
+### Ajouté
+
+- **Modification de l'image d'un mod/véhicule/carte après upload** — l'endpoint
+  `POST /mods/:id/image` existait déjà côté backend mais n'était appelé par
+  aucune interface ; une icône dédiée sur chaque carte (`ModCard`, `MapCard`)
+  permet désormais de choisir sa propre image à tout moment.
+- **Extraction automatique de l'image de prévisualisation sur l'upload manuel**
+  (formulaire simple, hors Scan & Import) — reprend les mêmes conventions
+  (`preview.jpg`, `icon.png`, texture par défaut d'un véhicule…) via un module
+  partagé `lib/zipPreview.ts`, au lieu d'être limitée au Scan & Import.
+
+### Corrigé
+
+- **48 mods/véhicules sans image** (uploadés avant l'introduction de
+  l'extraction automatique, ou par un chemin qui ne l'appliquait pas) —
+  récupérées depuis les images de la V1 (`/var/www/.../DATA/images`, ancienne
+  base MariaDB `beammp_Officiel`) sur la base d'une correspondance exacte de
+  nom de fichier (48/48 retrouvées).
 
 Version de référence avant cette passe : réécriture V2 du panel (Fastify +
 PostgreSQL + React), multi-instance, gestion des mods/maps/config/logs,
