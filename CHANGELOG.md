@@ -166,11 +166,19 @@ l'infrastructure de redémarrage.
 
 ### Corrigé
 
-- **48 mods/véhicules sans image** (uploadés avant l'introduction de
-  l'extraction automatique, ou par un chemin qui ne l'appliquait pas) —
-  récupérées depuis les images de la V1 (`/var/www/.../DATA/images`, ancienne
-  base MariaDB `beammp_Officiel`) sur la base d'une correspondance exacte de
-  nom de fichier (48/48 retrouvées).
+- **Images de tous les mods/véhicules/cartes resynchronisées avec la V1** —
+  l'extraction automatique (Scan & Import comme upload manuel) tire l'image
+  depuis le contenu du zip, ce qui donne parfois un résultat de moins bonne
+  qualité qu'une image choisie à la main (texture technique, angle non
+  représentatif…). Les 256 mods de l'instance ont été réassociés à l'image
+  d'origine de la V1 (`/var/www/.../DATA/images`, ancienne base MariaDB
+  `beammp_Officiel`), sur la base d'une correspondance exacte de nom de
+  fichier (256/256 retrouvées) — pas seulement ceux qui n'avaient aucune
+  image.
+- Fichiers copiés depuis la V1 avec des permissions Unix héritées de
+  l'ancien serveur web (`www-data`, non lisibles par le process Node du
+  panel) — provoquait des `500` sur `/images/*` pour les fichiers concernés ;
+  propriété et permissions corrigées.
 
 Version de référence avant cette passe : réécriture V2 du panel (Fastify +
 PostgreSQL + React), multi-instance, gestion des mods/maps/config/logs,
