@@ -3,6 +3,7 @@ import { api, type KnownPlayer } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { formatDuration } from '../../lib/format'
 import { Avatar } from '../../components/ui/Avatar'
+import { rankIcon, rankLabelKey, rankTier } from '../../lib/rank'
 
 export function SectionPlayers({ instanceId }: { instanceId: string }) {
   const { t } = useI18n()
@@ -26,19 +27,27 @@ export function SectionPlayers({ instanceId }: { instanceId: string }) {
 
       {loading ? <p className="text-sm text-zinc-600">{t('loading')}</p> : (
         <div className="card divide-y divide-surface-border">
-          {players.map((p, i) => (
-            <div key={p.id} className="flex items-center gap-3 px-4 py-3">
-              <span className="text-zinc-700 text-xs font-mono w-6 text-right shrink-0">#{i+1}</span>
-              <Avatar name={p.beammp_username} size={8} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{p.beammp_username}</p>
+          {players.map((p, i) => {
+            const tier = rankTier(p.connection_count)
+            return (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="text-zinc-700 text-xs font-mono w-6 text-right shrink-0">#{i+1}</span>
+                <Avatar name={p.beammp_username} size={8} />
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <p className="text-sm font-medium truncate">{p.beammp_username}</p>
+                  {tier && (
+                    <span title={t(rankLabelKey(tier))} aria-label={t(rankLabelKey(tier))} className="shrink-0">
+                      {rankIcon(tier)}
+                    </span>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-zinc-400 font-mono">{p.connection_count} {t('connections')}</p>
+                  <p className="text-sm font-semibold text-accent font-mono">{formatDuration(p.total_seconds)}</p>
+                </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-zinc-400 font-mono">{p.connection_count} {t('connections')}</p>
-                <p className="text-sm font-semibold text-accent font-mono">{formatDuration(p.total_seconds)}</p>
-              </div>
-            </div>
-          ))}
+            )
+          })}
           {players.length === 0 && <p className="p-8 text-center text-zinc-700 text-sm">{t('no_player')}</p>}
         </div>
       )}

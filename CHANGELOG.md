@@ -163,6 +163,15 @@ l'infrastructure de redémarrage.
   (formulaire simple, hors Scan & Import) — reprend les mêmes conventions
   (`preview.jpg`, `icon.png`, texture par défaut d'un véhicule…) via un module
   partagé `lib/zipPreview.ts`, au lieu d'être limitée au Scan & Import.
+- **Badge de rang** (🥉 Bronze / 🥈 Argent / 🥇 Or / 💎 Platine, par
+  `connection_count`) affiché à côté de chaque joueur dans *Joueurs* — jusqu'ici
+  visible uniquement dans le message Discord de connexion.
+- **`scripts/migrate-v1-to-v2.mjs`** — outil de migration réutilisable pour
+  quiconque passe de la V1 à la V2 : resynchronise les images et fusionne les
+  statistiques joueurs depuis l'ancienne base MariaDB, signale les mods sans
+  équivalent V2 à traiter via Scan & Import. Mode aperçu par défaut. Documenté
+  dans le README (section *Migration depuis la V1*, réécrite — l'ancienne
+  documentation référençait un `migrate.js`/`import.js` jamais implémenté).
 
 ### Corrigé
 
@@ -179,6 +188,9 @@ l'infrastructure de redémarrage.
   l'ancien serveur web (`www-data`, non lisibles par le process Node du
   panel) — provoquait des `500` sur `/images/*` pour les fichiers concernés ;
   propriété et permissions corrigées.
+- **`known_players` était vide côté V2** — la section *Joueurs* n'avait jamais
+  affiché aucune donnée depuis la bascule. Les 335 joueurs de la V1
+  (connexions, temps de jeu, dernière activité) ont été importés.
 
 Version de référence avant cette passe : réécriture V2 du panel (Fastify +
 PostgreSQL + React), multi-instance, gestion des mods/maps/config/logs,

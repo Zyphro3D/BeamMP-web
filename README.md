@@ -311,62 +311,40 @@ gunzip -c backups/beammp-panel-20260101-030000.sql.gz | docker compose exec -T p
 
 ## Migration depuis la V1 (MariaDB)
 
-### Méthode 1 — Via dump SQL (recommandée)
+`scripts/migrate-v1-to-v2.mjs` reprend les données de l'ancien panel (PHP +
+MariaDB) une fois les mods déjà enregistrés en V2 via **Scan & Import**.
+Mode aperçu par défaut (aucune écriture sans `--apply`).
 
-**1. Exporter depuis MariaDB** (sur la machine BeamMP) :
-
-```bash
-mysqldump -u <user> -p beammp_db beammp_Officiel users beammp_users_Officiel > migrate/dump.sql
-```
-
-**2. Lancer la migration** en copiant le dossier dans le container :
-
-```bash
-docker cp migrate/ beammp-panel-app-1:/tmp/migrate
-docker exec -it beammp-panel-app-1 sh -c "cd /tmp/migrate && npm install && node migrate.js"
-```
-
-### Méthode 2 — Via export TSV (alternative)
-
-Si MariaDB est inaccessible directement depuis la machine Docker :
-
-**1. Sur la machine BeamMP**, exporter en TSV :
+**Prérequis** — le site V1 (dossier contenant son `.env` et `DATA/images/`)
+doit être accessible en lecture depuis la machine qui lance le script, et sa
+base MariaDB démarrée et joignable (`DB_HOST`/`DB_NAME`/`DB_USER`/
+`DB_PASSWORD` sont lus directement depuis le `.env` du site V1, pas besoin de
+les ressaisir).
 
 ```bash
-# Mods
-mysql -u <user> -p --batch --silent beammp_db -e \
-  "SELECT nom, description, type, archive, image, id_map, map_active, mod_actif, date FROM beammp_Officiel" \
-  > migrate/mods.tsv
+# Aperçu (rien n'est modifié)
+node scripts/migrate-v1-to-v2.mjs --v1-root=/var/www/mon-ancien-site
 
-# Joueurs
-mysql -u <user> -p --batch --silent beammp_db -e \
-  "SELECT username, connection_count, last_connect, last_disconnect, total_time FROM beammp_users_Officiel" \
-  > migrate/players.tsv
+# Application réelle
+node scripts/migrate-v1-to-v2.mjs --v1-root=/var/www/mon-ancien-site --apply
 ```
 
-**2. Copier les fichiers TSV** dans le dossier `migrate/` sur la machine Docker.
+### Ce qui est repris
 
-**3. Lancer l'import :**
-
-```bash
-docker cp migrate/ beammp-panel-app-1:/tmp/migrate
-docker exec -it beammp-panel-app-1 sh -c "cd /tmp/migrate && npm install && node import.js"
-```
-
-### Ce qui est migré
-
-| Source (MariaDB) | Destination (PostgreSQL) | Notes |
+| Donnée V1 | Effet côté V2 | Détail |
 |---|---|---|
-| `users` | `users` | Rôles conservés — **mots de passe non migrés** |
-| `beammp_<instance>` | `mods` | Mods, maps, véhicules |
-| `beammp_users_<instance>` | `known_players` | Historique joueurs |
+| Images (`beammp_Officiel.image`) | `mods.image` | Pour chaque mod déjà présent en V2 (même `filename`), l'image V1 **remplace** l'image actuelle (l'extraction automatique depuis le zip donne souvent un résultat de moins bonne qualité qu'une image choisie à la main). |
+| Joueurs (`beammp_users_Officiel`) | `known_players` | Fusionné avec les stats V2 existantes plutôt qu'écrasé : `connection_count`/temps de jeu s'additionnent (périodes disjointes avant/après bascule), les dates prennent la plus ancienne/récente des deux sources. Le rang (🥉🥈🥇💎, visible dans *Joueurs*) est recalculé automatiquement depuis `connection_count` — rien à migrer séparément. |
+| Mods sans équivalent V2 | *(rapport seulement, aucune écriture)* | Un mod ne peut pas être recréé sans son `.zip` — le script liste ceux qui n'ont pas de ligne V2 correspondante, à traiter via **Scan & Import** si le fichier est toujours dans `Resources/`. |
 
-Après migration : réinitialiser les mots de passe via *Administration → Utilisateurs*.
+**Non repris, volontairement** : les comptes admin V1 (`users`) — schéma de
+mot de passe différent, et V2 a son propre flux de compte (demande +
+approbation). Créer les comptes nécessaires depuis *Administration*.
 
-> Si l'`instance_id` inséré ne correspond pas à `default`, corriger avec :
-> ```sql
-> UPDATE mods SET instance_id = 'default' WHERE instance_id != 'default';
-> ```
+**Idempotent** pour les images (une resynchronisation écrase avec la même
+valeur), mais **pas** pour les joueurs si relancé avec les mêmes données V1 —
+la fusion additionne les compteurs à chaque exécution. Ne lancer l'import
+joueurs qu'une fois par site V1 source.
 
 ---
 
