@@ -20,11 +20,19 @@ dernière entrée de ce fichier.
   `connection_count`) affiché à côté de chaque joueur dans *Joueurs* — jusqu'ici
   visible uniquement dans le message Discord de connexion.
 - **`scripts/migrate-v1-to-v2.mjs`** — outil de migration réutilisable pour
-  quiconque passe de la V1 à la V2 : resynchronise les images et fusionne les
-  statistiques joueurs depuis l'ancienne base MariaDB, signale les mods sans
-  équivalent V2 à traiter via Scan & Import. Mode aperçu par défaut. Documenté
-  dans le README (section *Migration depuis la V1*, réécrite — l'ancienne
-  documentation référençait un `migrate.js`/`import.js` jamais implémenté).
+  quiconque passe de la V1 à la V2 : resynchronise images et descriptions,
+  fusionne les statistiques joueurs depuis l'ancienne base MariaDB, signale
+  les mods sans équivalent V2 à traiter via Scan & Import. Mode aperçu par
+  défaut. Remplace `migrate/migrate.js` et `migrate/import.js` (présents
+  depuis le tout premier commit du dépôt, mais cassés depuis le passage
+  multi-instance : `ON CONFLICT` sur `beammp_username`/`filename` seuls,
+  alors que la contrainte réelle est désormais `(instance_id, ...)` —
+  dossier `migrate/` supprimé, remplacé par cet outil unique et testé.
+- Import des **descriptions** de mods/véhicules/cartes depuis la V1
+  (`DATA/descriptions/*.json`) dans `scripts/migrate-v1-to-v2.mjs` — ne
+  remplit que les descriptions V2 actuellement vides (jamais d'écrasement,
+  contrairement aux images), ignore les descriptions V1 auto-générées sans
+  contenu réel ("Description non fournie.", "Description pour X").
 
 ### Corrigé
 
@@ -44,6 +52,11 @@ dernière entrée de ce fichier.
 - **`known_players` était vide côté V2** — la section *Joueurs* n'avait jamais
   affiché aucune donnée depuis la bascule. Les 335 joueurs de la V1
   (connexions, temps de jeu, dernière activité) ont été importés.
+- **Descriptions jamais migrées depuis la V1** — 36 mods/véhicules/cartes de
+  l'instance avaient un texte descriptif réel en V1 (hors placeholders
+  auto-générés), perdu lors de la bascule vers la V2 ; réimportés.
+- **`package.json` (backend et frontend) resté à `1.0.0`** alors que
+  `PANEL_VERSION`/le changelog étaient déjà à `1.1.0` — remis en cohérence.
 - **`GET /api/admin/players` exigeait `superadmin`** alors que le lien
   *Joueurs* est visible dans le menu pour tous les rôles — un `admin` ou
   `moderator` tombait sur une erreur 403 en cliquant dessus. Abaissé à

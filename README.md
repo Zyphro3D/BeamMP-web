@@ -315,11 +315,11 @@ gunzip -c backups/beammp-panel-20260101-030000.sql.gz | docker compose exec -T p
 MariaDB) une fois les mods déjà enregistrés en V2 via **Scan & Import**.
 Mode aperçu par défaut (aucune écriture sans `--apply`).
 
-**Prérequis** — le site V1 (dossier contenant son `.env` et `DATA/images/`)
-doit être accessible en lecture depuis la machine qui lance le script, et sa
-base MariaDB démarrée et joignable (`DB_HOST`/`DB_NAME`/`DB_USER`/
-`DB_PASSWORD` sont lus directement depuis le `.env` du site V1, pas besoin de
-les ressaisir).
+**Prérequis** — le site V1 (dossier contenant son `.env` et `DATA/images/` +
+`DATA/descriptions/`) doit être accessible en lecture depuis la machine qui
+lance le script, et sa base MariaDB démarrée et joignable (`DB_HOST`/
+`DB_NAME`/`DB_USER`/`DB_PASSWORD` sont lus directement depuis le `.env` du
+site V1, pas besoin de les ressaisir).
 
 ```bash
 # Aperçu (rien n'est modifié)
@@ -334,6 +334,7 @@ node scripts/migrate-v1-to-v2.mjs --v1-root=/var/www/mon-ancien-site --apply
 | Donnée V1 | Effet côté V2 | Détail |
 |---|---|---|
 | Images (`beammp_Officiel.image`) | `mods.image` | Pour chaque mod déjà présent en V2 (même `filename`), l'image V1 **remplace** l'image actuelle (l'extraction automatique depuis le zip donne souvent un résultat de moins bonne qualité qu'une image choisie à la main). |
+| Descriptions (`beammp_Officiel.description`) | `mods.description` | Ne **remplit que les descriptions V2 actuellement vides** (jamais d'écrasement — contrairement aux images, c'est du texte éditorial qui a pu être réécrit côté V2). Les descriptions V1 auto-générées ("Description non fournie.", "Description pour X") sont ignorées. |
 | Joueurs (`beammp_users_Officiel`) | `known_players` | Fusionné avec les stats V2 existantes plutôt qu'écrasé : `connection_count`/temps de jeu s'additionnent (périodes disjointes avant/après bascule), les dates prennent la plus ancienne/récente des deux sources. Le rang (🥉🥈🥇💎, visible dans *Joueurs*) est recalculé automatiquement depuis `connection_count` — rien à migrer séparément. |
 | Mods sans équivalent V2 | *(rapport seulement, aucune écriture)* | Un mod ne peut pas être recréé sans son `.zip` — le script liste ceux qui n'ont pas de ligne V2 correspondante, à traiter via **Scan & Import** si le fichier est toujours dans `Resources/`. |
 
@@ -342,9 +343,10 @@ mot de passe différent, et V2 a son propre flux de compte (demande +
 approbation). Créer les comptes nécessaires depuis *Administration*.
 
 **Idempotent** pour les images (une resynchronisation écrase avec la même
-valeur), mais **pas** pour les joueurs si relancé avec les mêmes données V1 —
-la fusion additionne les compteurs à chaque exécution. Ne lancer l'import
-joueurs qu'une fois par site V1 source.
+valeur) et les descriptions (ne touche jamais une ligne déjà remplie), mais
+**pas** pour les joueurs si relancé avec les mêmes données V1 — la fusion
+additionne les compteurs à chaque exécution. Ne lancer l'import joueurs
+qu'une fois par site V1 source.
 
 ---
 

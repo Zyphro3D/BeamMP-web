@@ -7,6 +7,11 @@
  *   - images des mods/véhicules/cartes (écrase les images déjà présentes en V2 —
  *     l'extraction automatique par zip donne souvent un résultat de moins bonne
  *     qualité que l'image choisie à la main en V1)
+ *   - descriptions des mods/véhicules/cartes (ne remplit que les descriptions
+ *     V2 actuellement vides — celles-ci sont du texte éditorial, contrairement
+ *     aux images ; on n'écrase jamais un texte déjà (re)écrit côté V2). Les
+ *     descriptions V1 générées automatiquement ("Description non fournie.",
+ *     "Description pour X") sont ignorées, elles n'apportent rien.
  *   - statistiques joueurs (connection_count, temps de jeu, dernière connexion),
  *     fusionnées avec les stats déjà accumulées en V2 le cas échéant (pas un
  *     simple écrasement — utile si le script est relancé ou si le panel V2
@@ -21,12 +26,14 @@
  *   node scripts/migrate-v1-to-v2.mjs --v1-root=/var/www/mon-ancien-site [options]
  *
  * Options :
- *   --v1-root=<path>      Racine du site V1 (contient .env et DATA/) [requis]
- *   --v1-images=<path>    Dossier images V1 (défaut : <v1-root>/DATA/images)
- *   --instance=<id>       Instance V2 ciblée (défaut : default)
- *   --skip-images         Ne pas resynchroniser les images
- *   --skip-players        Ne pas importer les joueurs
- *   --apply                Applique réellement les changements (sinon dry-run)
+ *   --v1-root=<path>         Racine du site V1 (contient .env et DATA/) [requis]
+ *   --v1-images=<path>       Dossier images V1 (défaut : <v1-root>/DATA/images)
+ *   --v1-descriptions=<path> Dossier descriptions V1 (défaut : <v1-root>/DATA/descriptions)
+ *   --instance=<id>          Instance V2 ciblée (défaut : default)
+ *   --skip-images            Ne pas resynchroniser les images
+ *   --skip-descriptions      Ne pas importer les descriptions
+ *   --skip-players           Ne pas importer les joueurs
+ *   --apply                  Applique réellement les changements (sinon dry-run)
  */
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -47,12 +54,18 @@ if (!args['v1-root']) {
   process.exit(1)
 }
 
-const V1_ROOT      = path.resolve(String(args['v1-root']))
-const V1_IMAGES    = args['v1-images'] ? path.resolve(String(args['v1-images'])) : path.join(V1_ROOT, 'DATA', 'images')
-const INSTANCE_ID  = args.instance ?? 'default'
-const APPLY        = !!args.apply
-const SKIP_IMAGES  = !!args['skip-images']
-const SKIP_PLAYERS = !!args['skip-players']
+const V1_ROOT         = path.resolve(String(args['v1-root']))
+const V1_IMAGES       = args['v1-images'] ? path.resolve(String(args['v1-images'])) : path.join(V1_ROOT, 'DATA', 'images')
+const V1_DESCRIPTIONS = args['v1-descriptions'] ? path.resolve(String(args['v1-descriptions'])) : path.join(V1_ROOT, 'DATA', 'descriptions')
+const INSTANCE_ID       = args.instance ?? 'default'
+const APPLY             = !!args.apply
+const SKIP_IMAGES       = !!args['skip-images']
+const SKIP_DESCRIPTIONS = !!args['skip-descriptions']
+const SKIP_PLAYERS      = !!args['skip-players']
+
+// Descriptions auto-générées par la V1 quand l'utilisateur n'a rien renseigné —
+// aucune valeur éditoriale, ne valent pas la peine d'être importées.
+const PLACEHOLDER_DESCRIPTION_RE = /^(Description non fournie\.|Description pour .+)$/
 
 function sqlEscape(str) {
   return String(str).replace(/'/g, "''")
@@ -192,6 +205,48 @@ function syncImages(creds) {
   console.log(`${matches.length} image(s) synchronisée(s).`)
 }
 
+// ── Descriptions ─────────────────────────────────────────────────────────
+function syncDescriptions(creds) {
+  console.log('\n=== Descriptions (mods/véhicules/cartes) ===')
+  const v1Rows = queryV1(creds, `SELECT chemin, description FROM beammp_Officiel WHERE description IS NOT NULL AND description != ''`)
+  const v2Rows = queryV2(`SELECT filename FROM mods WHERE instance_id = '${sqlEscape(INSTANCE_ID)}' AND description IS NULL`)
+  const v2FilenamesWithoutDesc = new Set(v2Rows.map(r => r[0]))
+
+  const matches = []
+  let placeholderCount = 0
+  for (const [chemin, description] of v1Rows) {
+    if (!v2FilenamesWithoutDesc.has(chemin)) continue
+    const basename = description.replace(/^\/?descriptions\//, '')
+    const srcPath = path.join(V1_DESCRIPTIONS, basename)
+    if (!fs.existsSync(srcPath)) continue
+
+    let parsed
+    try {
+      parsed = JSON.parse(fs.readFileSync(srcPath, 'utf8'))
+    } catch {
+      continue
+    }
+    const real = Object.fromEntries(
+      Object.entries(parsed).filter(([, v]) => v && !PLACEHOLDER_DESCRIPTION_RE.test(String(v).trim()))
+    )
+    if (Object.keys(real).length === 0) { placeholderCount++; continue }
+    matches.push({ chemin, description: real })
+  }
+
+  console.log(`${matches.length} mod(s) V2 sans description avec un contenu V1 exploitable`)
+  console.log(`(${placeholderCount} ignorée(s) — texte V1 auto-généré sans valeur).`)
+  if (!APPLY) {
+    console.log('(dry-run — relancer avec --apply pour importer)')
+    return
+  }
+
+  const sql = matches.map(m =>
+    `UPDATE mods SET description = '${sqlEscape(JSON.stringify(m.description))}'::jsonb WHERE filename = '${sqlEscape(m.chemin)}' AND instance_id = '${sqlEscape(INSTANCE_ID)}' AND description IS NULL;`
+  )
+  applyV2Sql(sql)
+  console.log(`${matches.length} description(s) importée(s).`)
+}
+
 // ── Joueurs ──────────────────────────────────────────────────────────────
 function importPlayers(creds) {
   console.log('\n=== Joueurs ===')
@@ -236,10 +291,12 @@ function importPlayers(creds) {
 console.log(`Migration V1 -> V2 (instance "${INSTANCE_ID}") ${APPLY ? '[APPLY]' : '[DRY-RUN]'}`)
 console.log(`V1 root: ${V1_ROOT}`)
 console.log(`V1 images: ${V1_IMAGES}`)
+console.log(`V1 descriptions: ${V1_DESCRIPTIONS}`)
 
 const creds = readV1Credentials()
 reportUnmatchedMods(creds)
-if (!SKIP_IMAGES)  syncImages(creds)
-if (!SKIP_PLAYERS) importPlayers(creds)
+if (!SKIP_IMAGES)       syncImages(creds)
+if (!SKIP_DESCRIPTIONS) syncDescriptions(creds)
+if (!SKIP_PLAYERS)      importPlayers(creds)
 
 console.log('\nTerminé.')
