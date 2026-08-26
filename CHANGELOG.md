@@ -4,6 +4,53 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [Non publié]
+
+### Ajouté
+
+- **Modification de l'image d'un mod/véhicule/carte après upload** — l'endpoint
+  `POST /mods/:id/image` existait déjà côté backend mais n'était appelé par
+  aucune interface ; une icône dédiée sur chaque carte (`ModCard`, `MapCard`)
+  permet désormais de choisir sa propre image à tout moment.
+- **Extraction automatique de l'image de prévisualisation sur l'upload manuel**
+  (formulaire simple, hors Scan & Import) — reprend les mêmes conventions
+  (`preview.jpg`, `icon.png`, texture par défaut d'un véhicule…) via un module
+  partagé `lib/zipPreview.ts`, au lieu d'être limitée au Scan & Import.
+- **Badge de rang** (🥉 Bronze / 🥈 Argent / 🥇 Or / 💎 Platine, par
+  `connection_count`) affiché à côté de chaque joueur dans *Joueurs* — jusqu'ici
+  visible uniquement dans le message Discord de connexion.
+- **`scripts/migrate-v1-to-v2.mjs`** — outil de migration réutilisable pour
+  quiconque passe de la V1 à la V2 : resynchronise les images et fusionne les
+  statistiques joueurs depuis l'ancienne base MariaDB, signale les mods sans
+  équivalent V2 à traiter via Scan & Import. Mode aperçu par défaut. Documenté
+  dans le README (section *Migration depuis la V1*, réécrite — l'ancienne
+  documentation référençait un `migrate.js`/`import.js` jamais implémenté).
+
+### Corrigé
+
+- **Images de tous les mods/véhicules/cartes resynchronisées avec la V1** —
+  l'extraction automatique (Scan & Import comme upload manuel) tire l'image
+  depuis le contenu du zip, ce qui donne parfois un résultat de moins bonne
+  qualité qu'une image choisie à la main (texture technique, angle non
+  représentatif…). Les 256 mods de l'instance ont été réassociés à l'image
+  d'origine de la V1 (`/var/www/.../DATA/images`, ancienne base MariaDB
+  `beammp_Officiel`), sur la base d'une correspondance exacte de nom de
+  fichier (256/256 retrouvées) — pas seulement ceux qui n'avaient aucune
+  image.
+- Fichiers copiés depuis la V1 avec des permissions Unix héritées de
+  l'ancien serveur web (`www-data`, non lisibles par le process Node du
+  panel) — provoquait des `500` sur `/images/*` pour les fichiers concernés ;
+  propriété et permissions corrigées.
+- **`known_players` était vide côté V2** — la section *Joueurs* n'avait jamais
+  affiché aucune donnée depuis la bascule. Les 335 joueurs de la V1
+  (connexions, temps de jeu, dernière activité) ont été importés.
+- **`GET /api/admin/players` exigeait `superadmin`** alors que le lien
+  *Joueurs* est visible dans le menu pour tous les rôles — un `admin` ou
+  `moderator` tombait sur une erreur 403 en cliquant dessus. Abaissé à
+  `requireAuth`, cohérent avec le reste des données en lecture seule
+  (aucune donnée sensible dans cette liste — pseudos et statistiques déjà
+  publiques en jeu).
+
 ## [1.1.0] — 2026-08-07
 
 Passe complète suite à deux audits indépendants (sécurité, backend, qualité,
@@ -151,46 +198,7 @@ l'infrastructure de redémarrage.
   ponctuel, pas de migration automatique — le heuristique ne s'applique
   qu'aux futurs imports).
 
-## [Non publié]
-
-### Ajouté
-
-- **Modification de l'image d'un mod/véhicule/carte après upload** — l'endpoint
-  `POST /mods/:id/image` existait déjà côté backend mais n'était appelé par
-  aucune interface ; une icône dédiée sur chaque carte (`ModCard`, `MapCard`)
-  permet désormais de choisir sa propre image à tout moment.
-- **Extraction automatique de l'image de prévisualisation sur l'upload manuel**
-  (formulaire simple, hors Scan & Import) — reprend les mêmes conventions
-  (`preview.jpg`, `icon.png`, texture par défaut d'un véhicule…) via un module
-  partagé `lib/zipPreview.ts`, au lieu d'être limitée au Scan & Import.
-- **Badge de rang** (🥉 Bronze / 🥈 Argent / 🥇 Or / 💎 Platine, par
-  `connection_count`) affiché à côté de chaque joueur dans *Joueurs* — jusqu'ici
-  visible uniquement dans le message Discord de connexion.
-- **`scripts/migrate-v1-to-v2.mjs`** — outil de migration réutilisable pour
-  quiconque passe de la V1 à la V2 : resynchronise les images et fusionne les
-  statistiques joueurs depuis l'ancienne base MariaDB, signale les mods sans
-  équivalent V2 à traiter via Scan & Import. Mode aperçu par défaut. Documenté
-  dans le README (section *Migration depuis la V1*, réécrite — l'ancienne
-  documentation référençait un `migrate.js`/`import.js` jamais implémenté).
-
-### Corrigé
-
-- **Images de tous les mods/véhicules/cartes resynchronisées avec la V1** —
-  l'extraction automatique (Scan & Import comme upload manuel) tire l'image
-  depuis le contenu du zip, ce qui donne parfois un résultat de moins bonne
-  qualité qu'une image choisie à la main (texture technique, angle non
-  représentatif…). Les 256 mods de l'instance ont été réassociés à l'image
-  d'origine de la V1 (`/var/www/.../DATA/images`, ancienne base MariaDB
-  `beammp_Officiel`), sur la base d'une correspondance exacte de nom de
-  fichier (256/256 retrouvées) — pas seulement ceux qui n'avaient aucune
-  image.
-- Fichiers copiés depuis la V1 avec des permissions Unix héritées de
-  l'ancien serveur web (`www-data`, non lisibles par le process Node du
-  panel) — provoquait des `500` sur `/images/*` pour les fichiers concernés ;
-  propriété et permissions corrigées.
-- **`known_players` était vide côté V2** — la section *Joueurs* n'avait jamais
-  affiché aucune donnée depuis la bascule. Les 335 joueurs de la V1
-  (connexions, temps de jeu, dernière activité) ont été importés.
+## [1.0.0] — antérieur
 
 Version de référence avant cette passe : réécriture V2 du panel (Fastify +
 PostgreSQL + React), multi-instance, gestion des mods/maps/config/logs,

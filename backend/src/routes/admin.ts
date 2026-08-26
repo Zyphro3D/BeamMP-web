@@ -146,7 +146,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // ── Known players ─────────────────────────────────────────────
   app.get<{ Querystring: { instanceId?: string } }>(
     '/api/admin/players',
-    { preHandler: requireSuperAdmin },
+    { preHandler: requireAuth },
     async (req) => {
       // instanceId optional for back-compat — defaults to the first instance,
       // same pattern as the legacy routes in public.ts.

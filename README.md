@@ -459,9 +459,10 @@ supprimer puis recréer le compte.
 - Uploads validés par magic bytes (signature ZIP `PK\x03\x04`)
 - Conteneur non-root (UID 1000)
 - Headers de sécurité via `@fastify/helmet`, CSP sans `unsafe-inline` sur les scripts
-- Rate limiting sur `/api/auth/login` (5 req/min par IP), `/api/auth/request-account`
-  et le redémarrage serveur (3 req/min) — voir `TRUST_PROXY_HOPS` si le panel
-  est derrière un reverse proxy, sinon le rate-limit reste basé sur l'IP directe
+- Rate limiting par IP : `/api/auth/login` et `/api/auth/request-account`
+  (5 req/min chacun), redémarrage serveur (3 req/min) — voir `TRUST_PROXY_HOPS`
+  si le panel est derrière un reverse proxy, sinon le rate-limit reste basé
+  sur l'IP directe
 - Toutes les opérations fichier (upload, cohérence, import) sanitisent les
   noms de fichiers et vérifient que le chemin résolu reste dans le dossier attendu
 - beammp-agent (redémarrage) : token dans un fichier dédié en 600 (jamais dans
