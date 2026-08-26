@@ -14,8 +14,12 @@ const LABEL_KEYS: Record<RankTier, string> = {
   platinum: 'rank_platinum',
 }
 
-// Seuils repris de backend/src/services/logWatcher.ts (rankLabel) — à garder
-// synchronisés, c'est la même progression que celle annoncée sur Discord.
+// Seuils dupliqués depuis backend/src/services/logWatcher.ts (rankLabel,
+// mêmes 4 nombres) — AUCUN mécanisme automatique ne les garde en phase (deux
+// runtimes distincts, pas de package partagé entre backend/ et frontend/).
+// Si ces seuils changent ici, reporter le même changement dans rankLabel()
+// côté backend ou le message Discord divergera silencieusement du badge
+// affiché au joueur.
 export function rankTier(connectionCount: number): RankTier | null {
   if (connectionCount < 2)   return null
   if (connectionCount < 10)  return 'bronze'

@@ -107,7 +107,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         const zip = new StreamZip.async({ file: destPath })
         try {
           const entries = await zip.entries()
-          imageFilename = await extractZipPreviewImage(zip, Object.keys(entries), IMAGES, path.parse(safeFilename).name)
+          imageFilename = await extractZipPreviewImage(zip, entries, IMAGES, path.parse(safeFilename).name, inst.id)
         } finally {
           await zip.close()
         }
@@ -264,7 +264,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
       const imgName = `${req.params.id}.webp`
       const buffer  = await data.toBuffer()
-      const webp    = await sharp(buffer).resize(400, 400, { fit: 'cover' }).webp({ quality: 80 }).toBuffer()
+      let webp: Buffer
+      try {
+        webp = await sharp(buffer).resize(400, 400, { fit: 'cover' }).webp({ quality: 80 }).toBuffer()
+      } catch {
+        return reply.code(400).send({ error: 'Fichier image invalide' })
+      }
       // Images are always stored locally (Docker volume) regardless of instance mode
       if (!fs.existsSync(IMAGES)) fs.mkdirSync(IMAGES, { recursive: true })
       fs.writeFileSync(path.join(IMAGES, imgName), webp)

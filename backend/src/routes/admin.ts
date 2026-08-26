@@ -30,6 +30,7 @@ async function analyzeZip(
   defaultDir: 'client' | 'inactive_mod' | 'inactive_map',
   imagesDir:  string,
   baseName:   string,
+  instanceId: string,
 ): Promise<ZipAnalysis> {
   const zip = new StreamZip.async({ file: zipPath })
   try {
@@ -66,7 +67,7 @@ async function analyzeZip(
     }
 
     // ── Preview image ───────────────────────────────────────────
-    const imageFilename = await extractZipPreviewImage(zip, entryNames, imagesDir, baseName)
+    const imageFilename = await extractZipPreviewImage(zip, entries, imagesDir, baseName, instanceId)
 
     return { name, type, imageFilename }
   } finally {
@@ -627,6 +628,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
               dirKey,
               config.localImagesPath,
               baseName,
+              inst.id,
             )
 
             await db.query(

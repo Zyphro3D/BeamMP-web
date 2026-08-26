@@ -36,7 +36,7 @@ export function SectionPlayers({ instanceId }: { instanceId: string }) {
                 <div className="flex-1 min-w-0 flex items-center gap-1.5">
                   <p className="text-sm font-medium truncate">{p.beammp_username}</p>
                   {tier && (
-                    <span title={t(rankLabelKey(tier))} aria-label={t(rankLabelKey(tier))} className="shrink-0">
+                    <span role="img" title={t(rankLabelKey(tier))} aria-label={t(rankLabelKey(tier))} className="shrink-0">
                       {rankIcon(tier)}
                     </span>
                   )}

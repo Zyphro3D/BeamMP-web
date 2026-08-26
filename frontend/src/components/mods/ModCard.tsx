@@ -12,15 +12,19 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
   const { t, lang } = useI18n()
   const [editingDesc, setEditingDesc] = useState(false)
   const [uploadingImg, setUploadingImg] = useState(false)
+  const [imgError, setImgError] = useState('')
   const imageInputRef = useRef<HTMLInputElement>(null)
   const modDesc = desc(mod.description, lang)
 
   const handleImageChange = async (file: File | undefined) => {
     if (!file) return
     setUploadingImg(true)
+    setImgError('')
     try {
       await api.uploadModImage(instanceId, mod.id, file)
       onRefresh()
+    } catch (e: unknown) {
+      setImgError(e instanceof Error ? e.message : t('error'))
     } finally {
       setUploadingImg(false)
       if (imageInputRef.current) imageInputRef.current.value = ''
@@ -59,7 +63,7 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
             <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImg}
               className="p-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
               title={t('change_image')} aria-label={t('change_image')}>
-              <ImageIcon size={12} />
+              <ImageIcon size={12} className={uploadingImg ? 'animate-spin' : ''} />
             </button>
             <button onClick={() => setEditingDesc(true)}
               className="p-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-lg transition-colors"
@@ -73,6 +77,7 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
               <Trash2 size={13} />
             </button>
           </div>
+          {imgError && <p className="text-xs text-red-400">{imgError}</p>}
         </div>
       </div>
       {editingDesc && (

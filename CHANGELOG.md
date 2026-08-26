@@ -4,6 +4,84 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [Non publié]
+
+Corrections suite à un audit complet (sécurité, backend, qualité, devops,
+performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
+`scripts/migrate-v1-to-v2.mjs` et les nouveaux boutons d'image sur les cartes.
+
+### Sécurité
+
+- **Traversée de chemin potentielle dans `scripts/migrate-v1-to-v2.mjs`** —
+  les noms de fichier image/description venant de la base V1 n'étaient pas
+  validés avant d'être utilisés dans un chemin de lecture local et dans la
+  destination d'un `docker compose cp` ; une valeur contenant `../` aurait pu
+  faire sortir la lecture de `DATA/images`/`DATA/descriptions`, ou faire
+  écrire hors de `/app/images` dans le conteneur. Corrigé avec le même
+  garde-fou que `backend/src/routes/admin.ts` (`safeBasename` : rejette toute
+  valeur contenant un séparateur de chemin plutôt que de la nettoyer).
+- **Construction SQL par concaténation de chaînes** dans le script de
+  migration (`sqlEscape`) — non exploitable dans la configuration Docker
+  actuelle (PostgreSQL 16, `standard_conforming_strings=on` par défaut), mais
+  seul point du projet à ne pas utiliser de requêtes paramétrées. Remplacé :
+  les écritures passent désormais par `scripts/migrate-runner.mjs`, exécuté
+  dans le conteneur `app` via le module `pg` déjà présent, avec des requêtes
+  `$1, $2…` et aucune valeur jamais insérée dans du texte SQL.
+- **Mot de passe MariaDB V1 passé en argument `mysql -p<mot de passe>`** —
+  visible par tout utilisateur local via `ps`/`/proc/<pid>/cmdline` le temps
+  de l'exécution. Remplacé par un fichier `--defaults-extra-file` temporaire
+  en `600`, supprimé juste après usage.
+- **Limite de taille absente sur l'extraction de preview** (`lib/zipPreview.ts`)
+  — un zip pouvait déclarer une entrée `preview.jpg` fortement compressée qui,
+  une fois décompressée en mémoire par `sharp`, pouvait saturer le process
+  Fastify partagé par toutes les instances (déni de service). Rejette
+  désormais toute entrée de plus de 20 Mio non compressés avant décompression.
+
+### Corrigé
+
+- **Application SQL non atomique en cas d'échec partiel** — `psql -f` sans
+  `ON_ERROR_STOP` continuait après une ligne en erreur et retournait un code
+  de sortie 0 : une migration pouvait être appliquée à moitié tout en
+  s'affichant comme réussie. Chaque lot d'opérations s'exécute désormais dans
+  une transaction unique (tout ou rien), et un échec fait maintenant échouer
+  le script de façon visible.
+- **Import joueurs non rejouable sans risque** — la fusion des statistiques
+  est additive par nature (périodes V1/V2 disjointes) ; relancer l'étape pour
+  le même site V1 aurait doublé les compteurs déjà migrés. Un garde-fou local
+  (`scripts/.migrate-v1-to-v2.state.json`, propre à la machine) bloque
+  désormais une seconde exécution par site V1 + instance sauf `--force-players`
+  explicite.
+- **Identifiants PostgreSQL V2 codés en dur** (`beammp`/`beammp`) dans le
+  script de migration — cassait si les identifiants par défaut avaient été
+  changés (recommandé en production). Lus depuis les variables d'environnement
+  du conteneur `postgres` lui-même.
+- **Fichier temporaire du script de migration non nettoyé en cas d'échec** —
+  le nettoyage côté conteneur ne s'exécutait qu'après un `psql -f` réussi ;
+  englobé dans un `finally` pour s'exécuter dans tous les cas.
+- **Collision de nom d'image entre instances** — le nom de fichier extrait
+  automatiquement d'un zip (`<nom>.webp`) ne dépendait que du nom du mod, pas
+  de l'instance, alors que le dossier d'images est un volume partagé entre
+  toutes les instances : deux instances avec un mod de même nom de fichier
+  pouvaient silencieusement écraser l'image l'une de l'autre. Préfixé par
+  l'identifiant d'instance.
+- **Upload d'image échouant silencieusement** — `ModCard`/`MapCard`
+  n'avaient aucune gestion d'erreur sur l'upload d'image (contrairement au
+  reste de l'app) : un échec (fichier invalide, session expirée…) ne
+  produisait aucun retour visible. Erreur maintenant affichée sous la carte,
+  et le backend renvoie un message clair (`Fichier image invalide`) au lieu
+  d'un 500 générique quand le fichier envoyé n'est pas une image valide.
+- **Sections Upload/Configuration visibles pour `moderator`** dans le menu et
+  au rendu direct, alors que toutes les mutations qu'elles proposent sont
+  bloquées côté backend (`requireAdmin`) — un moderator pouvait ouvrir ces
+  pages, remplir un formulaire, puis échouer en 403 sans comprendre pourquoi.
+  Masquées comme le sont déjà Cohérence/Import pour ce rôle.
+- Contraste insuffisant en mode clair sur les boutons d'action de `MapCard`
+  (repris d'un défaut déjà présent sur le bouton description, maintenant
+  dupliqué sur le nouveau bouton image) ; badge de rang sans `role="img"`,
+  ignoré par certains lecteurs d'écran ; indicateur de chargement peu visible
+  pendant l'upload d'image (remplacé par une icône animée, cohérent avec le
+  reste de l'app) ; ordre des boutons harmonisé entre `ModCard`/`MapCard`.
+
 ## [1.2.0] — 2026-08-26
 
 ### Ajouté

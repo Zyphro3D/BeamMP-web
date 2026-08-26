@@ -95,8 +95,8 @@ export function Sidebar({ section, onSection, modCount, instanceId = 'default' }
         {nav('players',   <Users    size={15} />, t('nav_players'))}
 
         <p className="section-label mt-4">{t('nav_administration')}</p>
-        {nav('upload', <Upload     size={15} />, t('nav_upload'))}
-        {nav('config', <Settings   size={15} />, t('nav_config'))}
+        {(user?.role === 'superadmin' || user?.role === 'admin') && nav('upload', <Upload     size={15} />, t('nav_upload'))}
+        {(user?.role === 'superadmin' || user?.role === 'admin') && nav('config', <Settings   size={15} />, t('nav_config'))}
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('consistency', <ScanSearch size={15} />, t('nav_consistency'))}
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('import', <FolderInput size={15} />, t('nav_import'))}
         {user?.role === 'superadmin' && nav('admin', <Shield size={15} />, t('nav_admin'))}

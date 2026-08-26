@@ -13,6 +13,11 @@ const sessionStart = new Map<string, Date>()
 
 // Rangs par ancienneté (repris de la V1, bot/players.py + messages.json) —
 // n'apparaît qu'à partir de la 2e connexion, la 1ère a son propre message.
+// Seuils dupliqués dans frontend/src/lib/rank.ts (rankTier) pour le badge
+// affiché dans Joueurs — AUCUN mécanisme automatique ne les garde en phase
+// (deux runtimes distincts, pas de package partagé). Si ces seuils changent
+// ici, reporter le même changement dans rankTier() ou le badge affiché au
+// joueur divergera silencieusement du message Discord.
 function rankLabel(connectionCount: number): string | null {
   if (connectionCount < 2)   return null
   if (connectionCount < 10)  return `🥉 Niveau Bronze ${connectionCount}/10`

@@ -136,8 +136,8 @@ export function Dashboard() {
           {section === 'mods'      && <SectionMods instanceId={instanceId} mods={modList} vehicles={vehicles} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'maps'      && <SectionMaps instanceId={instanceId} maps={maps} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'players'   && <SectionPlayers instanceId={instanceId} />}
-          {section === 'upload'       && <SectionUpload instanceId={instanceId} onRefresh={refresh} />}
-          {section === 'config'       && <SectionConfig instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={handleRestart} />}
+          {section === 'upload'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionUpload instanceId={instanceId} onRefresh={refresh} />}
+          {section === 'config'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConfig instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={handleRestart} />}
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}
           {section === 'import'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionScanImport instanceId={instanceId} onRefresh={refresh} />}
           {section === 'admin'        && user?.role === 'superadmin' && <SectionAdmin />}
