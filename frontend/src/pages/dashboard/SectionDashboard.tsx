@@ -12,6 +12,7 @@ function activityColor(type: ActivityEvent['type']): string {
     : type === 'player_leave'   ? 'bg-zinc-500'
     : type === 'mod_upload'     ? 'bg-accent'
     : type === 'server_restart' ? 'bg-red-400'
+    : type === 'server_update'  ? 'bg-yellow-400'
     : 'bg-blue-400'
 }
 

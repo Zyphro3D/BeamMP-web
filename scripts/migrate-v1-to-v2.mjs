@@ -36,6 +36,7 @@
  *   --v1-descriptions=<path> Dossier descriptions V1 (défaut : <v1-root>/DATA/descriptions)
  *   --instance=<id>          Instance V2 ciblée (défaut : default)
  *   --skip-images            Ne pas resynchroniser les images
+ *   --skip-official-maps     Ne pas créer les cartes officielles BeamNG manquantes
  *   --skip-descriptions      Ne pas importer les descriptions
  *   --skip-players           Ne pas importer les joueurs
  *   --force-players          Réimporter les joueurs même si déjà fait pour ce site V1
@@ -68,6 +69,7 @@ const V1_DESCRIPTIONS = args['v1-descriptions'] ? path.resolve(String(args['v1-d
 const INSTANCE_ID       = args.instance ?? 'default'
 const APPLY             = !!args.apply
 const SKIP_IMAGES       = !!args['skip-images']
+const SKIP_OFFICIAL_MAPS = !!args['skip-official-maps']
 const SKIP_DESCRIPTIONS = !!args['skip-descriptions']
 const SKIP_PLAYERS      = !!args['skip-players']
 const FORCE_PLAYERS     = !!args['force-players']
@@ -262,6 +264,53 @@ function syncImages(creds) {
   console.log(`${matches.length} image(s) synchronisée(s).`)
 }
 
+// ── Cartes officielles (BeamNG stock, sans .zip) ──────────────────────────
+// `map_officielle = 1` en V1 = carte livrée avec le jeu de base (pas de zip
+// de mod, `chemin` toujours NULL) — un concept que le schéma V2 prévoit déjà
+// (colonne is_official, convention de filename `__official__:<map_id>`)
+// mais qu'aucun chemin de création ne peuplait jamais : ces cartes étaient
+// tout simplement absentes du catalogue V2. Jamais activée automatiquement
+// (active=false) — libre à l'opérateur de le faire depuis Cartes.
+function syncOfficialMaps(creds) {
+  console.log('\n=== Cartes officielles (BeamNG stock) ===')
+  const v1Rows = queryV1(creds, `SELECT nom, id_map, image FROM beammp_Officiel WHERE map_officielle = 1`)
+  const v2Rows = queryV2(`SELECT map_id FROM mods WHERE instance_id = '${INSTANCE_ID.replace(/'/g, "''")}' AND map_id IS NOT NULL`)
+  const existingMapIds = new Set(v2Rows.map(r => r[0]))
+
+  const matches = []
+  for (const [nom, mapId, image] of v1Rows) {
+    if (!mapId || existingMapIds.has(mapId)) continue
+    const basename = image ? safeBasename(image.replace(/^\/?images\//, '')) : null
+    const srcPath = basename ? path.join(V1_IMAGES, basename) : null
+    matches.push({ nom, mapId, basename: srcPath && fs.existsSync(srcPath) ? basename : null, srcPath })
+  }
+
+  console.log(`${matches.length} carte(s) officielle(s) V1 absente(s) de la V2 (sur ${v1Rows.length} au total).`)
+  if (!APPLY) {
+    console.log('(dry-run — relancer avec --apply pour les créer, inactives)')
+    return
+  }
+
+  for (const m of matches) {
+    if (m.basename) {
+      execFileSync('docker', ['compose', 'cp', m.srcPath, `app:/app/images/${m.basename}`], { cwd: REPO_ROOT })
+    }
+  }
+  if (matches.some(m => m.basename)) {
+    execFileSync('docker', [
+      'compose', 'exec', '-u', 'root', '-T', 'app',
+      'sh', '-c', 'chown -R node:node /app/images && chmod -R u+rw,g+r,o+r /app/images',
+    ], { cwd: REPO_ROOT })
+  }
+
+  applyV2Ops(matches.map(m => ({
+    sql: `INSERT INTO mods (instance_id, name, type, filename, map_id, image, active, is_official)
+          VALUES ($1, $2, 'map', $3, $4, $5, false, true)`,
+    params: [INSTANCE_ID, m.nom, `__official__:${m.mapId}`, m.mapId, m.basename],
+  })))
+  console.log(`${matches.length} carte(s) officielle(s) créée(s) (inactives).`)
+}
+
 // ── Descriptions ─────────────────────────────────────────────────────────
 function syncDescriptions(creds) {
   console.log('\n=== Descriptions (mods/véhicules/cartes) ===')
@@ -397,8 +446,9 @@ console.log(`V1 descriptions: ${V1_DESCRIPTIONS}`)
 
 const creds = readV1Credentials()
 reportUnmatchedMods(creds)
-if (!SKIP_IMAGES)       syncImages(creds)
-if (!SKIP_DESCRIPTIONS) syncDescriptions(creds)
-if (!SKIP_PLAYERS)      importPlayers(creds)
+if (!SKIP_OFFICIAL_MAPS) syncOfficialMaps(creds)
+if (!SKIP_IMAGES)        syncImages(creds)
+if (!SKIP_DESCRIPTIONS)  syncDescriptions(creds)
+if (!SKIP_PLAYERS)       importPlayers(creds)
 
 console.log('\nTerminé.')

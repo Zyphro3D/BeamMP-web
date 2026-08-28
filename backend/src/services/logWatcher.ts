@@ -11,6 +11,58 @@ const LEAVE_RE = /Disconnected:\s+(.+)/i
 // Session start times keyed by "instanceId:username"
 const sessionStart = new Map<string, Date>()
 
+// ── Alertes critiques ────────────────────────────────────────────────────
+// Erreurs qui signifient concrètement "le serveur n'est pas joignable par
+// les joueurs" — jusqu'ici invisibles dans le panel, il fallait aller lire
+// Server.log à la main pour les remarquer (cas vécu : une AuthKey invalide
+// passée inaperçue pendant des jours). Message exact repris du code source
+// de BeamMP-Server (THeartbeatThread.cpp) pour l'AuthKey — stable, ce n'est
+// pas un texte qu'on devine.
+export interface CriticalAlert {
+  type:      string
+  message:   string
+  hint:      string
+  firstSeen: number
+  lastSeen:  number
+}
+
+const CRITICAL_PATTERNS: Array<{ type: string; re: RegExp; hint: string }> = [
+  {
+    type: 'auth_key_invalid',
+    re:   /Backend REFUSED the auth key\.\s*(.*)/i,
+    hint: 'Clé AuthKey invalide ou expirée — le serveur est invisible dans la liste BeamMP officielle (le direct-connect reste possible). Générer une nouvelle clé sur https://keymaster.beammp.com/ puis la reporter dans Configuration.',
+  },
+]
+
+// instanceId -> type -> alerte active
+const criticalAlerts = new Map<string, Map<string, CriticalAlert>>()
+
+// Une alerte non revue depuis ce délai est considérée résolue — le pattern
+// ne réapparaît plus dans les logs une fois le problème corrigé, donc rien
+// ne la "referme" explicitement autrement qu'en expirant faute de nouvelle
+// occurrence.
+const CRITICAL_ALERT_TTL_MS = 5 * 60 * 1000
+
+function recordCriticalError(instanceId: string, type: string, message: string, hint: string): void {
+  if (!criticalAlerts.has(instanceId)) criticalAlerts.set(instanceId, new Map())
+  const perInstance = criticalAlerts.get(instanceId)!
+  const existing = perInstance.get(type)
+  perInstance.set(type, {
+    type,
+    message,
+    hint,
+    firstSeen: existing?.firstSeen ?? Date.now(),
+    lastSeen:  Date.now(),
+  })
+}
+
+export function getActiveCriticalAlerts(instanceId: string): CriticalAlert[] {
+  const perInstance = criticalAlerts.get(instanceId)
+  if (!perInstance) return []
+  const now = Date.now()
+  return [...perInstance.values()].filter(a => now - a.lastSeen < CRITICAL_ALERT_TTL_MS)
+}
+
 // Rangs par ancienneté (repris de la V1, bot/players.py + messages.json) —
 // n'apparaît qu'à partir de la 2e connexion, la 1ère a son propre message.
 // Seuils dupliqués dans frontend/src/lib/rank.ts (rankTier) pour le badge
@@ -81,7 +133,12 @@ function processChunk(inst: InstanceConfig, chunk: string): void {
     const joinMatch = line.match(JOIN_RE)
     if (joinMatch) { handleJoin(inst, joinMatch[1].trim()).catch(console.error); continue }
     const leaveMatch = line.match(LEAVE_RE)
-    if (leaveMatch) { handleLeave(inst, leaveMatch[1].trim()).catch(console.error) }
+    if (leaveMatch) { handleLeave(inst, leaveMatch[1].trim()).catch(console.error); continue }
+
+    for (const { type, re, hint } of CRITICAL_PATTERNS) {
+      const m = line.match(re)
+      if (m) { recordCriticalError(inst.id, type, m[0].trim(), hint); break }
+    }
   }
 }
 

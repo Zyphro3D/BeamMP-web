@@ -16,6 +16,34 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   icône clé à côté de la déconnexion) — jusqu'ici seul un SuperAdmin pouvait
   réinitialiser le mot de passe d'un compte via *Administration*, aucun
   utilisateur ne pouvait changer le sien une fois connecté.
+- **Mise à jour du serveur BeamMP depuis le panel** (*Configuration*, sous le
+  bouton de redémarrage) — télécharge et installe la dernière release
+  officielle depuis GitHub via beammp-agent, vérifie son sha256 avant toute
+  installation, sauvegarde le binaire précédent. Nécessite `BEAMMP_BINARY_PATH`
+  côté agent et `BEAMMP_AGENT_ASSET` côté panel (les deux optionnels — sans
+  eux, redémarrage seul reste disponible comme avant).
+- **Détection automatique des erreurs critiques dans `Server.log`** (ex.
+  `Backend REFUSED the auth key`) avec bannière d'alerte visible depuis
+  n'importe quelle section — jusqu'ici il fallait lire le log à la main pour
+  s'apercevoir qu'une AuthKey invalide rendait le serveur invisible dans la
+  liste BeamMP officielle. Pattern repris du code source de BeamMP-Server
+  (`THeartbeatThread.cpp`) pour rester exact et stable.
+- **`scripts/migrate-v1-to-v2.mjs` reprend aussi les cartes officielles
+  BeamNG** (`map_officielle` en V1) — un concept que le schéma V2 prévoyait
+  déjà (`is_official`, convention `__official__:<id>`) mais qu'aucun chemin
+  de création ne peuplait jamais ; 14 cartes du jeu de base totalement
+  absentes du catalogue V2 avant ce correctif, créées inactives.
+
+### Corrigé
+
+- **Panneau de logs qui arrachait la lecture en cours** (*Configuration*) —
+  le défilement automatique vers le bas se déclenchait à chaque poll (5s),
+  y compris quand l'utilisateur avait remonté pour lire un log plus ancien.
+  Ne recolle en bas que si l'utilisateur y était déjà.
+- **Carte active mal identifiée** — `ServerConfig.toml` pointait vers
+  `Black_Hills_Battle` (le mod carte `Black_Hills_Battle_Ultra_4.zip`, déjà
+  en base mais jamais marqué actif ni lié par `map_id`), pendant que le
+  dashboard affichait "Aucune carte active" faute de correspondance.
 
 ### Corrigé (données)
 
@@ -26,6 +54,14 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   volontairement non repris par `scripts/migrate-v1-to-v2.mjs` (schéma de
   mot de passe différent), documenté dans le README, mais jamais recréé
   manuellement avant ce jour.
+- **14 cartes officielles BeamNG récupérées depuis la V1** via le nouveau
+  support de `migrate-v1-to-v2.mjs` (voir ci-dessus) : Automation Test Track,
+  Centre de formation ETK, Circuit Hirochi, Côte Est/Ouest USA, Derby,
+  Gridmap v2, Ile Jungle Rock, Ile Small USA, Italie, Johnson Valley, Petite
+  grille, Site industriel, Utah USA.
+- **Serveur BeamMP mis à jour** de v3.9.0 à v3.9.3 (durcissements inclus :
+  limitation par IP, validation de la longueur des messages de chat, parsing
+  durci contre les paquets véhicule malformés).
 
 ### Sécurité
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Copy, RotateCcw } from 'lucide-react'
-import { api } from '../../lib/api'
+import { Copy, RotateCcw, ArrowUpCircle } from 'lucide-react'
+import { api, type UpdateCheck } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { Toggle } from '../../components/ui/Toggle'
 import { BeamMPTextEditor } from '../../components/ui/BeamMPTextEditor'
@@ -32,6 +32,19 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
   const [error, setError]     = useState('')
   const [logs, setLogs]       = useState<string[]>([])
   const logsRef = useRef<HTMLDivElement>(null)
+  const logsBottomRef = useRef<HTMLDivElement>(null)
+  // Ne recolle en bas que si l'utilisateur y était déjà — sinon chaque poll
+  // de 5s (nouvelle ligne de log) lui arracherait la lecture en cours pour
+  // le ramener au bas de la liste.
+  const pinnedToBottom = useRef(true)
+  const handleLogsScroll = () => {
+    const el = logsRef.current
+    if (!el) return
+    pinnedToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+  }
+  const [updateCheck, setUpdateCheck] = useState<UpdateCheck | null>(null)
+  const [updating, setUpdating]       = useState(false)
+  const [updateError, setUpdateError] = useState('')
 
   useEffect(() => {
     api.getConfig(instanceId).then(c => {
@@ -41,9 +54,28 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
     }).catch(e => setError(e.message)).finally(() => setLoading(false))
   }, [instanceId])
 
+  useEffect(() => {
+    api.checkServerUpdate(instanceId).then(setUpdateCheck).catch(() => {})
+  }, [instanceId])
+
+  const installUpdate = async () => {
+    setUpdating(true); setUpdateError('')
+    try {
+      await api.updateServer(instanceId)
+      const check = await api.checkServerUpdate(instanceId)
+      setUpdateCheck(check)
+    } catch (e: unknown) {
+      setUpdateError(e instanceof Error ? e.message : t('error'))
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   const refreshLogs = useCallback(() => api.logs(instanceId, 80).then(r => setLogs(r.lines)).catch(() => {}), [instanceId])
   useEffect(() => { refreshLogs(); const t = setInterval(refreshLogs, 5000); return () => clearInterval(t) }, [refreshLogs])
-  useEffect(() => { logsRef.current?.scrollTo(0, logsRef.current.scrollHeight) }, [logs])
+  useEffect(() => {
+    if (pinnedToBottom.current) logsBottomRef.current?.scrollIntoView({ block: 'end' })
+  }, [logs])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); setSaving(true); setSaved(false)
@@ -118,9 +150,10 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">● {t('server_logs')}</p>
           <button onClick={copyLogs} className="p-1.5 text-zinc-600 hover:text-zinc-300 transition-colors" title={t('copy')} aria-label={t('copy')}><Copy size={13} /></button>
         </div>
-        <div ref={logsRef} className="flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed bg-surface min-h-[300px] max-h-[400px]">
+        <div ref={logsRef} onScroll={handleLogsScroll} className="flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed bg-surface min-h-[300px] max-h-[400px]">
           {logs.length === 0 ? <span className="text-zinc-700">{t('no_log')}</span> :
             logs.map((l, i) => <div key={i} className={logColor(l)}>{l}</div>)}
+          <div ref={logsBottomRef} />
         </div>
         <div className="p-3 border-t border-surface-border shrink-0" title={!canRestart ? t('restart_not_configured') : undefined}>
           <button onClick={onRestart} disabled={restarting || !canRestart} className="btn-danger w-full justify-center disabled:opacity-40 disabled:cursor-not-allowed">
@@ -128,6 +161,27 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
             {restarting ? t('restarting') : t('restart_server')}
           </button>
         </div>
+        {updateCheck?.enabled && (
+          <div className="p-3 border-t border-surface-border shrink-0 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-zinc-500">{t('server_update')}</span>
+              {updateCheck.currentVersion && (
+                <span className="text-zinc-600 font-mono">v{updateCheck.currentVersion}</span>
+              )}
+            </div>
+            {updateCheck.error ? (
+              <p className="text-xs text-zinc-600">{updateCheck.error}</p>
+            ) : updateCheck.updateAvailable ? (
+              <button onClick={installUpdate} disabled={updating} className="btn-accent w-full justify-center disabled:opacity-40">
+                <ArrowUpCircle size={13} />
+                {updating ? t('updating') : `${t('install_update')} v${updateCheck.latestVersion}`}
+              </button>
+            ) : (
+              <p className="text-xs text-green-600 dark:text-green-500">{t('up_to_date')}</p>
+            )}
+            {updateError && <p className="text-xs text-red-400">{updateError}</p>}
+          </div>
+        )}
       </div>
     </div>
   )

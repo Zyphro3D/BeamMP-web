@@ -6,7 +6,8 @@ import { config } from '../config'
 import { requireAuth, requireAdmin } from '../middleware/auth'
 import { sendDiscordNotification } from '../services/discord'
 import { invalidateCache } from '../services/beammp'
-import { restartViaAgent } from '../services/agent'
+import { restartViaAgent, checkForUpdate, updateViaAgent } from '../services/agent'
+import { getActiveCriticalAlerts } from '../services/logWatcher'
 import { getInstance } from '../lib/getInstance'
 import { extractZipPreviewImage } from '../lib/zipPreview'
 import StreamZip from 'node-stream-zip'
@@ -433,6 +434,19 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     }
   )
 
+  // Alertes critiques détectées dans Server.log (ex. AuthKey invalide) —
+  // lecture seule, ouverte à tous les rôles comme le reste des données de
+  // statut (cf. GET /api/admin/players).
+  app.get<{ Params: { instanceId: string } }>(
+    '/api/i/:instanceId/alerts',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
+      return getActiveCriticalAlerts(inst.id)
+    }
+  )
+
   // ── Server restart ───────────────────────────────────────────
   // Passe par beammp-agent (daemon systemd sur l'hôte, hors Docker) —
   // seul moyen d'atteindre systemctl depuis un conteneur. 501 si l'agent
@@ -463,6 +477,50 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       logActivity(inst.id, 'server_restart', 'Serveur redémarré')
       await sendDiscordNotification('server_restart', `Le serveur **${inst.name}** a été redémarré`)
       return { restarted: true }
+    }
+  )
+
+  // ── Server update ─────────────────────────────────────────────
+  // Vérifie/installe la dernière release BeamMP-Server officielle via
+  // beammp-agent. Désactivé (enabled:false / 501) si BEAMMP_AGENT_ASSET
+  // n'est pas configuré pour cette instance.
+
+  app.get<{ Params: { instanceId: string } }>(
+    '/api/i/:instanceId/server/update-check',
+    { preHandler: requireAdmin },
+    async (req, reply: FastifyReply) => {
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
+      return checkForUpdate(inst)
+    }
+  )
+
+  app.post<{ Params: { instanceId: string } }>(
+    '/api/i/:instanceId/server/update',
+    {
+      preHandler: requireAdmin,
+      // Télécharge et remplace un binaire système — même prudence que le
+      // redémarrage, avec une marge en plus pour laisser le temps de cliquer
+      // deux fois par erreur sans relancer un téléchargement de ~12 Mo.
+      config: { rateLimit: { max: 2, timeWindow: '5 minute' } },
+    },
+    async (req, reply: FastifyReply) => {
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
+      if (!inst.agent || !inst.agent.asset) {
+        return reply.code(501).send({
+          error: 'Mise à jour non configurée pour cette instance — voir BEAMMP_AGENT_ASSET dans .env',
+        })
+      }
+
+      const result = await updateViaAgent(inst)
+      if (!result.ok) {
+        return reply.code(502).send({ error: result.error })
+      }
+
+      logActivity(inst.id, 'server_update', `Serveur mis à jour vers ${result.version}`)
+      await sendDiscordNotification('server_update', `Le serveur **${inst.name}** a été mis à jour vers **${result.version}**`)
+      return { updated: true, version: result.version }
     }
   )
 }

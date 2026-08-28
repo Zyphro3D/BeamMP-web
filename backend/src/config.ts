@@ -23,6 +23,13 @@ export interface InstanceConfig {
     url:     string
     token:   string
     service: string
+    /**
+     * Suffixe d'asset GitHub release BeamMP-Server pour cet hôte (ex.
+     * "debian.13.x86_64", voir `uname -m` + `/etc/os-release`) — active le
+     * bouton de mise à jour du serveur si renseigné. `null` = mise à jour
+     * désactivée (redémarrage reste disponible indépendamment).
+     */
+    asset: string | null
   } | null
 }
 
@@ -34,8 +41,10 @@ function parseInstances(): InstanceConfig[] {
   const agentUrl   = process.env.BEAMMP_AGENT_URL   ?? ''
   const agentToken = process.env.BEAMMP_AGENT_TOKEN ?? ''
 
-  function buildAgent(service: string): InstanceConfig['agent'] {
-    return agentUrl && agentToken && service ? { url: agentUrl, token: agentToken, service } : null
+  function buildAgent(service: string, asset: string): InstanceConfig['agent'] {
+    return agentUrl && agentToken && service
+      ? { url: agentUrl, token: agentToken, service, asset: asset || null }
+      : null
   }
 
   // Instance unique (pas de variable INSTANCES)
@@ -52,7 +61,7 @@ function parseInstances(): InstanceConfig[] {
         logPath:       process.env.BEAMMP_LOG_PATH        ?? '/beammp/server.log',
         configPath:    process.env.BEAMMP_CONFIG_PATH     ?? '/beammp/ServerConfig.toml',
       },
-      agent: buildAgent(process.env.BEAMMP_AGENT_SERVICE ?? ''),
+      agent: buildAgent(process.env.BEAMMP_AGENT_SERVICE ?? '', process.env.BEAMMP_AGENT_ASSET ?? ''),
     }]
   }
 
@@ -71,7 +80,7 @@ function parseInstances(): InstanceConfig[] {
         logPath:       process.env[`${P}BEAMMP_LOG_PATH`]         ?? '/beammp/server.log',
         configPath:    process.env[`${P}BEAMMP_CONFIG_PATH`]      ?? '/beammp/ServerConfig.toml',
       },
-      agent: buildAgent(process.env[`${P}AGENT_SERVICE`] ?? ''),
+      agent: buildAgent(process.env[`${P}AGENT_SERVICE`] ?? '', process.env[`${P}AGENT_ASSET`] ?? ''),
     }
   })
 }

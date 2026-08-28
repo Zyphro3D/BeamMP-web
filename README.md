@@ -262,6 +262,30 @@ Sans ces trois variables, le bouton de redémarrage reste désactivé (tooltip
 > passerelle peut changer — revérifier `AGENT_HOST` et `BEAMMP_AGENT_URL`
 > ensemble dans ce cas.
 
+### Mise à jour du serveur BeamMP (binaire du jeu)
+
+À ne pas confondre avec la mise à jour du panel lui-même (section suivante).
+Un bouton dans *Configuration* télécharge et installe la dernière release
+[BeamMP-Server](https://github.com/BeamMP/BeamMP-Server/releases) officielle
+via beammp-agent, vérifie son empreinte sha256 (fournie par l'API GitHub)
+avant toute installation, sauvegarde le binaire précédent
+(`BeamMP-Server.bak-<timestamp>`, à supprimer manuellement une fois la mise
+à jour confirmée stable), puis redémarre le service.
+
+**Activation** (en plus de la config restart ci-dessus) :
+
+1. Renseigner `BEAMMP_BINARY_PATH` dans `beammp-agent.service` (chemin vers
+   l'exécutable `BeamMP-Server`) et `ReadWritePaths=<dossier du binaire>`
+   dans la section `[Service]` (`ProtectSystem=strict` rend le reste du
+   système en lecture seule pour l'agent — sans ça, l'installation échoue).
+2. Dans le `.env` du panel, ajouter `BEAMMP_AGENT_ASSET` — le suffixe exact
+   d'un asset de la page releases (ex. `debian.13.x86_64`, à déterminer via
+   `uname -m` + `cat /etc/os-release` sur l'hôte).
+3. `sudo systemctl daemon-reload && sudo systemctl restart beammp-agent`
+
+Sans `BEAMMP_AGENT_ASSET`, le bloc "Mise à jour du serveur" n'apparaît pas
+dans Configuration (redémarrage seul reste disponible, indépendamment).
+
 ---
 
 ## Mise à jour
@@ -333,6 +357,7 @@ node scripts/migrate-v1-to-v2.mjs --v1-root=/var/www/mon-ancien-site --apply
 
 | Donnée V1 | Effet côté V2 | Détail |
 |---|---|---|
+| Cartes officielles BeamNG (`map_officielle = 1`) | `mods` (nouvelle ligne, `is_official=true`) | Ces cartes du jeu de base (sans `.zip`) n'ont aucun chemin de création côté V2 en dehors de ce script — absentes du catalogue tant qu'elles n'ont pas été importées ainsi. Créées **inactives** ; jamais activées automatiquement. |
 | Images (`beammp_Officiel.image`) | `mods.image` | Pour chaque mod déjà présent en V2 (même `filename`), l'image V1 **remplace** l'image actuelle (l'extraction automatique depuis le zip donne souvent un résultat de moins bonne qualité qu'une image choisie à la main). |
 | Descriptions (`beammp_Officiel.description`) | `mods.description` | Ne **remplit que les descriptions V2 actuellement vides** (jamais d'écrasement — contrairement aux images, c'est du texte éditorial qui a pu être réécrit côté V2). Les descriptions V1 auto-générées ("Description non fournie.", "Description pour X") sont ignorées. |
 | Joueurs (`beammp_users_Officiel`) | `known_players` | Fusionné avec les stats V2 existantes plutôt qu'écrasé : `connection_count`/temps de jeu s'additionnent (périodes disjointes avant/après bascule), les dates prennent la plus ancienne/récente des deux sources. Le rang (🥉🥈🥇💎, visible dans *Joueurs*) est recalculé automatiquement depuis `connection_count` — rien à migrer séparément. |

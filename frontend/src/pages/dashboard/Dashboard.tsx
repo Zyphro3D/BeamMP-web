@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Power } from 'lucide-react'
-import { api, type Mod, type InstanceInfo } from '../../lib/api'
+import { api, type Mod, type InstanceInfo, type CriticalAlert } from '../../lib/api'
 import { Sidebar, type AdminSection } from '../../components/layout/Sidebar'
 import { ErrorBanner } from '../../components/ui/ErrorBanner'
 import { getStoredUser } from '../../lib/auth'
@@ -40,6 +40,8 @@ export function Dashboard() {
   const [needsRestart, setNeedsRestart] = useState(false)
   const [instances, setInstances] = useState<InstanceInfo[]>([])
   const [instanceId, setInstanceId] = useState<string>('')
+  const [alerts, setAlerts] = useState<CriticalAlert[]>([])
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
 
   // Load instance list once
   useEffect(() => {
@@ -56,6 +58,21 @@ export function Dashboard() {
   }, [instanceId])
 
   useEffect(() => { refresh() }, [refresh])
+
+  useEffect(() => {
+    if (!instanceId) return
+    const poll = () => api.alerts(instanceId).then(list => {
+      setAlerts(list)
+      // Une alerte redevient visible si elle réapparaît après avoir disparu
+      // (résolue puis re-cassée) — on n'oublie le dismiss que pour les types
+      // qui ne sont plus actifs.
+      const activeTypes = new Set(list.map(a => a.type))
+      setDismissedAlerts(prev => new Set([...prev].filter(t => activeTypes.has(t))))
+    }).catch(() => {})
+    poll()
+    const t = setInterval(poll, 20_000)
+    return () => clearInterval(t)
+  }, [instanceId])
 
   const maps     = mods.filter(m => m.type === 'map')
   const vehicles = mods.filter(m => m.type === 'vehicle')
@@ -127,6 +144,14 @@ export function Dashboard() {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-5">
+          {alerts.filter(a => !dismissedAlerts.has(a.type)).map(a => (
+            <div className="mb-4" key={a.type}>
+              <ErrorBanner
+                message={`${a.hint} (${a.message})`}
+                onDismiss={() => setDismissedAlerts(prev => new Set(prev).add(a.type))}
+              />
+            </div>
+          ))}
           {restartError && (
             <div className="mb-4">
               <ErrorBanner message={restartError} onDismiss={() => setRestartError('')} />

@@ -96,6 +96,8 @@ export const api = {
   // Per-instance — Logs
   logs: (instanceId: string, lines = 100) =>
     request<{ lines: string[] }>(`${i(instanceId)}/logs?lines=${lines}`),
+  alerts: (instanceId: string) =>
+    request<CriticalAlert[]>(`${i(instanceId)}/alerts`),
 
   // Per-instance — Activity
   activity: (instanceId: string) => request<ActivityEvent[]>(`${i(instanceId)}/activity`),
@@ -103,6 +105,10 @@ export const api = {
   // Per-instance — Server
   restartServer: (instanceId: string) =>
     request<{ restarted: boolean }>(`${i(instanceId)}/server/restart`, { method: 'POST' }),
+  checkServerUpdate: (instanceId: string) =>
+    request<UpdateCheck>(`${i(instanceId)}/server/update-check`),
+  updateServer: (instanceId: string) =>
+    request<{ updated: boolean; version: string }>(`${i(instanceId)}/server/update`, { method: 'POST' }),
 
   // Public per-instance
   activeMods: (instanceId: string) => request<Mod[]>(`${i(instanceId)}/mods/active`),
@@ -157,9 +163,26 @@ export interface ServerInfo {
   serverDescription: string
 }
 
+export interface CriticalAlert {
+  type:      string
+  message:   string
+  hint:      string
+  firstSeen: number
+  lastSeen:  number
+}
+
+export interface UpdateCheck {
+  enabled:         boolean
+  currentVersion:  string | null
+  latestVersion:   string | null
+  updateAvailable: boolean
+  releaseUrl:      string | null
+  error?:          string
+}
+
 export interface ActivityEvent {
   id: number
-  type: 'player_join' | 'player_leave' | 'mod_upload' | 'server_restart' | 'map_change'
+  type: 'player_join' | 'player_leave' | 'mod_upload' | 'server_restart' | 'server_update' | 'map_change'
   message: string
   timestamp: string
   user?: string
