@@ -28,6 +28,15 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   s'apercevoir qu'une AuthKey invalide rendait le serveur invisible dans la
   liste BeamMP officielle. Pattern repris du code source de BeamMP-Server
   (`THeartbeatThread.cpp`) pour rester exact et stable.
+- **Configs pré-établies** (nouvelle section *Configs*) — bascule d'un
+  scénario serveur à l'autre (tel jeu de mods/véhicules + telle carte) en un
+  clic au lieu de cocher chaque élément à la main : active exactement ce que
+  décrit la config, désactive le reste, change de carte, redémarre le
+  serveur. Un mod/véhicule supprimé depuis la sauvegarde d'une config est
+  ignoré à l'application plutôt que de la rendre inutilisable. Nouvelle table
+  `config_presets` ; logique de bascule mod/carte extraite de
+  `POST /mods/:id/toggle` et `POST /maps/activate` vers `lib/modState.ts`
+  pour être réutilisée sans duplication.
 - **`scripts/migrate-v1-to-v2.mjs` reprend aussi les cartes officielles
   BeamNG** (`map_officielle` en V1) — un concept que le schéma V2 prévoyait
   déjà (`is_official`, convention `__official__:<id>`) mais qu'aucun chemin

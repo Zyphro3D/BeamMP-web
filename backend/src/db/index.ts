@@ -52,6 +52,21 @@ export async function runMigrations(): Promise<void> {
         is_official BOOLEAN NOT NULL DEFAULT false,
         UNIQUE (instance_id, filename)
       );
+
+      -- Config pré-établie : nom + liste de mods/véhicules à activer + une
+      -- carte. mod_ids en tableau d'entiers plutôt qu'une table de jointure
+      -- séparée — pas de contrainte FK dessus par choix : un mod supprimé
+      -- après la sauvegarde d'une config ne doit jamais bloquer son
+      -- application, juste être ignoré (voir services/presets.ts).
+      CREATE TABLE IF NOT EXISTS config_presets (
+        id          SERIAL PRIMARY KEY,
+        instance_id VARCHAR(50)  NOT NULL DEFAULT 'default',
+        name        VARCHAR(255) NOT NULL,
+        mod_ids     INTEGER[]    NOT NULL DEFAULT '{}',
+        map_id      VARCHAR(100),
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE (instance_id, name)
+      );
     `)
 
     // ── Idempotent migrations ──────────────────────────────────

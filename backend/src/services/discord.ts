@@ -1,6 +1,6 @@
 import { config } from '../config'
 
-type EventType = 'player_join' | 'player_leave' | 'mod_upload' | 'map_change' | 'server_restart' | 'server_update'
+type EventType = 'player_join' | 'player_leave' | 'mod_upload' | 'map_change' | 'server_restart' | 'server_update' | 'preset_applied'
 
 interface DiscordPayload {
   username: string
@@ -19,6 +19,7 @@ const COLORS = {
   map_change: 0x5865f2,
   server_restart: 0xfee75c,
   server_update: 0xfee75c,
+  preset_applied: 0x5865f2,
 }
 
 const TITLES = {
@@ -28,6 +29,7 @@ const TITLES = {
   map_change: '🗺️ Carte changée',
   server_restart: '🔄 Serveur redémarré',
   server_update: '⬆️ Serveur mis à jour',
+  preset_applied: '🎛️ Config appliquée',
 }
 
 // Retourne l'URL webhook pour un événement donné
@@ -36,7 +38,7 @@ function getWebhookUrl(event: EventType): string {
   const d = config.discord
   if (event === 'server_restart' || event === 'server_update') return d.webhookRestart || d.webhookUrl
   if (event === 'player_join' || event === 'player_leave') return d.webhookPlayers || d.webhookUrl
-  if (event === 'mod_upload' || event === 'map_change') return d.webhookMods || d.webhookUrl
+  if (event === 'mod_upload' || event === 'map_change' || event === 'preset_applied') return d.webhookMods || d.webhookUrl
   return d.webhookUrl
 }
 
@@ -51,7 +53,7 @@ export async function sendDiscordNotification(
   if (event === 'player_join'    && !config.discord.notifyJoin) return
   if (event === 'player_leave'   && !config.discord.notifyLeave) return
   if (event === 'mod_upload'     && !config.discord.notifyModUpload) return
-  if (event === 'map_change'     && !config.discord.notifyMapChange) return
+  if ((event === 'map_change' || event === 'preset_applied') && !config.discord.notifyMapChange) return
   if ((event === 'server_restart' || event === 'server_update') && !config.discord.notifyRestart) return
 
   const payload: DiscordPayload = {

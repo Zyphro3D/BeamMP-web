@@ -14,6 +14,7 @@ import { publicRoutes }    from './routes/public'
 import { authRoutes }      from './routes/auth'
 import { dashboardRoutes } from './routes/dashboard'
 import { adminRoutes }     from './routes/admin'
+import { presetsRoutes }   from './routes/presets'
 import { startLogWatchers } from './services/logWatcher'
 import { hashPassword }     from './routes/auth'
 
@@ -135,6 +136,7 @@ async function main(): Promise<void> {
   await app.register(authRoutes)
   await app.register(dashboardRoutes)
   await app.register(adminRoutes)
+  await app.register(presetsRoutes)
 
   // ── Init ──────────────────────────────────────────────────────
   await runMigrations()

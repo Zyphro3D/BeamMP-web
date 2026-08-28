@@ -17,12 +17,13 @@ Fonctionne sur **Linux** et **Windows** (Docker Desktop).
 6. [Reverse proxy HTTPS](#reverse-proxy-https)
 7. [Multi-instance](#multi-instance)
 8. [Redémarrage du serveur](#redémarrage-du-serveur)
-9. [Mise à jour](#mise-à-jour)
-10. [Sauvegarde](#sauvegarde)
-11. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
-12. [Variables d'environnement](#variables-denvironnement)
-13. [Rôles et comptes](#rôles-et-comptes)
-14. [Sécurité](#sécurité)
+9. [Configs pré-établies](#configs-pré-établies)
+10. [Mise à jour](#mise-à-jour)
+11. [Sauvegarde](#sauvegarde)
+12. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
+13. [Variables d'environnement](#variables-denvironnement)
+14. [Rôles et comptes](#rôles-et-comptes)
+15. [Sécurité](#sécurité)
 
 ---
 
@@ -285,6 +286,34 @@ avant toute installation, sauvegarde le binaire précédent
 
 Sans `BEAMMP_AGENT_ASSET`, le bloc "Mise à jour du serveur" n'apparaît pas
 dans Configuration (redémarrage seul reste disponible, indépendamment).
+
+---
+
+## Configs pré-établies
+
+Section *Configs* — bascule d'un scénario serveur à l'autre en un clic
+(ex. "Soirée Muscle Cars" : tel jeu de véhicules + telle carte) au lieu de
+cocher les mods un par un.
+
+Une config = un nom + une liste de mods/véhicules à activer + une carte.
+**Appliquer** une config :
+
+1. Active exactement les mods/véhicules listés, désactive tout le reste
+   (déplace les fichiers entre `Client/` et `inactive_mod/` comme le ferait
+   une bascule manuelle).
+2. Active la carte choisie (si renseignée) — même mécanisme que *Cartes*.
+3. Redémarre le serveur automatiquement si beammp-agent est configuré
+   (sinon : "redémarrage requis", comme le reste du panel).
+
+Un mod/véhicule supprimé depuis la sauvegarde de la config est **ignoré
+silencieusement** à l'application plutôt que de la rendre inutilisable — le
+résultat affiché indique combien ont été ignorés.
+
+Les configs restent éditables à tout moment (ajout/retrait d'éléments,
+changement de carte, renommage) depuis l'icône crayon de chaque config.
+Le bouton "Utiliser les actifs actuels" dans l'éditeur pré-remplit la
+sélection avec l'état actif du moment — pratique pour créer une config à
+partir d'une configuration déjà en place.
 
 ---
 

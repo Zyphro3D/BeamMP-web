@@ -85,6 +85,23 @@ export const api = {
       body: JSON.stringify({ map_id }),
     }),
 
+  // Per-instance — Config presets
+  presets: (instanceId: string) => request<ConfigPreset[]>(`${i(instanceId)}/presets`),
+  createPreset: (instanceId: string, name: string, mod_ids: number[], map_id: string | null) =>
+    request<ConfigPreset>(`${i(instanceId)}/presets`, {
+      method: 'POST',
+      body: JSON.stringify({ name, mod_ids, map_id }),
+    }),
+  updatePreset: (instanceId: string, id: number, name: string, mod_ids: number[], map_id: string | null) =>
+    request<ConfigPreset>(`${i(instanceId)}/presets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, mod_ids, map_id }),
+    }),
+  deletePreset: (instanceId: string, id: number) =>
+    request<{ deleted: boolean }>(`${i(instanceId)}/presets/${id}`, { method: 'DELETE' }),
+  applyPreset: (instanceId: string, id: number) =>
+    request<PresetApplyResult>(`${i(instanceId)}/presets/${id}/apply`, { method: 'POST' }),
+
   // Per-instance — Config
   getConfig:    (instanceId: string) => request<Record<string, string>>(`${i(instanceId)}/config`),
   updateConfig: (instanceId: string, data: Record<string, string>) =>
@@ -215,6 +232,26 @@ export interface Mod {
   map_id: string | null
   is_official: boolean
   created_at: string
+}
+
+export interface ConfigPreset {
+  id: number
+  instance_id: string
+  name: string
+  mod_ids: number[]
+  map_id: string | null
+  created_at: string
+}
+
+export interface PresetApplyResult {
+  applied: string
+  modsActivated: number
+  modsMissing: number
+  mapApplied: string | null
+  mapError: string | null
+  restarted: boolean
+  restartError: string | null
+  needsRestart: boolean
 }
 
 export interface User {

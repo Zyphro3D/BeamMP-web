@@ -10,11 +10,11 @@ import { restartViaAgent, checkForUpdate, updateViaAgent } from '../services/age
 import { getActiveCriticalAlerts } from '../services/logWatcher'
 import { getInstance } from '../lib/getInstance'
 import { extractZipPreviewImage } from '../lib/zipPreview'
+import { setModActive, activateMap } from '../lib/modState'
 import StreamZip from 'node-stream-zip'
 import { logActivity } from '../services/activity'
 import {
-  readFile, readFileAsync, writeFile, uploadFile, deleteFile,
-  moveFile, fileExists, ensureDir,
+  readFile, readFileAsync, writeFile, uploadFile, deleteFile, ensureDir,
 } from '../services/fileService'
 import sharp from 'sharp'
 
@@ -148,38 +148,14 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       // Maps have exactly one "active" slot managed by /maps/activate — a
       // plain toggle would leave the DB with 0 or 2+ active maps, exactly
       // the inconsistency the consistency-scan endpoint exists to catch.
-      const typeCheck = await db.query('SELECT type FROM mods WHERE id = $1 AND instance_id = $2', [req.params.id, inst.id])
+      const typeCheck = await db.query('SELECT type, active FROM mods WHERE id = $1 AND instance_id = $2', [req.params.id, inst.id])
       if (!typeCheck.rows[0]) return reply.code(404).send({ error: 'Not found' })
       if (typeCheck.rows[0].type === 'map') {
         return reply.code(400).send({ error: 'Use /maps/activate to change the active map instead of toggling it' })
       }
 
-      const result = await db.query(
-        'UPDATE mods SET active = NOT active WHERE id = $1 AND instance_id = $2 RETURNING *',
-        [req.params.id, inst.id]
-      )
-      if (!result.rows[0]) return reply.code(404).send({ error: 'Not found' })
-
-      const mod = result.rows[0]
-
-      // Les maps officielles n'ont pas de fichier à déplacer
-      const hasFile = !mod.is_official && mod.filename && !mod.filename.startsWith('__official__:')
-
-      if (hasFile) {
-        // Mods/véhicules : déplacer entre Client/ et inactive_mod/
-        const activeDir   = path.join(inst.beammp.resourcesPath, 'Client')
-        const inactiveDir = path.join(inst.beammp.resourcesPath, 'inactive_mod')
-        ensureDir(inactiveDir)
-
-        if (!mod.active) {
-          const src = path.join(activeDir, mod.filename)
-          if (fileExists(src)) moveFile(src, path.join(inactiveDir, mod.filename))
-        } else {
-          const src = path.join(inactiveDir, mod.filename)
-          if (fileExists(src)) moveFile(src, path.join(activeDir, mod.filename))
-        }
-      }
-
+      const mod = await setModActive(inst, Number(req.params.id), !typeCheck.rows[0].active)
+      if (!mod) return reply.code(404).send({ error: 'Not found' })
       return { ...mod, needsRestart: true }
     }
   )
@@ -297,61 +273,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       if (!inst) return
 
       const { map_id } = req.body
-      const map = await db.query(
-        `SELECT * FROM mods WHERE map_id = $1 AND type = 'map' AND instance_id = $2`,
-        [map_id, inst.id]
-      )
-      if (!map.rows[0]) return reply.code(404).send({ error: 'Map not found' })
-
-      const clientDir     = path.join(inst.beammp.resourcesPath, 'Client')
-      const inactiveMapDir = path.join(inst.beammp.resourcesPath, 'inactive_map')
-
-      // Déplacer la carte actuellement active vers inactive_map/ (si non-officielle)
-      const currentActive = await db.query(
-        `SELECT * FROM mods WHERE type = 'map' AND active = true AND instance_id = $1 LIMIT 1`,
-        [inst.id]
-      )
-      if (currentActive.rows[0]) {
-        const cur = currentActive.rows[0]
-        if (!cur.is_official && cur.filename && !cur.filename.startsWith('__official__:')) {
-          const src = path.join(clientDir, cur.filename)
-          if (fileExists(src)) {
-            ensureDir(inactiveMapDir)
-            moveFile(src, path.join(inactiveMapDir, cur.filename))
-          }
-        }
-      }
-
-      // Mettre à jour la BDD
-      await db.query(`UPDATE mods SET active = false WHERE type = 'map' AND instance_id = $1`, [inst.id])
-      await db.query('UPDATE mods SET active = true WHERE map_id = $1 AND instance_id = $2', [map_id, inst.id])
-
-      // Déplacer le zip de la nouvelle carte vers Client/ (si non-officielle)
-      const newMap = map.rows[0]
-      if (!newMap.is_official && newMap.filename && !newMap.filename.startsWith('__official__:')) {
-        const src = path.join(inactiveMapDir, newMap.filename)
-        if (fileExists(src)) {
-          ensureDir(clientDir)
-          moveFile(src, path.join(clientDir, newMap.filename))
-        }
-      }
-
-      // Mettre à jour ServerConfig.toml
-      const cfgPath = inst.beammp.configPath
-      let content = readFile(cfgPath)
-      if (content) {
-        const mapValue = `/levels/${map_id}/info.json`
-        if (/^Map\s*=/m.test(content)) {
-          content = content.replace(/^Map\s*=.*$/m, `Map = "${mapValue}"`)
-        } else {
-          content = content.trimEnd() + `\nMap = "${mapValue}"\n`
-        }
-        writeFile(cfgPath, content)
-      }
+      const result = await activateMap(inst, map_id)
+      if (!result.ok) return reply.code(404).send({ error: result.error })
 
       invalidateCache(inst.id)
-      logActivity(inst.id, 'map_change', `Carte changée → ${newMap.name}`)
-      await sendDiscordNotification('map_change', `Nouvelle carte active : **${newMap.name}**`)
+      logActivity(inst.id, 'map_change', `Carte changée → ${result.map.name}`)
+      await sendDiscordNotification('map_change', `Nouvelle carte active : **${result.map.name}**`)
       return { activated: map_id, needsRestart: true }
     }
   )

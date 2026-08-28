@@ -1,4 +1,4 @@
-export type ActivityType = 'player_join' | 'player_leave' | 'mod_upload' | 'server_restart' | 'server_update' | 'map_change'
+export type ActivityType = 'player_join' | 'player_leave' | 'mod_upload' | 'server_restart' | 'server_update' | 'map_change' | 'preset_applied'
 
 export interface ActivityEvent {
   id: number

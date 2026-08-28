@@ -11,6 +11,7 @@ import { SectionMaps } from './SectionMaps'
 import { SectionPlayers } from './SectionPlayers'
 import { SectionUpload } from './SectionUpload'
 import { SectionConfig } from './SectionConfig'
+import { SectionPresets } from './SectionPresets'
 import { SectionConsistency } from './SectionConsistency'
 import { SectionScanImport } from './SectionScanImport'
 import { SectionAdmin } from './SectionAdmin'
@@ -25,6 +26,7 @@ const SECTION_TITLES: Record<AdminSection, string> = {
   players:     'section_players',
   upload:      'section_upload',
   config:      'nav_config',
+  presets:     'nav_presets',
   consistency: 'consistency_title',
   import:      'nav_import',
   admin:       'nav_admin',
@@ -163,6 +165,7 @@ export function Dashboard() {
           {section === 'players'   && <SectionPlayers instanceId={instanceId} />}
           {section === 'upload'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionUpload instanceId={instanceId} onRefresh={refresh} />}
           {section === 'config'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConfig instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={handleRestart} />}
+          {section === 'presets'      && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionPresets instanceId={instanceId} mods={modList} vehicles={vehicles} maps={maps} onApplied={refresh} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}
           {section === 'import'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionScanImport instanceId={instanceId} onRefresh={refresh} />}
           {section === 'admin'        && user?.role === 'superadmin' && <SectionAdmin />}

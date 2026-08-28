@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Package, Map, Users, Upload, Settings, LogOut, Shield, MessageSquare, ScanSearch, FolderInput, KeyRound } from 'lucide-react'
+import { LayoutDashboard, Package, Map, Users, Upload, Settings, LogOut, Shield, MessageSquare, ScanSearch, FolderInput, KeyRound, SlidersHorizontal } from 'lucide-react'
 import { useServerStatus } from '../../hooks/useServerStatus'
 import { getStoredUser, clearAuth } from '../../lib/auth'
 import { useNavigate } from 'react-router-dom'
@@ -13,7 +13,7 @@ import { ChangePasswordModal } from './ChangePasswordModal'
 
 export type AdminSection =
   | 'dashboard' | 'mods' | 'maps' | 'players'
-  | 'upload' | 'config' | 'admin' | 'consistency' | 'import'
+  | 'upload' | 'config' | 'presets' | 'admin' | 'consistency' | 'import'
 
 interface Props {
   section: AdminSection
@@ -99,6 +99,7 @@ export function Sidebar({ section, onSection, modCount, instanceId = 'default' }
         <p className="section-label mt-4">{t('nav_administration')}</p>
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('upload', <Upload     size={15} />, t('nav_upload'))}
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('config', <Settings   size={15} />, t('nav_config'))}
+        {(user?.role === 'superadmin' || user?.role === 'admin') && nav('presets', <SlidersHorizontal size={15} />, t('nav_presets'))}
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('consistency', <ScanSearch size={15} />, t('nav_consistency'))}
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('import', <FolderInput size={15} />, t('nav_import'))}
         {user?.role === 'superadmin' && nav('admin', <Shield size={15} />, t('nav_admin'))}
