@@ -28,6 +28,33 @@ const IMAGES = config.localImagesPath  // always local Docker volume
 // see cybersecurity-expert.md.
 const ALLOWED_CONFIG_KEYS = ['Name', 'Description', 'MaxPlayers', 'MaxCars', 'Private', 'LogChat', 'Tags', 'Debug']
 
+// TOML type per key — the PATCH handler below used to wrap every value in
+// quotes regardless of type, silently turning e.g. `Private = false` (a real
+// TOML boolean) into `Private = "false"` (a string) on the first edit made
+// through the panel. BeamMP-Server's TOML parser expects the native type;
+// only actual strings (Name/Description/Tags) should ever be quoted.
+const CONFIG_KEY_TOML_TYPE: Record<string, 'boolean' | 'number' | 'string'> = {
+  Private:  'boolean',
+  LogChat:  'boolean',
+  Debug:    'boolean',
+  MaxPlayers: 'number',
+  MaxCars:    'number',
+  Name:        'string',
+  Description: 'string',
+  Tags:        'string',
+}
+
+function formatTomlValue(key: string, value: string): string {
+  const type = CONFIG_KEY_TOML_TYPE[key] ?? 'string'
+  if (type === 'boolean') return value === 'true' ? 'true' : 'false'
+  if (type === 'number') {
+    const n = Number(value)
+    return Number.isFinite(n) ? String(n) : '0'
+  }
+  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return `"${escaped}"`
+}
+
 // ── Route registration ─────────────────────────────────────────
 
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
@@ -326,15 +353,15 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         // U+2028/U+2029 are line terminators for JS's /m regex flag (used to
         // re-match this key on a future PATCH) though not for TOML itself —
         // stripped anyway so a relecture never desyncs from what's on disk.
-        const value   = String(rawValue).replace(/[\r\n\u2028\u2029]/g, '')
-        const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        const value     = String(rawValue).replace(/[\r\n\u2028\u2029]/g, '')
+        const tomlValue = formatTomlValue(key, value)
         const re = new RegExp(`^${key}\\s*=\\s*.+$`, 'm')
         if (re.test(content)) {
-          content = content.replace(re, `${key} = "${escaped}"`)
+          content = content.replace(re, `${key} = ${tomlValue}`)
         } else {
           // Key absent from the file — append it instead of silently no-op'ing
           // (the caller gets { updated: true } either way, it must be true).
-          content = content.trimEnd() + `\n${key} = "${escaped}"\n`
+          content = content.trimEnd() + `\n${key} = ${tomlValue}\n`
         }
       }
       writeFile(inst.beammp.configPath, content)

@@ -45,6 +45,42 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
 
 ### Corrigé
 
+- **`Private = "true"` écrit comme chaîne au lieu d'un booléen TOML** — le
+  formulaire *Configuration* citait systématiquement chaque valeur avant
+  écriture dans `ServerConfig.toml`, y compris les booléens/nombres
+  (`Private`, `LogChat`, `Debug`, `MaxPlayers`, `MaxCars`), silencieusement
+  invalides pour le parseur TOML de BeamMP-Server dès la première
+  modification faite depuis le panel. Corrigé avec un typage par clé
+  (`CONFIG_KEY_TOML_TYPE`) : seules `Name`/`Description`/`Tags` sont
+  réellement des chaînes.
+- **Statut "Hors ligne" affiché à tort pour un serveur privé** — un serveur
+  avec `Private = true` n'apparaît jamais dans la liste publique BeamMP par
+  design ; le fallback de statut traitait pourtant cette absence comme une
+  preuve d'indisponibilité. Un serveur privé sain, fraîchement redémarré et
+  sans joueur connecté, n'avait alors plus aucun signal positif possible.
+  Ajout d'un signal "vu vivant" (`markServerAlive`, déclenché sur la ligne de
+  log `ALL SYSTEMS STARTED SUCCESSFULLY`) en plus des connexions/déconnexions
+  de joueurs, et l'absence dans la liste publique n'est plus décisive pour un
+  serveur privé.
+- **Suivi des logs interrompu à chaque redémarrage réel du serveur BeamMP**
+  (joueurs, alertes critiques) — bug à deux niveaux :
+  1. `fs.watch()`/inotify reste accroché à l'ancien inode d'un fichier
+     supprimé puis recréé au même chemin (au lieu d'être tronqué sur place) ;
+     BeamMP-Server fait exactement ça (`Server.log` → `Server.old.log` +
+     nouveau `Server.log`) à chaque démarrage. `watchLog()` passe donc en
+     sondage (`setInterval`, 2s) avec comparaison explicite de l'inode.
+  2. Plus profond : le volume Docker montait le **fichier** `Server.log`
+     directement (`${BEAMMP_LOG_PATH}:/beammp/server.log`), un bind mount
+     Docker sur un fichier unique restant accroché à l'inode existant au
+     moment du montage — aucun code applicatif ne peut voir au-delà. Le
+     conteneur ne revoyait alors plus jamais aucune écriture après un
+     redémarrage du serveur BeamMP, silencieusement, jusqu'au prochain
+     redémarrage du conteneur du panel lui-même. Corrigé en montant le
+     **dossier** contenant `Server.log` (`BEAMMP_LOG_DIR`) plutôt que le
+     fichier — voir README pour le détail. Vérifié en conditions réelles :
+     redémarrage du serveur BeamMP déclenché depuis le panel, nouvel inode de
+     `Server.log` visible côté conteneur sans redémarrer celui-ci, statut
+     "en ligne" retrouvé correctement.
 - **Panneau de logs qui arrachait la lecture en cours** (*Configuration*) —
   le défilement automatique vers le bas se déclenchait à chaque poll (5s),
   y compris quand l'utilisateur avait remonté pour lire un log plus ancien.

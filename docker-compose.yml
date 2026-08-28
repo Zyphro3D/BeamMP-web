@@ -11,12 +11,19 @@ services:
       # Chemins dans le conteneur — indépendants des chemins hôte du .env.
       # Les volumes ci-dessous mappent les chemins hôte (depuis .env) vers ces chemins fixes.
       BEAMMP_RESOURCES_PATH: /beammp/resources
-      BEAMMP_LOG_PATH: /beammp/server.log
+      BEAMMP_LOG_PATH: /beammp/logs/Server.log
       BEAMMP_CONFIG_PATH: /beammp/ServerConfig.toml
     volumes:
       - app_images:/app/images
       - ${BEAMMP_RESOURCES_PATH}:/beammp/resources
-      - ${BEAMMP_LOG_PATH}:/beammp/server.log:ro
+      # Le DOSSIER contenant Server.log, pas le fichier directement : BeamMP-Server
+      # recrée ce fichier (renommé en Server.old.log) à chaque redémarrage plutôt
+      # que de le tronquer sur place. Un bind mount sur un fichier unique reste
+      # accroché à l'ancien inode dans ce cas — plus aucune écriture n'est jamais
+      # revue côté conteneur après un redémarrage, silencieusement (le suivi
+      # joueurs/alertes du panel s'arrêtait net à chaque redémarrage du serveur).
+      # Monter le dossier évite le problème : le nom est résolu à chaque accès.
+      - ${BEAMMP_LOG_DIR}:/beammp/logs:ro
       - ${BEAMMP_CONFIG_PATH}:/beammp/ServerConfig.toml
     depends_on:
       postgres:

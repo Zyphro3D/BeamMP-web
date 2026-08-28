@@ -68,17 +68,24 @@ SUPERADMIN_PASSWORD=
 ```env
 # Linux
 BEAMMP_RESOURCES_PATH=/home/user/BeamMP-Server/Resources
-BEAMMP_LOG_PATH=/home/user/BeamMP-Server/Server.log
+BEAMMP_LOG_DIR=/home/user/BeamMP-Server
 BEAMMP_CONFIG_PATH=/home/user/BeamMP-Server/ServerConfig.toml
 
 # Windows (Docker Desktop)
 BEAMMP_RESOURCES_PATH=C:\Users\user\BeamMP-Server\Resources
-BEAMMP_LOG_PATH=C:\Users\user\BeamMP-Server\Server.log
+BEAMMP_LOG_DIR=C:\Users\user\BeamMP-Server
 BEAMMP_CONFIG_PATH=C:\Users\user\BeamMP-Server\ServerConfig.toml
 ```
 
 > Ces chemins sont les chemins **hôte**. Docker les monte automatiquement
 > en tant que volumes dans le conteneur (toujours sous `/beammp/...` côté container).
+>
+> `BEAMMP_LOG_DIR` pointe vers le **dossier** qui contient `Server.log`, pas
+> vers le fichier lui-même : BeamMP-Server recrée ce fichier (renomme
+> l'ancien en `Server.old.log`) à chaque démarrage plutôt que de le tronquer
+> sur place, et un bind mount Docker sur un fichier unique resterait accroché
+> à l'ancien inode — plus aucune écriture ne serait revue côté conteneur
+> après un redémarrage du serveur. Monter le dossier évite ce piège.
 
 **Si le panel est derrière un reverse proxy HTTPS :**
 
@@ -171,7 +178,7 @@ INSTANCE_MAIN_NAME=Serveur Principal
 INSTANCE_MAIN_SERVER_IP=1.2.3.4
 INSTANCE_MAIN_SERVER_PORT=30814
 INSTANCE_MAIN_BEAMMP_RESOURCES_PATH=/beammp/main/resources
-INSTANCE_MAIN_BEAMMP_LOG_PATH=/beammp/main/server.log
+INSTANCE_MAIN_BEAMMP_LOG_PATH=/beammp/main/logs/Server.log
 INSTANCE_MAIN_BEAMMP_CONFIG_PATH=/beammp/main/ServerConfig.toml
 INSTANCE_MAIN_AGENT_SERVICE=beammp-main.service
 
@@ -179,7 +186,7 @@ INSTANCE_EVENT_NAME=Serveur Évènement
 INSTANCE_EVENT_SERVER_IP=1.2.3.4
 INSTANCE_EVENT_SERVER_PORT=30815
 INSTANCE_EVENT_BEAMMP_RESOURCES_PATH=/beammp/event/resources
-INSTANCE_EVENT_BEAMMP_LOG_PATH=/beammp/event/server.log
+INSTANCE_EVENT_BEAMMP_LOG_PATH=/beammp/event/logs/Server.log
 INSTANCE_EVENT_BEAMMP_CONFIG_PATH=/beammp/event/ServerConfig.toml
 INSTANCE_EVENT_AGENT_SERVICE=beammp-event.service
 ```
@@ -196,11 +203,16 @@ Ajouter un volume par instance sous `services.app.volumes` :
 volumes:
   - app_images:/app/images
   - /host/main/Resources:/beammp/main/resources
-  - /host/main/Server.log:/beammp/main/server.log:ro
   - /host/main/ServerConfig.toml:/beammp/main/ServerConfig.toml
   - /host/event/Resources:/beammp/event/resources
-  - /host/event/Server.log:/beammp/event/server.log:ro
   - /host/event/ServerConfig.toml:/beammp/event/ServerConfig.toml
+  # Le DOSSIER contenant Server.log, jamais le fichier seul : BeamMP-Server le
+  # recrée (renomme l'ancien en Server.old.log) à chaque démarrage plutôt que
+  # de le tronquer sur place, et un bind mount Docker sur un fichier unique
+  # reste accroché à l'ancien inode — voir la note sur BEAMMP_LOG_DIR plus
+  # haut dans ce README.
+  - /host/main/:/beammp/main/logs:ro
+  - /host/event/:/beammp/event/logs:ro
 ```
 
 ---
@@ -438,7 +450,7 @@ qu'une fois par site V1 source.
 | `BEAMMP_SERVER_IP` | — | IP publique du serveur (statut temps réel) |
 | `BEAMMP_SERVER_PORT` | — | Port UDP du serveur BeamMP |
 | `BEAMMP_RESOURCES_PATH` | — | Chemin hôte vers `Resources/` |
-| `BEAMMP_LOG_PATH` | — | Chemin hôte vers `Server.log` |
+| `BEAMMP_LOG_DIR` | — | Chemin hôte vers le **dossier** contenant `Server.log` (pas le fichier — voir note plus haut) |
 | `BEAMMP_CONFIG_PATH` | — | Chemin hôte vers `ServerConfig.toml` |
 | `BEAMMP_API_HOST` | `localhost` | Host de l'API HTTP BeamMP (optionnel) |
 | `BEAMMP_API_PORT` | `4444` | Port de l'API HTTP BeamMP |

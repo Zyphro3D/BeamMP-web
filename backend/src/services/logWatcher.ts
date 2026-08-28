@@ -1,12 +1,13 @@
 import { db } from '../db'
 import { sendDiscordNotification } from './discord'
 import { watchLog } from './fileService'
-import { playerJoined, playerLeft } from './beammp'
+import { playerJoined, playerLeft, markServerAlive } from './beammp'
 import { logActivity } from './activity'
 import { config, type InstanceConfig } from '../config'
 
-const JOIN_RE  = /Connected:\s+(.+?)\s+\(/i
-const LEAVE_RE = /Disconnected:\s+(.+)/i
+const JOIN_RE    = /Connected:\s+(.+?)\s+\(/i
+const LEAVE_RE   = /Disconnected:\s+(.+)/i
+const ALIVE_RE   = /ALL SYSTEMS STARTED SUCCESSFULLY/i
 
 // Session start times keyed by "instanceId:username"
 const sessionStart = new Map<string, Date>()
@@ -134,6 +135,8 @@ function processChunk(inst: InstanceConfig, chunk: string): void {
     if (joinMatch) { handleJoin(inst, joinMatch[1].trim()).catch(console.error); continue }
     const leaveMatch = line.match(LEAVE_RE)
     if (leaveMatch) { handleLeave(inst, leaveMatch[1].trim()).catch(console.error); continue }
+
+    if (ALIVE_RE.test(line)) { markServerAlive(inst.id); continue }
 
     for (const { type, re, hint } of CRITICAL_PATTERNS) {
       const m = line.match(re)

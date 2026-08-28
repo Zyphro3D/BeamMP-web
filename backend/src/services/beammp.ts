@@ -114,6 +114,18 @@ export function getOnlinePlayers(instanceId: string): string[] {
   return [...getPlayerSet(instanceId)]
 }
 
+// Same "we saw fresh evidence the server is alive" signal as playerJoined/
+// playerLeft, without a player attached — used by logWatcher.ts on a
+// successful-startup log line. A private server never appears in the public
+// list (level 1) and rarely runs the optional local HTTP plugin (level 2),
+// so without this, hasRecentActivity below could only ever become true once
+// a player had joined — a freshly (re)started private server with zero
+// connections yet would show "hors ligne" despite being perfectly healthy.
+export function markServerAlive(instanceId: string): void {
+  lastActivityMap.set(instanceId, Date.now())
+  invalidateCache(instanceId)
+}
+
 // ── Per-instance status cache ──────────────────────────────────
 
 const caches = new Map<string, { data: ServerStatus; ts: number }>()
@@ -138,18 +150,20 @@ async function getActiveMapFromDb(instanceId: string): Promise<{ map_id: string;
 }
 
 // Fallback: read config file when public API is unavailable
-async function getConfigFallback(inst: InstanceConfig): Promise<{ maxPlayers: number; serverName: string }> {
+async function getConfigFallback(inst: InstanceConfig): Promise<{ maxPlayers: number; serverName: string; isPrivate: boolean }> {
   try {
     const { readFile } = await import('./fileService')
     const content = readFile(inst.beammp.configPath)
     const maxMatch  = content.match(/^MaxPlayers\s*=\s*(\d+)/m)
     const nameMatch = content.match(/^Name\s*=\s*["']?(.+?)["']?\s*$/m)
+    const privateMatch = content.match(/^Private\s*=\s*["']?(true|false)["']?/mi)
     return {
       maxPlayers: maxMatch ? parseInt(maxMatch[1]) : 0,
       serverName: nameMatch ? nameMatch[1].trim() : inst.name,
+      isPrivate:  privateMatch?.[1].toLowerCase() === 'true',
     }
   } catch {
-    return { maxPlayers: 0, serverName: inst.name }
+    return { maxPlayers: 0, serverName: inst.name, isPrivate: false }
   }
 }
 
@@ -230,13 +244,16 @@ async function fetchServerStatus(inst: InstanceConfig): Promise<ServerStatus> {
   const players     = getPlayerSet(inst.id)
   const lastActivity = lastActivityMap.get(inst.id) ?? 0
   const activeMap   = await getActiveMapFromDb(inst.id)
-  const { maxPlayers, serverName } = await getConfigFallback(inst)
+  const { maxPlayers, serverName, isPrivate } = await getConfigFallback(inst)
 
   // Levels 1 and 2 both failed to confirm the server is up. Only now do we
   // let the public API's "not in the list" verdict win outright; otherwise
-  // fall back to the log-activity heuristic as before.
+  // fall back to the log-activity heuristic as before. Exception: a private
+  // server (Private = true) NEVER appears in the public list by design — its
+  // absence there carries no information, so it must not veto the log-based
+  // heuristic the way a real "not found" would for a public server.
   const hasRecentActivity = (Date.now() - lastActivity) < 5 * 60 * 1000
-  const online = !publicListSaysOffline && (players.size > 0 || hasRecentActivity)
+  const online = (isPrivate || !publicListSaysOffline) && (players.size > 0 || hasRecentActivity)
 
   const data: ServerStatus = {
     online,

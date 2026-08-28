@@ -74,6 +74,15 @@ export async function listDir(dirPath: string): Promise<string[]> {
 
 // ── Watch log ──────────────────────────────────────────────────
 
+// Poll-based rather than fs.watch()/inotify: BeamMP-Server recreates
+// Server.log (new inode) rather than truncating it in place on restart,
+// which permanently orphans an inotify watch registered on the old inode —
+// fs.watch() never fires again for the new file at the same path. This
+// silently broke player join/leave tracking and Discord notifications after
+// every server restart (including via the panel's own restart button) until
+// the panel's own process happened to restart too. Polling by path sidesteps
+// the whole class of bug: every tick re-stats the path fresh, so a changed
+// inode is just as detectable as a truncation.
 export function watchLog(
   logPath: string,
   onData:  (chunk: string) => void,
@@ -81,12 +90,19 @@ export function watchLog(
   if (!fs.existsSync(logPath)) console.warn(`[fileService] Log not found: ${logPath}`)
 
   let offset = 0
-  try { offset = fs.statSync(logPath).size } catch { offset = 0 }
+  let inode: number | null = null
+  try {
+    const stat = fs.statSync(logPath)
+    offset = stat.size
+    inode  = stat.ino
+  } catch { /* not there yet — first successful poll establishes the baseline */ }
 
-  const watcher = fs.watch(logPath, { persistent: false }, () => {
+  const poll = () => {
     try {
       const stat = fs.statSync(logPath)
-      if (stat.size < offset) offset = 0
+      if (inode !== null && stat.ino !== inode) offset = 0 // file replaced, not just appended to
+      inode = stat.ino
+      if (stat.size < offset) offset = 0 // truncated in place
       const newBytes = stat.size - offset
       if (newBytes <= 0) return
       const buf = Buffer.alloc(newBytes)
@@ -98,10 +114,10 @@ export function watchLog(
     } catch (err) {
       console.error('[fileService] Log read error:', err)
     }
-  })
+  }
 
-  watcher.on('error', (err) => console.error('[fileService] Watch error:', err))
-  return () => watcher.close()
+  const interval = setInterval(poll, 2000)
+  return () => clearInterval(interval)
 }
 
 // ── Helpers ────────────────────────────────────────────────────
