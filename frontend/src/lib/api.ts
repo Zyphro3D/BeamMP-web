@@ -51,6 +51,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ beammp_username }),
     }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>('/api/auth/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
 
   // Per-instance — Mods
   mods:    (instanceId: string) => request<Mod[]>(`${i(instanceId)}/mods`),

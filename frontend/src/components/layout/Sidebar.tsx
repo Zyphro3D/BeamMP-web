@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Package, Map, Users, Upload, Settings, LogOut, Shield, MessageSquare, ScanSearch, FolderInput } from 'lucide-react'
+import { LayoutDashboard, Package, Map, Users, Upload, Settings, LogOut, Shield, MessageSquare, ScanSearch, FolderInput, KeyRound } from 'lucide-react'
 import { useServerStatus } from '../../hooks/useServerStatus'
 import { getStoredUser, clearAuth } from '../../lib/auth'
 import { useNavigate } from 'react-router-dom'
@@ -9,6 +9,7 @@ import { Avatar } from '../ui/Avatar'
 import { useI18n } from '../../context/I18nContext'
 import { api, type ServerInfo } from '../../lib/api'
 import { formatUptimeMs } from '../../lib/format'
+import { ChangePasswordModal } from './ChangePasswordModal'
 
 export type AdminSection =
   | 'dashboard' | 'mods' | 'maps' | 'players'
@@ -27,6 +28,7 @@ export function Sidebar({ section, onSection, modCount, instanceId = 'default' }
   const navigate = useNavigate()
   const { t } = useI18n()
   const [info, setInfo] = useState<ServerInfo | null>(null)
+  const [changingPassword, setChangingPassword] = useState(false)
   useEffect(() => { api.info().then(setInfo).catch(() => {}) }, [])
 
   const logout = async () => {
@@ -122,12 +124,17 @@ export function Sidebar({ section, onSection, modCount, instanceId = 'default' }
           </div>
           <LangToggle />
           <ThemeToggle />
+          <button onClick={() => setChangingPassword(true)} title={t('change_password')} aria-label={t('change_password')}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors shrink-0">
+            <KeyRound size={14} />
+          </button>
           <button onClick={logout} title={t('nav_logout')}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0">
             <LogOut size={14} />
           </button>
         </div>
       </div>
+      {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
     </aside>
   )
 }

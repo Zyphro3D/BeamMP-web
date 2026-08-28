@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import crypto from 'crypto'
 import bcrypt from 'bcrypt'
 import { db } from '../db'
+import { requireAuth } from '../middleware/auth'
 
 const BCRYPT_ROUNDS = 12
 const LEGACY_SALT   = 'beammp-salt' // kept only for one-time migration
@@ -125,6 +126,39 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       await db.query('INSERT INTO account_requests (beammp_username) VALUES ($1)', [beammp_username])
       return { message: 'Demande envoyée. En attente de validation par un SuperAdmin.' }
+    }
+  )
+
+  // ── Change own password (self-service) ───────────────────────
+  app.patch<{ Body: { currentPassword: string; newPassword: string } }>(
+    '/api/auth/password',
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['currentPassword', 'newPassword'],
+          properties: {
+            currentPassword: { type: 'string', minLength: 1, maxLength: 200 },
+            newPassword:     { type: 'string', minLength: 8, maxLength: 200 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { currentPassword, newPassword } = req.body
+      const userId = (req.user as { id: number }).id
+
+      const result = await db.query('SELECT password FROM users WHERE id = $1', [userId])
+      const row = result.rows[0]
+      if (!row) return reply.code(404).send({ error: 'Not found' })
+
+      const { ok } = await verifyPassword(currentPassword, row.password)
+      if (!ok) return reply.code(401).send({ error: 'Mot de passe actuel incorrect' })
+
+      const newHash = await hashPassword(newPassword)
+      await db.query('UPDATE users SET password = $1 WHERE id = $2', [newHash, userId])
+      return { ok: true }
     }
   )
 }

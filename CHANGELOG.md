@@ -10,6 +10,23 @@ Corrections suite à un audit complet (sécurité, backend, qualité, devops,
 performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
 `scripts/migrate-v1-to-v2.mjs` et les nouveaux boutons d'image sur les cartes.
 
+### Ajouté
+
+- **Changement de mot de passe en libre-service** (`PATCH /api/auth/password`,
+  icône clé à côté de la déconnexion) — jusqu'ici seul un SuperAdmin pouvait
+  réinitialiser le mot de passe d'un compte via *Administration*, aucun
+  utilisateur ne pouvait changer le sien une fois connecté.
+
+### Corrigé (données)
+
+- **Comptes admin V1 non migrés** — `AutoGamingPassion` et `Mickey1978`
+  (rôle `Admin` en V1, en plus de `zyphro` en SuperAdmin, déjà présent) ont
+  été recréés côté V2 avec le même rôle (`admin`) et un mot de passe
+  temporaire à faire changer via la nouvelle fonctionnalité ci-dessus —
+  volontairement non repris par `scripts/migrate-v1-to-v2.mjs` (schéma de
+  mot de passe différent), documenté dans le README, mais jamais recréé
+  manuellement avant ce jour.
+
 ### Sécurité
 
 - **Traversée de chemin potentielle dans `scripts/migrate-v1-to-v2.mjs`** —

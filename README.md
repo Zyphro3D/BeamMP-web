@@ -443,11 +443,15 @@ du cookie (7 jours) ni de déconnecter l'utilisateur.
    promotion en `admin` via une action explicite du SuperAdmin.
 4. Le joueur peut se connecter
 
-### Mot de passe perdu
+### Mot de passe
 
-Un SuperAdmin peut réinitialiser le mot de passe de n'importe quel compte
-existant depuis *Administration → Utilisateurs* (icône clé), sans avoir à
-supprimer puis recréer le compte.
+Tout utilisateur connecté peut changer son propre mot de passe via l'icône
+clé à côté du bouton de déconnexion (mot de passe actuel requis).
+
+Un SuperAdmin peut aussi réinitialiser le mot de passe de n'importe quel
+compte existant depuis *Administration → Utilisateurs* (icône clé), sans
+avoir à supprimer puis recréer le compte — utile en cas de perte, ou pour
+fixer un mot de passe temporaire à un compte nouvellement créé.
 
 ---
 
