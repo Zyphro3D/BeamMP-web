@@ -264,5 +264,19 @@
   "color_yellow": "Jaune",
   "color_white": "Blanc",
   "reset_password": "Réinitialiser le mot de passe",
-  "close": "Fermer"
+  "close": "Fermer",
+  "meta_configs_count": "{n} configurations",
+  "meta_offroad_tooltip": "Score tout-terrain BeamNG (indicatif) : {range}",
+  "meta_power_tooltip": "Puissance : {range} selon configuration",
+  "meta_subtype_script": "Script",
+  "meta_subtype_sound": "Son",
+  "meta_subtype_ui": "Interface",
+  "meta_subtype_prop": "Décor",
+  "analyze_existing_title": "Analyser les mods existants",
+  "analyze_existing_desc": "Relit les mods déjà présents dans le catalogue pour en extraire les informations pratiques (marque, style, motorisation, taille de carte…), sans rien réuploader.",
+  "analyze_existing_run": "Lancer l'analyse",
+  "analyzing": "Analyse en cours…",
+  "analyze_result": "{n} mod(s) analysé(s)",
+  "analyze_result_errors": "{n} erreur(s)",
+  "analyze_result_remaining": "d'autres mods restent à analyser — relancez l'analyse"
 }

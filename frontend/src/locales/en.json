@@ -264,5 +264,19 @@
   "color_yellow": "Yellow",
   "color_white": "White",
   "reset_password": "Reset password",
-  "close": "Close"
+  "close": "Close",
+  "meta_configs_count": "{n} configurations",
+  "meta_offroad_tooltip": "BeamNG off-road score (indicative): {range}",
+  "meta_power_tooltip": "Power: {range} depending on configuration",
+  "meta_subtype_script": "Script",
+  "meta_subtype_sound": "Sound",
+  "meta_subtype_ui": "UI",
+  "meta_subtype_prop": "Prop",
+  "analyze_existing_title": "Analyze existing mods",
+  "analyze_existing_desc": "Re-reads mods already in the catalogue to extract practical information (brand, body style, drivetrain, map size…), without re-uploading anything.",
+  "analyze_existing_run": "Run analysis",
+  "analyzing": "Analyzing…",
+  "analyze_result": "{n} mod(s) analyzed",
+  "analyze_result_errors": "{n} error(s)",
+  "analyze_result_remaining": "more mods remain to analyze — run it again"
 }

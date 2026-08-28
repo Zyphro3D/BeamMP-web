@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Play, X, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Play, X, Search, Car, Package } from 'lucide-react'
 import { api, type ConfigPreset, type Mod } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { Modal } from '../../components/ui/Modal'
 import { ErrorBanner } from '../../components/ui/ErrorBanner'
+import { ModMetaBadges } from '../../components/mods/ModMetaBadges'
 
 interface SectionPresetsProps {
   instanceId: string
@@ -192,13 +193,23 @@ function PresetEditor({ instanceId, preset, items, maps, onClose, onSaved }: {
             className="input pl-8 text-xs py-1.5" />
         </div>
 
-        <div className="border border-surface-border rounded-lg max-h-64 overflow-y-auto divide-y divide-surface-border">
+        <div className="border border-surface-border rounded-lg max-h-80 overflow-y-auto divide-y divide-surface-border">
           {filtered.length === 0 && <p className="p-4 text-center text-xs text-zinc-700">{t('no_result')}</p>}
           {filtered.map(m => (
-            <label key={m.id} className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:hover:bg-white/5 cursor-pointer">
+            <label key={m.id} className="flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:hover:bg-white/5 cursor-pointer">
               <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} className="shrink-0" />
-              <span className="truncate flex-1">{m.name}</span>
-              <span className="text-zinc-600 shrink-0">{t(m.type === 'vehicle' ? 'nav_vehicles' : 'nav_mods')}</span>
+              {m.image ? (
+                <img src={`/images/${m.image}`} alt="" loading="lazy"
+                  className="w-9 h-7 object-cover rounded shrink-0 bg-zinc-100 dark:bg-zinc-800/60" />
+              ) : (
+                <div className="w-9 h-7 rounded shrink-0 bg-surface flex items-center justify-center">
+                  {m.type === 'vehicle'
+                    ? <Car size={13} className="text-zinc-600" />
+                    : <Package size={13} className="text-zinc-600" />}
+                </div>
+              )}
+              <span className="truncate flex-1 min-w-0">{m.name}</span>
+              <ModMetaBadges metadata={m.metadata} variant="compact" />
             </label>
           ))}
         </div>

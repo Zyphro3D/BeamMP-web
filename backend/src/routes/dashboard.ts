@@ -10,6 +10,7 @@ import { restartViaAgent, checkForUpdate, updateViaAgent } from '../services/age
 import { getActiveCriticalAlerts } from '../services/logWatcher'
 import { getInstance } from '../lib/getInstance'
 import { extractZipPreviewImage } from '../lib/zipPreview'
+import { analyzeModContents, type ModMetadata } from '../lib/modAnalyzer'
 import { setModActive, activateMap } from '../lib/modState'
 import StreamZip from 'node-stream-zip'
 import { logActivity } from '../services/activity'
@@ -130,16 +131,20 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       // Best-effort: reuse the same preview-image conventions as Scan & Import
       // so a manual upload doesn't require a follow-up image edit when the zip
       // already ships one (preview.jpg, icon.png, vehicles/<name>/*.jpg, …).
+      // Same pass also extracts practical metadata (marque/style pour un
+      // véhicule, taille/tag_line pour une carte…) — voir lib/modAnalyzer.ts.
       let imageFilename: string | null = null
+      let metadata: ModMetadata | null = null
       try {
         const zip = new StreamZip.async({ file: destPath })
         try {
           const entries = await zip.entries()
           imageFilename = await extractZipPreviewImage(zip, entries, IMAGES, path.parse(safeFilename).name, inst.id)
+          metadata = await analyzeModContents(zip, entries, type)
         } finally {
           await zip.close()
         }
-      } catch { /* not a browsable archive — no preview, non-critical */ }
+      } catch { /* not a browsable archive — no preview/analyse, non-critical */ }
 
       const descJson = desc ? JSON.stringify({ fr: desc }) : null
 
@@ -154,9 +159,10 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const result = await db.query(
-        `INSERT INTO mods (instance_id, name, type, filename, description, active, map_id, image)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8) RETURNING *`,
-        [inst.id, name, type, safeFilename, descJson, startActive, map_id, imageFilename]
+        `INSERT INTO mods (instance_id, name, type, filename, description, active, map_id, image, metadata)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9::jsonb) RETURNING *`,
+        [inst.id, name, type, safeFilename, descJson, startActive, map_id, imageFilename,
+         metadata ? JSON.stringify(metadata) : null]
       )
 
       logActivity(inst.id, 'mod_upload', `Mod uploadé · ${name}`)

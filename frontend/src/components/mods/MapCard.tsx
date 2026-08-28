@@ -4,6 +4,7 @@ import { api, type Mod } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { desc } from '../../lib/desc'
 import { DescriptionEditor } from './DescriptionEditor'
+import { ModMetaBadges } from './ModMetaBadges'
 
 export function MapCard({ instanceId, map, activating, onActivate, onDelete, onToggleOfficial, onRefresh }: {
   instanceId: string
@@ -68,6 +69,7 @@ export function MapCard({ instanceId, map, activating, onActivate, onDelete, onT
           {map.map_id && (
             <span className="badge-zinc font-mono text-[10px] truncate max-w-full block">{map.map_id}</span>
           )}
+          {map.metadata && <ModMetaBadges metadata={map.metadata} />}
 
           {/* Actions */}
           <div className="flex items-center gap-1 pt-1">

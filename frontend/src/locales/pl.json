@@ -264,5 +264,19 @@
   "color_yellow": "Żółty",
   "color_white": "Biały",
   "reset_password": "Zresetuj hasło",
-  "close": "Zamknij"
+  "close": "Zamknij",
+  "meta_configs_count": "{n} konfiguracji",
+  "meta_offroad_tooltip": "Wynik terenowy BeamNG (orientacyjny): {range}",
+  "meta_power_tooltip": "Moc: {range} w zależności od konfiguracji",
+  "meta_subtype_script": "Skrypt",
+  "meta_subtype_sound": "Dźwięk",
+  "meta_subtype_ui": "Interfejs",
+  "meta_subtype_prop": "Dekoracja",
+  "analyze_existing_title": "Analizuj istniejące mody",
+  "analyze_existing_desc": "Ponownie odczytuje mody już obecne w katalogu, aby wydobyć praktyczne informacje (marka, nadwozie, napęd, rozmiar mapy…), bez ponownego przesyłania czegokolwiek.",
+  "analyze_existing_run": "Uruchom analizę",
+  "analyzing": "Analizowanie…",
+  "analyze_result": "Przeanalizowano {n} mod(ów)",
+  "analyze_result_errors": "{n} błąd(ów)",
+  "analyze_result_remaining": "pozostały kolejne mody do analizy — uruchom ponownie"
 }

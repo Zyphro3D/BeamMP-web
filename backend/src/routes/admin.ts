@@ -7,6 +7,7 @@ import { config } from '../config'
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { getInstance } from '../lib/getInstance'
 import { extractZipPreviewImage } from '../lib/zipPreview'
+import { analyzeModContents, parseLenientJson, type ModMetadata } from '../lib/modAnalyzer'
 import { hashPassword } from './auth'
 import { listDir, moveFile, deleteFile, fileExists, ensureDir } from '../services/fileService'
 
@@ -23,6 +24,7 @@ interface ZipAnalysis {
   name:          string
   type:          'mod' | 'vehicle' | 'map'
   imageFilename: string | null
+  metadata:      ModMetadata | null
 }
 
 async function analyzeZip(
@@ -57,11 +59,9 @@ async function analyzeZip(
     })
     if (infoEntry) {
       try {
-        const raw     = (await zip.entryData(infoEntry)).toString('utf8')
-        // BeamNG uses trailing commas and // comments — strip them
-        const cleaned = raw.replace(/,(\s*[}\]])/g, '$1').replace(/\/\/[^\n]*/g, '')
-        const data    = JSON.parse(cleaned)
-        const n       = data.Name ?? data.name
+        const raw  = (await zip.entryData(infoEntry)).toString('utf8')
+        const data = parseLenientJson(raw) as Record<string, unknown>
+        const n    = data.Name ?? data.name
         if (typeof n === 'string' && n.trim()) name = n.trim()
       } catch { /* fallback to filename */ }
     }
@@ -69,7 +69,10 @@ async function analyzeZip(
     // ── Preview image ───────────────────────────────────────────
     const imageFilename = await extractZipPreviewImage(zip, entries, imagesDir, baseName, instanceId)
 
-    return { name, type, imageFilename }
+    // ── Métadonnées pratiques (marque/style, taille de carte…) ───
+    const metadata = await analyzeModContents(zip, entries, type)
+
+    return { name, type, imageFilename, metadata }
   } finally {
     await zip.close()
   }
@@ -632,10 +635,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
             )
 
             await db.query(
-              `INSERT INTO mods (instance_id, name, type, filename, image, active)
-               VALUES ($1,$2,$3,$4,$5,$6)
+              `INSERT INTO mods (instance_id, name, type, filename, image, active, metadata)
+               VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)
                ON CONFLICT (instance_id, filename) DO NOTHING`,
-              [inst.id, analysis.name, analysis.type, filename, analysis.imageFilename, active]
+              [inst.id, analysis.name, analysis.type, filename, analysis.imageFilename, active,
+               analysis.metadata ? JSON.stringify(analysis.metadata) : null]
             )
             existingFilenames.add(filename)
 
@@ -660,6 +664,64 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         total:    results.length,
         results,
       }
+    }
+  )
+
+  // Backfill : ré-analyse les mods déjà en base uploadés avant l'introduction
+  // de `metadata` (ou dont l'analyse a échoué à l'époque). N'insère rien de
+  // nouveau, ne touche à aucun fichier — relit juste le zip déjà présent sur
+  // le volume pour remplir la colonne `metadata`. Cap volontaire : un très
+  // gros catalogue peut nécessiter de cliquer plusieurs fois (report
+  // `remaining` plutôt que de bloquer une requête sur des centaines de zips).
+  const ANALYZE_EXISTING_BATCH = 300
+
+  app.post<{ Params: { instanceId: string } }>(
+    '/api/admin/i/:instanceId/mods/analyze-existing',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const inst = getInstance(req.params.instanceId, reply)
+      if (!inst) return
+
+      const pending = await db.query(
+        `SELECT id, type, filename, active FROM mods
+         WHERE instance_id = $1 AND metadata IS NULL
+         ORDER BY id LIMIT $2`,
+        [inst.id, ANALYZE_EXISTING_BATCH + 1]
+      )
+      const rows      = pending.rows.slice(0, ANALYZE_EXISTING_BATCH)
+      const remaining = pending.rows.length > ANALYZE_EXISTING_BATCH
+
+      const rp = inst.beammp.resourcesPath
+      let analyzed = 0, notFound = 0, errors = 0
+
+      for (const mod of rows) {
+        const dir = mod.active ? 'Client' : (mod.type === 'map' ? 'inactive_map' : 'inactive_mod')
+        const zipPath = path.join(rp, dir, mod.filename)
+        if (!fileExists(zipPath)) { notFound++; continue }
+
+        try {
+          const zip = new StreamZip.async({ file: zipPath })
+          try {
+            const entries  = await zip.entries()
+            const metadata = await analyzeModContents(zip, entries, mod.type)
+            // 'other'/'unknown' rather than null when nothing was found: a
+            // NULL here would make this same row show up as "pending" again
+            // on the next backfill run, forever, for a mod that legitimately
+            // has nothing to extract (e.g. no info.json at all).
+            const stored: ModMetadata = metadata ?? { kind: 'other', other: { subtype: 'unknown' } }
+            await db.query('UPDATE mods SET metadata = $1::jsonb WHERE id = $2', [
+              JSON.stringify(stored), mod.id,
+            ])
+            analyzed++
+          } finally {
+            await zip.close()
+          }
+        } catch {
+          errors++
+        }
+      }
+
+      return { analyzed, notFound, errors, total: rows.length, remaining }
     }
   )
 }

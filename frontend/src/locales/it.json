@@ -264,5 +264,19 @@
   "color_yellow": "Giallo",
   "color_white": "Bianco",
   "reset_password": "Reimposta password",
-  "close": "Chiudi"
+  "close": "Chiudi",
+  "meta_configs_count": "{n} configurazioni",
+  "meta_offroad_tooltip": "Punteggio fuoristrada BeamNG (indicativo): {range}",
+  "meta_power_tooltip": "Potenza: {range} a seconda della configurazione",
+  "meta_subtype_script": "Script",
+  "meta_subtype_sound": "Suono",
+  "meta_subtype_ui": "Interfaccia",
+  "meta_subtype_prop": "Decorazione",
+  "analyze_existing_title": "Analizza le mod esistenti",
+  "analyze_existing_desc": "Rilegge le mod già presenti nel catalogo per estrarre informazioni pratiche (marca, stile, trazione, dimensione della mappa…), senza ricaricare nulla.",
+  "analyze_existing_run": "Avvia analisi",
+  "analyzing": "Analisi in corso…",
+  "analyze_result": "{n} mod analizzate",
+  "analyze_result_errors": "{n} errori",
+  "analyze_result_remaining": "restano altre mod da analizzare — riavvia l'analisi"
 }

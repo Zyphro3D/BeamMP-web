@@ -142,6 +142,8 @@ export const api = {
   // Admin — scan & import
   scanImport: (instanceId: string) =>
     request<ScanImportReport>(`/api/admin/i/${instanceId}/scan-import`, { method: 'POST' }),
+  analyzeExistingMods: (instanceId: string) =>
+    request<AnalyzeExistingReport>(`/api/admin/i/${instanceId}/mods/analyze-existing`, { method: 'POST' }),
 
   // Admin (global)
   requests: () => request<AccountRequest[]>('/api/admin/requests'),
@@ -221,6 +223,56 @@ export interface ServerStatus {
   modlist?: string[]
 }
 
+// Extraction automatique au moment de l'upload/import — voir
+// backend/src/lib/modAnalyzer.ts pour le détail des champs et leurs limites
+// (Off-Road Score notamment : indice, pas une preuve de capacité tout-terrain).
+export interface VehicleMeta {
+  brand?:           string
+  bodyStyle?:       string
+  vehicleType?:     string
+  country?:         string
+  derbyClass?:      string
+  yearMin?:         number
+  yearMax?:         number
+  configCount:      number
+  configurations:   string[]
+  drivetrains:      string[]
+  fuelTypes:        string[]
+  transmissions:    string[]
+  powerMin?:        number
+  powerMax?:        number
+  offRoadScoreMin?: number
+  offRoadScoreMax?: number
+}
+
+export interface MapMeta {
+  title?:       string
+  description?: string
+  sizeMeters?:  number
+  author?:      string
+  tagLine?:     string
+  category?:    string
+}
+
+export interface OtherMeta {
+  subtype: 'script' | 'sound' | 'ui' | 'prop' | 'unknown'
+}
+
+export interface ModMetadata {
+  kind:     'vehicle' | 'map' | 'other'
+  vehicle?: VehicleMeta
+  map?:     MapMeta
+  other?:   OtherMeta
+}
+
+export interface AnalyzeExistingReport {
+  analyzed:  number
+  notFound:  number
+  errors:    number
+  total:     number
+  remaining: boolean
+}
+
 export interface Mod {
   id: number
   name: string
@@ -231,6 +283,7 @@ export interface Mod {
   active: boolean
   map_id: string | null
   is_official: boolean
+  metadata: ModMetadata | null
   created_at: string
 }
 

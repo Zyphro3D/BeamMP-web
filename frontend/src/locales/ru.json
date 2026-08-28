@@ -264,5 +264,19 @@
   "color_yellow": "Жёлтый",
   "color_white": "Белый",
   "reset_password": "Сбросить пароль",
-  "close": "Закрыть"
+  "close": "Закрыть",
+  "meta_configs_count": "{n} конфигураций",
+  "meta_offroad_tooltip": "Индекс внедорожности BeamNG (ориентировочно): {range}",
+  "meta_power_tooltip": "Мощность: {range} в зависимости от конфигурации",
+  "meta_subtype_script": "Скрипт",
+  "meta_subtype_sound": "Звук",
+  "meta_subtype_ui": "Интерфейс",
+  "meta_subtype_prop": "Декор",
+  "analyze_existing_title": "Проанализировать существующие моды",
+  "analyze_existing_desc": "Повторно считывает моды, уже имеющиеся в каталоге, чтобы извлечь практическую информацию (марка, кузов, привод, размер карты…), ничего не загружая заново.",
+  "analyze_existing_run": "Запустить анализ",
+  "analyzing": "Идёт анализ…",
+  "analyze_result": "Проанализировано модов: {n}",
+  "analyze_result_errors": "Ошибок: {n}",
+  "analyze_result_remaining": "остались непроанализированные моды — запустите ещё раз"
 }

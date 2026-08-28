@@ -43,6 +43,23 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   de création ne peuplait jamais ; 14 cartes du jeu de base totalement
   absentes du catalogue V2 avant ce correctif, créées inactives.
 
+### Ajouté
+
+- **Analyse automatique du contenu des mods** — à l'upload, à l'import
+  (*Scan & import*) et rétroactivement pour le catalogue existant (bouton
+  *Analyser les mods existants*), le zip est inspecté pour en extraire des
+  informations pratiques sans aucune saisie manuelle : pour un véhicule,
+  marque, style de carrosserie, drivetrain(s), plage de puissance et score
+  tout-terrain BeamNG (indicatif — un "Rally" peut scorer aussi bas qu'un
+  "Street Drag" du même véhicule, vérifié sur un mod réel du catalogue) ;
+  pour une carte, taille et résumé de l'auteur si le mod vient du repository
+  officiel BeamNG ; pour un script/son/mod UI, sa catégorie. Affiché en
+  badges sur les cartes de mods et, avec vignette, dans le sélecteur de
+  *Configs* (jusqu'ici texte seul — la config voulait des infos visuelles,
+  pas juste des noms). Nouvelle colonne `mods.metadata` (JSONB,
+  `lib/modAnalyzer.ts`) ; `null` pour tout mod uploadé avant cette
+  fonctionnalité jusqu'à ré-analyse.
+
 ### Corrigé
 
 - **`Private = "true"` écrit comme chaîne au lieu d'un booléen TOML** — le

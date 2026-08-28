@@ -264,5 +264,19 @@
   "color_yellow": "Amarelo",
   "color_white": "Branco",
   "reset_password": "Repor palavra-passe",
-  "close": "Fechar"
+  "close": "Fechar",
+  "meta_configs_count": "{n} configurações",
+  "meta_offroad_tooltip": "Pontuação off-road BeamNG (indicativa): {range}",
+  "meta_power_tooltip": "Potência: {range} conforme configuração",
+  "meta_subtype_script": "Script",
+  "meta_subtype_sound": "Som",
+  "meta_subtype_ui": "Interface",
+  "meta_subtype_prop": "Cenário",
+  "analyze_existing_title": "Analisar mods existentes",
+  "analyze_existing_desc": "Relê os mods já presentes no catálogo para extrair informações práticas (marca, estilo, tração, tamanho do mapa…), sem reenviar nada.",
+  "analyze_existing_run": "Iniciar análise",
+  "analyzing": "Analisando…",
+  "analyze_result": "{n} mod(s) analisado(s)",
+  "analyze_result_errors": "{n} erro(s)",
+  "analyze_result_remaining": "ainda há mods por analisar — execute novamente"
 }

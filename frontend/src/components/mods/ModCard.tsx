@@ -5,6 +5,7 @@ import { Toggle } from '../ui/Toggle'
 import { useI18n } from '../../context/I18nContext'
 import { desc } from '../../lib/desc'
 import { DescriptionEditor } from './DescriptionEditor'
+import { ModMetaBadges } from './ModMetaBadges'
 
 export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
   instanceId: string; mod: Mod; onToggle: () => void; onDelete: () => void; onRefresh: () => void
@@ -51,6 +52,7 @@ export function ModCard({ instanceId, mod, onToggle, onDelete, onRefresh }: {
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate">{mod.name}</p>
             {modDesc && <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{modDesc}</p>}
+            {mod.metadata && <div className="mt-1"><ModMetaBadges metadata={mod.metadata} /></div>}
           </div>
 
           <div className="flex items-center gap-2 mt-auto">

@@ -264,5 +264,19 @@
   "color_yellow": "Gelb",
   "color_white": "Weiß",
   "reset_password": "Passwort zurücksetzen",
-  "close": "Schließen"
+  "close": "Schließen",
+  "meta_configs_count": "{n} Konfigurationen",
+  "meta_offroad_tooltip": "BeamNG-Geländewert (indikativ): {range}",
+  "meta_power_tooltip": "Leistung: {range} je nach Konfiguration",
+  "meta_subtype_script": "Skript",
+  "meta_subtype_sound": "Sound",
+  "meta_subtype_ui": "Oberfläche",
+  "meta_subtype_prop": "Deko",
+  "analyze_existing_title": "Vorhandene Mods analysieren",
+  "analyze_existing_desc": "Liest bereits im Katalog vorhandene Mods erneut, um praktische Infos zu extrahieren (Marke, Karosserieform, Antrieb, Kartengröße…), ohne etwas neu hochzuladen.",
+  "analyze_existing_run": "Analyse starten",
+  "analyzing": "Analyse läuft…",
+  "analyze_result": "{n} Mod(s) analysiert",
+  "analyze_result_errors": "{n} Fehler",
+  "analyze_result_remaining": "weitere Mods müssen noch analysiert werden — erneut ausführen"
 }

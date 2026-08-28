@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { CheckCircle2, FolderInput, RotateCcw } from 'lucide-react'
-import { api, type ScanImportReport } from '../../lib/api'
+import { CheckCircle2, FolderInput, RotateCcw, Sparkles } from 'lucide-react'
+import { api, type AnalyzeExistingReport, type ScanImportReport } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 
 export function SectionScanImport({ instanceId, onRefresh }: { instanceId: string; onRefresh: () => void }) {
@@ -8,6 +8,10 @@ export function SectionScanImport({ instanceId, onRefresh }: { instanceId: strin
   const [scanning, setScanning] = useState(false)
   const [report, setReport] = useState<ScanImportReport | null>(null)
   const [error, setError] = useState('')
+
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeReport, setAnalyzeReport] = useState<AnalyzeExistingReport | null>(null)
+  const [analyzeError, setAnalyzeError] = useState('')
 
   const runScan = async () => {
     setScanning(true)
@@ -21,6 +25,21 @@ export function SectionScanImport({ instanceId, onRefresh }: { instanceId: strin
       setError(err instanceof Error ? err.message : t('error'))
     } finally {
       setScanning(false)
+    }
+  }
+
+  const runAnalyzeExisting = async () => {
+    setAnalyzing(true)
+    setAnalyzeError('')
+    setAnalyzeReport(null)
+    try {
+      const result = await api.analyzeExistingMods(instanceId)
+      setAnalyzeReport(result)
+      if (result.analyzed > 0) onRefresh()
+    } catch (err: unknown) {
+      setAnalyzeError(err instanceof Error ? err.message : t('error'))
+    } finally {
+      setAnalyzing(false)
     }
   }
 
@@ -119,6 +138,32 @@ export function SectionScanImport({ instanceId, onRefresh }: { instanceId: strin
           )}
         </>
       )}
+
+      {/* Analyse rétroactive du catalogue existant */}
+      <div className="card p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <Sparkles size={20} className="text-accent mt-0.5 shrink-0" />
+          <div>
+            <h2 className="font-semibold text-sm">{t('analyze_existing_title')}</h2>
+            <p className="text-xs text-zinc-500 mt-1">{t('analyze_existing_desc')}</p>
+          </div>
+        </div>
+        <button onClick={runAnalyzeExisting} disabled={analyzing} className="btn-accent">
+          {analyzing ? (
+            <><RotateCcw size={14} className="animate-spin" />{t('analyzing')}</>
+          ) : (
+            <><Sparkles size={14} />{t('analyze_existing_run')}</>
+          )}
+        </button>
+        {analyzeError && <p className="text-xs text-red-400">{analyzeError}</p>}
+        {analyzeReport && (
+          <p className="text-xs text-zinc-500">
+            {t('analyze_result').replace('{n}', String(analyzeReport.analyzed))}
+            {analyzeReport.errors > 0 && ` · ${t('analyze_result_errors').replace('{n}', String(analyzeReport.errors))}`}
+            {analyzeReport.remaining && ` · ${t('analyze_result_remaining')}`}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

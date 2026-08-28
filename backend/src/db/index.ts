@@ -50,6 +50,7 @@ export async function runMigrations(): Promise<void> {
         map_id      VARCHAR(100),
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         is_official BOOLEAN NOT NULL DEFAULT false,
+        metadata    JSONB,
         UNIQUE (instance_id, filename)
       );
 
@@ -111,6 +112,19 @@ export async function runMigrations(): Promise<void> {
         ) THEN
           ALTER TABLE mods ADD COLUMN is_official BOOLEAN NOT NULL DEFAULT false;
           RAISE NOTICE 'is_official column added to mods';
+        END IF;
+
+        -- metadata : analyse automatique du contenu du zip à l'upload/import
+        -- (véhicule : marque/style/motorisation… ; carte : taille/tag_line… ;
+        -- autre : script/son/UI…) — voir lib/modAnalyzer.ts. NULL pour tout
+        -- mod uploadé avant cette fonctionnalité, tant qu'il n'a pas été
+        -- ré-analysé via POST /api/admin/i/:instanceId/mods/analyze-existing.
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'mods' AND column_name = 'metadata'
+        ) THEN
+          ALTER TABLE mods ADD COLUMN metadata JSONB;
+          RAISE NOTICE 'metadata column added to mods';
         END IF;
 
         -- add instance_id to known_players if missing (pre-existing installs)
