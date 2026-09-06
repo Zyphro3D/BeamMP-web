@@ -43,6 +43,52 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   de création ne peuplait jamais ; 14 cartes du jeu de base totalement
   absentes du catalogue V2 avant ce correctif, créées inactives.
 
+### Sécurité
+
+- **Montée de version majeure pour corriger toutes les alertes Dependabot
+  ouvertes** (fastify 4→5, react-router 6→7, bcrypt 5→6, sharp 0.33→0.35,
+  plus le lot habituel de transitives) :
+  - `fastify` 4.28→5.12.1 (CVE-2026-18504 — schéma body primitif à la
+    racine ; ce projet n'utilise que des schémas `object`, non affecté en
+    pratique, mais autant être sur la version corrigée). Tous les plugins
+    `@fastify/*` montés en parallèle vers leur première version majeure
+    compatible v5 (`cookie` 9→11, `cors` 9→11, `helmet` 11→13, `jwt` 8→10,
+    `multipart` 8→10, `rate-limit` 9→11, `static` 7→10).
+  - **`TRUST_PROXY_HOPS` (nombre de sauts) remplacé par `TRUST_PROXY`
+    (IP/CIDR)** — Fastify v5 a supprimé le support d'un simple compte de
+    sauts (non vérifiable contre le pair direct, donc jugé non sûr) ; un
+    nombre y est désormais silencieusement traité comme "ne faire confiance
+    à personne" plutôt que de lever une erreur. Repéré en isolant chaque
+    erreur de compilation une par une plutôt qu'en forçant `--force` à
+    l'aveugle — ce changement-là ne se serait vu qu'en prod, derrière un
+    vrai reverse proxy, sous forme de rate-limit partagé entre tous les
+    utilisateurs du proxy.
+  - `node:20-alpine` → `node:22-alpine` dans `Dockerfile` (les trois
+    stages) : `@fastify/cookie` 11.1.1+ exige Node ≥22 en interne.
+  - `bcrypt` 5→6 (corrige une vulnérabilité critique du `tar` embarqué par
+    `@mapbox/node-pre-gyp`, uniquement utilisée à l'installation — jamais
+    exécutée par l'app en service, mais aucune raison de la laisser).
+  - `sharp` 0.33→0.35 (CVE libvips héritées : CVE-2026-33327/33328/35590/35591).
+  - `react-router-dom` 6→7 (redirections via cibles `Link`/`navigate`
+    contrôlées par un attaquant — ce projet n'utilise que des chemins en
+    dur, non affecté en pratique ; et `deserializeErrors()` en SSR, jamais
+    utilisé, cette app étant 100% cliente). Usage de `react-router-dom`
+    limité au strict mode déclaratif (`BrowserRouter`/`Routes`/`Route`/
+    `Navigate`/`useNavigate`/`useSearchParams`), resté compatible sans
+    changement de code.
+  - `nanoid`/`postcss`/`postcss-selector-parser` (frontend, transitives de
+    build `postcss`/`tailwindcss`) — jamais présentes dans l'image de
+    production de toute façon (le stage de build frontend est jeté après
+    avoir copié `dist/`), corrigées par sécurité de forme.
+  - Non touché, volontairement : `vite`/`esbuild` (uniquement le serveur de
+    dev, jamais servi en production ; corriger demanderait de sauter 3
+    versions majeures de Vite d'un coup — hors scope de cette passe).
+  - Vérifié en conditions réelles après déploiement : CSP/helmet, cookie +
+    JWT (login), rate-limit (429 après 5 tentatives), upload multipart,
+    fichiers statiques (SPA + `/images/`) — tous testés sur le serveur live,
+    `npm audit` à 0 vulnérabilité sur le backend et le frontend (hors
+    vite/esbuild, assumé).
+
 ### Ajouté
 
 - **Analyse automatique du contenu des mods** — à l'upload, à l'import

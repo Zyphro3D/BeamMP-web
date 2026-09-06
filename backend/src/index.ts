@@ -21,10 +21,22 @@ import { hashPassword }     from './routes/auth'
 // trustProxy: false by default — the panel is exposed directly by Docker
 // (no proxy in front unless the operator adds one, cf. README). With
 // trustProxy:true unconditionally, anyone could forge X-Forwarded-For to
-// get a fresh rate-limit bucket on every login attempt. TRUST_PROXY_HOPS=1
-// when there's exactly one reverse proxy (Caddy/Nginx) terminating in front.
-const trustProxyHops = process.env.TRUST_PROXY_HOPS ? parseInt(process.env.TRUST_PROXY_HOPS, 10) : false
-const app = Fastify({ logger: { level: 'info' }, trustProxy: trustProxyHops })
+// get a fresh rate-limit bucket on every login attempt.
+//
+// TRUST_PROXY=<ip-or-cidr>[,<ip-or-cidr>…] when there's a reverse proxy
+// (Caddy/Nginx) terminating in front — set it to that proxy's address (e.g.
+// 127.0.0.1 for one on the same host, or its container/subnet CIDR).
+// TRUST_PROXY=true trusts every hop unconditionally (only for a proxy setup
+// where every possible path to the app is already otherwise controlled).
+//
+// Previously a hop COUNT (TRUST_PROXY_HOPS=1) — Fastify v5 removed that
+// entirely: a bare count can't be checked against the actual immediate
+// peer, so a number is now silently treated as "trust nothing" internally
+// (fails closed) rather than throwing. An IP/CIDR is validated against the
+// real peer address instead, which a hop count never was.
+const trustProxyEnv = process.env.TRUST_PROXY
+const trustProxy: boolean | string = trustProxyEnv === 'true' ? true : (trustProxyEnv || false)
+const app = Fastify({ logger: { level: 'info' }, trustProxy })
 
 async function main(): Promise<void> {
   // ── Startup security checks ────────────────────────────────────

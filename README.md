@@ -426,7 +426,7 @@ qu'une fois par site V1 source.
 | `JWT_SECRET` | — | **Oui** | Clé secrète JWT — min 32 chars (`openssl rand -hex 32`) |
 | `COOKIE_SECURE` | `false` | | Mettre `true` derrière un reverse proxy HTTPS |
 | `ALLOWED_ORIGIN` | — | | URL du panel pour CORS si domaine différent |
-| `TRUST_PROXY_HOPS` | — | | Nombre de reverse proxy en amont (ex. `1`). Laisser vide si le panel est exposé directement — sinon le rate-limit de login peut être contourné en forgeant `X-Forwarded-For` |
+| `TRUST_PROXY` | — | | Adresse/CIDR du reverse proxy en amont (ex. `127.0.0.1`), ou `true`. Laisser vide si le panel est exposé directement — sinon le rate-limit de login peut être contourné en forgeant `X-Forwarded-For` |
 | `SUPERADMIN_USERNAME` | — | | Login du superadmin (premier démarrage uniquement) |
 | `SUPERADMIN_PASSWORD` | — | | Mot de passe min 8 chars (premier démarrage uniquement) |
 | `PORT` | `3000` | | Avancé — port interne au conteneur. Ne pas confondre avec `APP_PORT` |
@@ -532,7 +532,7 @@ fixer un mot de passe temporaire à un compte nouvellement créé.
 - Conteneur non-root (UID 1000)
 - Headers de sécurité via `@fastify/helmet`, CSP sans `unsafe-inline` sur les scripts
 - Rate limiting par IP : `/api/auth/login` et `/api/auth/request-account`
-  (5 req/min chacun), redémarrage serveur (3 req/min) — voir `TRUST_PROXY_HOPS`
+  (5 req/min chacun), redémarrage serveur (3 req/min) — voir `TRUST_PROXY`
   si le panel est derrière un reverse proxy, sinon le rate-limit reste basé
   sur l'IP directe
 - Toutes les opérations fichier (upload, cohérence, import) sanitisent les
