@@ -1,5 +1,11 @@
 # 🚗 BeamMP-Web – Web Management Interface for BeamMP Servers
 
+> ⚠️ **This branch holds V1 (PHP/MariaDB), which is no longer maintained.**
+> The current version is **V2** (Node.js/TypeScript + PostgreSQL, Docker):
+> branch [`v2`](https://github.com/Zyphro3D/BeamMP-web/tree/v2) —
+> [latest release](https://github.com/Zyphro3D/BeamMP-web/releases/latest).
+> A V1 → V2 migration tool is included (`scripts/migrate-v1-to-v2.mjs`).
+
 ![Interface Preview](./docs/beammp-web.jpg)
 
 ---
