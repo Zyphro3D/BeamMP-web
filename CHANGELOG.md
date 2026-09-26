@@ -4,13 +4,27 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
-## [Non publié]
+## [1.3.0] — 2026-09-26
 
-Corrections suite à un audit complet (sécurité, backend, qualité, devops,
-performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
-`scripts/migrate-v1-to-v2.mjs` et les nouveaux boutons d'image sur les cartes.
+> **Changement de configuration** — `TRUST_PROXY_HOPS` est remplacé par
+> `TRUST_PROXY` (IP/CIDR du reverse proxy) et l'ancienne variable est
+> désormais ignorée : à mettre à jour dans `.env` avant de redéployer (voir
+> *Sécurité* ci-dessous et la section *Mise à jour* du README).
+
+Mot de passe en libre-service, mise à jour du serveur BeamMP depuis le panel,
+alertes critiques, configs pré-établies, analyse automatique du contenu des
+mods ; montée de version majeure des dépendances (Fastify 5, React Router 7)
+pour solder toutes les alertes Dependabot ; correctifs issus d'un audit
+complet (sécurité, backend, qualité, devops, performance, UI) du périmètre
+de la 1.2.0.
 
 ### Ajouté
+
+- **`agent/beammp-agent.py` et `agent/beammp-agent.service` versionnés** — le
+  README demandait de copier ces deux fichiers pour activer le redémarrage et
+  la mise à jour du serveur, mais ils n'avaient jamais été ajoutés au dépôt.
+  Le unit est fourni comme modèle (valeurs à adapter) ; le README documente
+  aussi la règle sudoers minimale nécessaire à l'agent.
 
 - **Changement de mot de passe en libre-service** (`PATCH /api/auth/password`,
   icône clé à côté de la déconnexion) — jusqu'ici seul un SuperAdmin pouvait
@@ -42,6 +56,21 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   déjà (`is_official`, convention `__official__:<id>`) mais qu'aucun chemin
   de création ne peuplait jamais ; 14 cartes du jeu de base totalement
   absentes du catalogue V2 avant ce correctif, créées inactives.
+
+- **Analyse automatique du contenu des mods** — à l'upload, à l'import
+  (*Scan & import*) et rétroactivement pour le catalogue existant (bouton
+  *Analyser les mods existants*), le zip est inspecté pour en extraire des
+  informations pratiques sans aucune saisie manuelle : pour un véhicule,
+  marque, style de carrosserie, drivetrain(s), plage de puissance et score
+  tout-terrain BeamNG (indicatif — un "Rally" peut scorer aussi bas qu'un
+  "Street Drag" du même véhicule, vérifié sur un mod réel du catalogue) ;
+  pour une carte, taille et résumé de l'auteur si le mod vient du repository
+  officiel BeamNG ; pour un script/son/mod UI, sa catégorie. Affiché en
+  badges sur les cartes de mods et, avec vignette, dans le sélecteur de
+  *Configs* (jusqu'ici texte seul — la config voulait des infos visuelles,
+  pas juste des noms). Nouvelle colonne `mods.metadata` (JSONB,
+  `lib/modAnalyzer.ts`) ; `null` pour tout mod uploadé avant cette
+  fonctionnalité jusqu'à ré-analyse.
 
 ### Sécurité
 
@@ -89,22 +118,30 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
     `npm audit` à 0 vulnérabilité sur le backend et le frontend (hors
     vite/esbuild, assumé).
 
-### Ajouté
-
-- **Analyse automatique du contenu des mods** — à l'upload, à l'import
-  (*Scan & import*) et rétroactivement pour le catalogue existant (bouton
-  *Analyser les mods existants*), le zip est inspecté pour en extraire des
-  informations pratiques sans aucune saisie manuelle : pour un véhicule,
-  marque, style de carrosserie, drivetrain(s), plage de puissance et score
-  tout-terrain BeamNG (indicatif — un "Rally" peut scorer aussi bas qu'un
-  "Street Drag" du même véhicule, vérifié sur un mod réel du catalogue) ;
-  pour une carte, taille et résumé de l'auteur si le mod vient du repository
-  officiel BeamNG ; pour un script/son/mod UI, sa catégorie. Affiché en
-  badges sur les cartes de mods et, avec vignette, dans le sélecteur de
-  *Configs* (jusqu'ici texte seul — la config voulait des infos visuelles,
-  pas juste des noms). Nouvelle colonne `mods.metadata` (JSONB,
-  `lib/modAnalyzer.ts`) ; `null` pour tout mod uploadé avant cette
-  fonctionnalité jusqu'à ré-analyse.
+- **Traversée de chemin potentielle dans `scripts/migrate-v1-to-v2.mjs`** —
+  les noms de fichier image/description venant de la base V1 n'étaient pas
+  validés avant d'être utilisés dans un chemin de lecture local et dans la
+  destination d'un `docker compose cp` ; une valeur contenant `../` aurait pu
+  faire sortir la lecture de `DATA/images`/`DATA/descriptions`, ou faire
+  écrire hors de `/app/images` dans le conteneur. Corrigé avec le même
+  garde-fou que `backend/src/routes/admin.ts` (`safeBasename` : rejette toute
+  valeur contenant un séparateur de chemin plutôt que de la nettoyer).
+- **Construction SQL par concaténation de chaînes** dans le script de
+  migration (`sqlEscape`) — non exploitable dans la configuration Docker
+  actuelle (PostgreSQL 16, `standard_conforming_strings=on` par défaut), mais
+  seul point du projet à ne pas utiliser de requêtes paramétrées. Remplacé :
+  les écritures passent désormais par `scripts/migrate-runner.mjs`, exécuté
+  dans le conteneur `app` via le module `pg` déjà présent, avec des requêtes
+  `$1, $2…` et aucune valeur jamais insérée dans du texte SQL.
+- **Mot de passe MariaDB V1 passé en argument `mysql -p<mot de passe>`** —
+  visible par tout utilisateur local via `ps`/`/proc/<pid>/cmdline` le temps
+  de l'exécution. Remplacé par un fichier `--defaults-extra-file` temporaire
+  en `600`, supprimé juste après usage.
+- **Limite de taille absente sur l'extraction de preview** (`lib/zipPreview.ts`)
+  — un zip pouvait déclarer une entrée `preview.jpg` fortement compressée qui,
+  une fois décompressée en mémoire par `sharp`, pouvait saturer le process
+  Fastify partagé par toutes les instances (déni de service). Rejette
+  désormais toute entrée de plus de 20 Mio non compressés avant décompression.
 
 ### Corrigé
 
@@ -153,53 +190,6 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   en base mais jamais marqué actif ni lié par `map_id`), pendant que le
   dashboard affichait "Aucune carte active" faute de correspondance.
 
-### Corrigé (données)
-
-- **Comptes admin V1 non migrés** — `AutoGamingPassion` et `Mickey1978`
-  (rôle `Admin` en V1, en plus de `zyphro` en SuperAdmin, déjà présent) ont
-  été recréés côté V2 avec le même rôle (`admin`) et un mot de passe
-  temporaire à faire changer via la nouvelle fonctionnalité ci-dessus —
-  volontairement non repris par `scripts/migrate-v1-to-v2.mjs` (schéma de
-  mot de passe différent), documenté dans le README, mais jamais recréé
-  manuellement avant ce jour.
-- **14 cartes officielles BeamNG récupérées depuis la V1** via le nouveau
-  support de `migrate-v1-to-v2.mjs` (voir ci-dessus) : Automation Test Track,
-  Centre de formation ETK, Circuit Hirochi, Côte Est/Ouest USA, Derby,
-  Gridmap v2, Ile Jungle Rock, Ile Small USA, Italie, Johnson Valley, Petite
-  grille, Site industriel, Utah USA.
-- **Serveur BeamMP mis à jour** de v3.9.0 à v3.9.3 (durcissements inclus :
-  limitation par IP, validation de la longueur des messages de chat, parsing
-  durci contre les paquets véhicule malformés).
-
-### Sécurité
-
-- **Traversée de chemin potentielle dans `scripts/migrate-v1-to-v2.mjs`** —
-  les noms de fichier image/description venant de la base V1 n'étaient pas
-  validés avant d'être utilisés dans un chemin de lecture local et dans la
-  destination d'un `docker compose cp` ; une valeur contenant `../` aurait pu
-  faire sortir la lecture de `DATA/images`/`DATA/descriptions`, ou faire
-  écrire hors de `/app/images` dans le conteneur. Corrigé avec le même
-  garde-fou que `backend/src/routes/admin.ts` (`safeBasename` : rejette toute
-  valeur contenant un séparateur de chemin plutôt que de la nettoyer).
-- **Construction SQL par concaténation de chaînes** dans le script de
-  migration (`sqlEscape`) — non exploitable dans la configuration Docker
-  actuelle (PostgreSQL 16, `standard_conforming_strings=on` par défaut), mais
-  seul point du projet à ne pas utiliser de requêtes paramétrées. Remplacé :
-  les écritures passent désormais par `scripts/migrate-runner.mjs`, exécuté
-  dans le conteneur `app` via le module `pg` déjà présent, avec des requêtes
-  `$1, $2…` et aucune valeur jamais insérée dans du texte SQL.
-- **Mot de passe MariaDB V1 passé en argument `mysql -p<mot de passe>`** —
-  visible par tout utilisateur local via `ps`/`/proc/<pid>/cmdline` le temps
-  de l'exécution. Remplacé par un fichier `--defaults-extra-file` temporaire
-  en `600`, supprimé juste après usage.
-- **Limite de taille absente sur l'extraction de preview** (`lib/zipPreview.ts`)
-  — un zip pouvait déclarer une entrée `preview.jpg` fortement compressée qui,
-  une fois décompressée en mémoire par `sharp`, pouvait saturer le process
-  Fastify partagé par toutes les instances (déni de service). Rejette
-  désormais toute entrée de plus de 20 Mio non compressés avant décompression.
-
-### Corrigé
-
 - **Application SQL non atomique en cas d'échec partiel** — `psql -f` sans
   `ON_ERROR_STOP` continuait après une ligne en erreur et retournait un code
   de sortie 0 : une migration pouvait être appliquée à moitié tout en
@@ -242,6 +232,24 @@ performance, UI) sur le nouveau périmètre de la 1.2.0 — essentiellement
   ignoré par certains lecteurs d'écran ; indicateur de chargement peu visible
   pendant l'upload d'image (remplacé par une icône animée, cohérent avec le
   reste de l'app) ; ordre des boutons harmonisé entre `ModCard`/`MapCard`.
+
+### Corrigé (données)
+
+- **Comptes admin V1 non migrés** — deux comptes `Admin` de la V1 (le
+  SuperAdmin, lui, était déjà présent) ont
+  été recréés côté V2 avec le même rôle (`admin`) et un mot de passe
+  temporaire à faire changer via la nouvelle fonctionnalité ci-dessus —
+  volontairement non repris par `scripts/migrate-v1-to-v2.mjs` (schéma de
+  mot de passe différent), documenté dans le README, mais jamais recréé
+  manuellement avant ce jour.
+- **14 cartes officielles BeamNG récupérées depuis la V1** via le nouveau
+  support de `migrate-v1-to-v2.mjs` (voir ci-dessus) : Automation Test Track,
+  Centre de formation ETK, Circuit Hirochi, Côte Est/Ouest USA, Derby,
+  Gridmap v2, Ile Jungle Rock, Ile Small USA, Italie, Johnson Valley, Petite
+  grille, Site industriel, Utah USA.
+- **Serveur BeamMP mis à jour** de v3.9.0 à v3.9.3 (durcissements inclus :
+  limitation par IP, validation de la longueur des messages de chat, parsing
+  durci contre les paquets véhicule malformés).
 
 ## [1.2.0] — 2026-08-26
 

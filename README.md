@@ -5,25 +5,63 @@ Gestion des mods, cartes, configuration, logs et joueurs — déployable en un s
 
 Fonctionne sur **Linux** et **Windows** (Docker Desktop).
 
+> **Branche `v2` (par défaut) = version actuelle** — Node.js/TypeScript +
+> PostgreSQL, un seul conteneur. La branche `main` contient l'ancienne V1
+> (PHP/MariaDB), conservée pour historique uniquement et plus maintenue.
+> Pour migrer une installation V1, voir
+> [Migration depuis la V1](#migration-depuis-la-v1-mariadb).
+
+---
+
+## Fonctionnalités
+
+- **Mods, véhicules et cartes** — upload (simple ou *Scan & Import* des
+  `.zip` déjà présents dans `Resources/`), activation/désactivation, carte
+  active, image de prévisualisation extraite automatiquement et modifiable,
+  description éditable.
+- **Analyse automatique du contenu des mods** — marque, style de
+  carrosserie, transmission(s), puissance, configurations pour les
+  véhicules ; taille, auteur, catégorie pour les cartes. Affichée en badges
+  sur chaque carte.
+- **Configs pré-établies** — un jeu de mods + une carte appliqués en un clic
+  (voir [Configs pré-établies](#configs-pré-établies)).
+- **Configuration serveur** — édition de `ServerConfig.toml`, redémarrage et
+  mise à jour du binaire BeamMP-Server via
+  [beammp-agent](#redémarrage-du-serveur).
+- **Logs et alertes** — consultation de `Server.log`, bannière d'alerte sur les
+  erreurs critiques (ex. AuthKey refusée par le backend BeamMP).
+- **Joueurs** — historique des connexions, temps de jeu, badge de rang
+  (Bronze/Argent/Or/Platine).
+- **Cohérence** — détection (et correction en un clic) des écarts entre la
+  base et les fichiers réels de `Resources/`.
+- **Multi-instance** — plusieurs serveurs BeamMP pilotés depuis un seul panel.
+- **Comptes et rôles** — moderator / admin / superadmin, demandes de compte
+  validées par un superadmin,
+  changement de mot de passe en libre-service.
+- **Page publique** — statut du serveur en temps réel, carte et mods actifs.
+- **Notifications Discord** (optionnelles), interface en 8 langues
+  (fr, en, de, es, it, pl, pt, ru), thème clair/sombre.
+
 ---
 
 ## Sommaire
 
-1. [Prérequis](#prérequis)
-2. [Installation](#installation)
-3. [Configuration `.env`](#configuration-env)
-4. [Démarrage](#démarrage)
-5. [Premier démarrage](#premier-démarrage)
-6. [Reverse proxy HTTPS](#reverse-proxy-https)
-7. [Multi-instance](#multi-instance)
-8. [Redémarrage du serveur](#redémarrage-du-serveur)
-9. [Configs pré-établies](#configs-pré-établies)
-10. [Mise à jour](#mise-à-jour)
-11. [Sauvegarde](#sauvegarde)
-12. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
-13. [Variables d'environnement](#variables-denvironnement)
-14. [Rôles et comptes](#rôles-et-comptes)
-15. [Sécurité](#sécurité)
+1. [Fonctionnalités](#fonctionnalités)
+2. [Prérequis](#prérequis)
+3. [Installation](#installation)
+4. [Configuration `.env`](#configuration-env)
+5. [Démarrage](#démarrage)
+6. [Premier démarrage](#premier-démarrage)
+7. [Reverse proxy HTTPS](#reverse-proxy-https)
+8. [Multi-instance](#multi-instance)
+9. [Redémarrage du serveur](#redémarrage-du-serveur)
+10. [Configs pré-établies](#configs-pré-établies)
+11. [Mise à jour](#mise-à-jour)
+12. [Sauvegarde](#sauvegarde)
+13. [Migration depuis la V1 (MariaDB)](#migration-depuis-la-v1-mariadb)
+14. [Variables d'environnement](#variables-denvironnement)
+15. [Rôles et comptes](#rôles-et-comptes)
+16. [Sécurité](#sécurité)
 
 ---
 
@@ -225,11 +263,22 @@ daemon Python (aucune dépendance) installé sur l'hôte, hors Docker.
 
 ### Installation
 
+Les deux fichiers sont dans le dossier [`agent/`](./agent) du dépôt :
+
 ```bash
 sudo mkdir -p /opt/beammp-agent
-sudo cp beammp-agent.py /opt/beammp-agent/
-sudo cp beammp-agent.service /etc/systemd/system/
+sudo cp agent/beammp-agent.py /opt/beammp-agent/
+sudo cp agent/beammp-agent.service /etc/systemd/system/
 sudo chmod +x /opt/beammp-agent/beammp-agent.py
+```
+
+L'agent tourne sous un utilisateur non-root (`User=` dans le unit) et
+redémarre le serveur via `sudo systemctl restart <service>`. Autoriser
+**uniquement** cette commande, pour ce(s) service(s) (`sudo visudo -f
+/etc/sudoers.d/beammp-agent`) :
+
+```
+beammp ALL=(root) NOPASSWD: /usr/bin/systemctl restart beammp.service
 ```
 
 Créer `/etc/beammp-agent.env` (**jamais** dans le unit file, qui est lisible
@@ -243,6 +292,7 @@ sudo chown root:root /etc/beammp-agent.env
 
 Éditer `/etc/systemd/system/beammp-agent.service` :
 
+- `User` — l'utilisateur de la règle sudoers ci-dessus
 - `ALLOWED_SERVICES` — nom(s) du/des service(s) systemd du serveur BeamMP
   (whitelist stricte, l'agent refuse tout service hors de cette liste)
 - `AGENT_HOST` — **ne pas** utiliser `0.0.0.0` ni l'IP LAN de la machine.
@@ -340,6 +390,12 @@ Les données PostgreSQL sont conservées dans le volume `postgres_data`.
 Les migrations de schéma s'appliquent automatiquement au démarrage.
 
 Voir [CHANGELOG.md](./CHANGELOG.md) pour le détail des versions.
+
+> **Passage en 1.3.0** — `TRUST_PROXY_HOPS` n'existe plus (supprimé par
+> Fastify 5) et est **ignoré silencieusement**. Derrière un reverse proxy,
+> le remplacer par `TRUST_PROXY=<IP du proxy>` dans `.env`, sinon toutes les
+> requêtes semblent venir du proxy et le rate-limit de login devient commun
+> à tous les utilisateurs.
 
 ---
 
@@ -462,6 +518,11 @@ qu'une fois par site V1 source.
 | `BEAMMP_AGENT_URL` | — | URL de beammp-agent sur l'hôte (IP de la passerelle Docker, pas `0.0.0.0`/IP LAN) |
 | `BEAMMP_AGENT_TOKEN` | — | Doit correspondre à `RESTART_TOKEN` dans `/etc/beammp-agent.env` |
 | `BEAMMP_AGENT_SERVICE` | — | Nom du service systemd à redémarrer (doit être dans `ALLOWED_SERVICES` côté agent) |
+| `BEAMMP_AGENT_ASSET` | — | Suffixe de l'asset BeamMP-Server à installer (ex. `debian.13.x86_64`) — active la [mise à jour du binaire](#mise-à-jour-du-serveur-beammp-binaire-du-jeu) |
+
+Côté hôte, l'agent lit `RESTART_TOKEN` (dans `/etc/beammp-agent.env`),
+`ALLOWED_SERVICES`, `AGENT_HOST`, `AGENT_PORT` (défaut `4445`) et
+`BEAMMP_BINARY_PATH` (dans le unit systemd).
 
 ### Discord (optionnel)
 

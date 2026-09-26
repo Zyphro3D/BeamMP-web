@@ -1,0 +1,36 @@
+[Unit]
+Description=BeamMP Panel Restart Agent
+After=network.target docker.service
+
+[Service]
+Type=simple
+# Utilisateur non-root autorisé à lancer `sudo systemctl restart <service>`
+# via une règle sudoers dédiée (voir README, section "Redémarrage du serveur").
+User=beammp
+ExecStart=/usr/bin/python3 /opt/beammp-agent/beammp-agent.py
+
+# Secret (RESTART_TOKEN=...) — jamais dans ce fichier.
+EnvironmentFile=/etc/beammp-agent.env
+
+# Service(s) systemd que l'agent a le droit de redémarrer (séparés par des virgules).
+Environment=ALLOWED_SERVICES=beammp.service
+# IP de la passerelle du réseau Docker du panel — pas 0.0.0.0 ni l'IP LAN.
+# `docker network inspect beammp-panel_default` → Gateway
+Environment=AGENT_HOST=172.18.0.1
+Environment=AGENT_PORT=4445
+
+# Optionnel — mise à jour du binaire BeamMP-Server depuis le panel.
+# Décommenter les deux lignes et adapter le chemin.
+#Environment=BEAMMP_BINARY_PATH=/home/beammp/BeamMP-Server/bin/BeamMP-Server
+#ReadWritePaths=/home/beammp/BeamMP-Server/bin
+
+Restart=always
+RestartSec=5
+
+# Durcissement — système de fichiers en lecture seule sauf ReadWritePaths.
+# NoNewPrivileges n'est PAS activé : il bloquerait l'appel à sudo.
+ProtectSystem=strict
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
