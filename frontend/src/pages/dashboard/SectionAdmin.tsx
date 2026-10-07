@@ -110,7 +110,7 @@ export function SectionAdmin() {
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="space-y-1">
-              <label htmlFor="initial-password" className="text-xs text-zinc-400">{t('initial_password')}</label>
+              <label htmlFor="initial-password" className="inline-block text-xs text-zinc-400">{t('initial_password')}</label>
               <input id="initial-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('initial_password_min')} className="input" />
             </div>
             <div className="flex gap-2">
@@ -126,7 +126,7 @@ export function SectionAdmin() {
           <div className="space-y-4">
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="space-y-1">
-              <label htmlFor="new-password" className="text-xs text-zinc-400">{t('initial_password_min')}</label>
+              <label htmlFor="new-password" className="inline-block text-xs text-zinc-400">{t('initial_password_min')}</label>
               <input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder={t('initial_password_min')} className="input" />
             </div>
             <button onClick={resetPassword} disabled={!newPassword || newPassword.length < 8} className="btn-accent w-full justify-center">{t('save')}</button>

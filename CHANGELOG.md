@@ -4,6 +4,39 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [1.3.2] — 2026-10-07
+
+Passage du frontend à Tailwind CSS 4 pour solder la dernière alerte
+Dependabot (`postcss-selector-parser`, tirée par Tailwind 3). Aucun
+changement de configuration ni d'API.
+
+### Modifié
+
+- **Tailwind CSS 3.4 → 4.3** (outil officiel `@tailwindcss/upgrade`) :
+  `tailwind.config.js` supprimé, thème (`accent`, `surface`, police) déclaré
+  en CSS via `@theme` dans `src/index.css` ; classes de composants (`card`,
+  `btn-*`, `input`, `badge-*`, `nav-item`…) converties en `@utility` ;
+  `darkMode: 'class'` remplacé par `@custom-variant dark` ; PostCSS passe par
+  `@tailwindcss/postcss` (`autoprefixer` retiré, intégré à Tailwind 4).
+- Classes renommées par Tailwind 4 : `rounded` → `rounded-sm`,
+  `backdrop-blur-sm` → `backdrop-blur-xs`, `shadow` → `shadow-sm`,
+  `flex-shrink-0` → `shrink-0`, `outline-none` → `outline-hidden`.
+- Comportements par défaut de Tailwind 3 conservés explicitement : couleur
+  de bordure par défaut, couleur des placeholders, curseur « main » sur les
+  boutons.
+- Libellés de formulaire passés en `inline-block` : avec Tailwind 4,
+  `space-y-*` pose la marge sous chaque élément et non plus au-dessus, ce qui
+  collait les champs à leur libellé (vérifié par comparaison de captures
+  avant/après sur toutes les pages, thèmes clair et sombre).
+- Barre latérale : les marges `mt-4`/`mt-3` au-dessus de « Administration »
+  et de « Discord » sont désormais appliquées (Tailwind 3 les écrasait par
+  `space-y-0.5`) — espacement légèrement plus aéré, conforme au code.
+
+### Sécurité
+
+- Frontend : `npm audit` à 0 vulnérabilité (`braces`, `micromatch`,
+  `postcss-selector-parser` disparaissent avec Tailwind 3).
+
 ## [1.3.1] — 2026-10-07
 
 Version corrective de sécurité : mise à jour des dépendances pour solder les

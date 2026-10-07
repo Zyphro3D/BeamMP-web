@@ -127,13 +127,13 @@ export function BeamMPTextEditor({ id, name, value, onChange, multiline = false,
         {/* Format buttons */}
         {FORMATS.map(f => (
           <button key={f.code} type="button" title={t(f.titleKey)} aria-label={t(f.titleKey)} onClick={() => insert(f.code)}
-            className={`px-2 py-0.5 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 ${f.className}`}>
+            className={`px-2 py-0.5 text-xs rounded-sm bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 ${f.className}`}>
             {f.label}
           </button>
         ))}
         {multiline && (
           <button type="button" title={t('new_line')} onClick={() => insert('p')}
-            className="px-2 py-0.5 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300">
+            className="px-2 py-0.5 text-xs rounded-sm bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300">
             {t('new_line')}
           </button>
         )}
@@ -141,7 +141,7 @@ export function BeamMPTextEditor({ id, name, value, onChange, multiline = false,
         {/* Color palette */}
         {COLORS.map(c => (
           <button key={c.code} type="button" title={t(c.nameKey)} aria-label={t(c.nameKey)} onClick={() => insert(c.code)}
-            className="w-5 h-5 rounded border border-zinc-600 hover:scale-110 transition-transform flex-shrink-0"
+            className="w-5 h-5 rounded-sm border border-zinc-600 hover:scale-110 transition-transform shrink-0"
             style={{ backgroundColor: c.hex }} />
         ))}
       </div>

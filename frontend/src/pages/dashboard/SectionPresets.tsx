@@ -168,12 +168,12 @@ function PresetEditor({ instanceId, preset, items, maps, onClose, onSaved }: {
     <Modal title={preset ? `${t('edit_preset')} — ${preset.name}` : t('new_preset')} onClose={onClose}>
       <div className="space-y-3">
         <div className="space-y-1">
-          <label htmlFor="preset-name" className="text-xs text-zinc-400">{t('preset_name_label')}</label>
+          <label htmlFor="preset-name" className="inline-block text-xs text-zinc-400">{t('preset_name_label')}</label>
           <input id="preset-name" value={name} onChange={e => setName(e.target.value)} className="input" />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="preset-map" className="text-xs text-zinc-400">{t('preset_map_label')}</label>
+          <label htmlFor="preset-map" className="inline-block text-xs text-zinc-400">{t('preset_map_label')}</label>
           <select id="preset-map" value={mapId} onChange={e => setMapId(e.target.value)} className="input">
             <option value="">{t('preset_no_map')}</option>
             {maps.filter(m => m.map_id).map(m => (
@@ -183,7 +183,7 @@ function PresetEditor({ instanceId, preset, items, maps, onClose, onSaved }: {
         </div>
 
         <div className="flex items-center justify-between">
-          <label className="text-xs text-zinc-400">{t('preset_items_label')} ({selected.size})</label>
+          <label className="inline-block text-xs text-zinc-400">{t('preset_items_label')} ({selected.size})</label>
           <button type="button" onClick={useCurrentActive} className="btn-ghost text-[11px] py-1">{t('use_current_active')}</button>
         </div>
 
@@ -200,9 +200,9 @@ function PresetEditor({ instanceId, preset, items, maps, onClose, onSaved }: {
               <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} className="shrink-0" />
               {m.image ? (
                 <img src={`/images/${m.image}`} alt="" loading="lazy"
-                  className="w-9 h-7 object-cover rounded shrink-0 bg-zinc-100 dark:bg-zinc-800/60" />
+                  className="w-9 h-7 object-cover rounded-sm shrink-0 bg-zinc-100 dark:bg-zinc-800/60" />
               ) : (
-                <div className="w-9 h-7 rounded shrink-0 bg-surface flex items-center justify-center">
+                <div className="w-9 h-7 rounded-sm shrink-0 bg-surface flex items-center justify-center">
                   {m.type === 'vehicle'
                     ? <Car size={13} className="text-zinc-600" />
                     : <Package size={13} className="text-zinc-600" />}

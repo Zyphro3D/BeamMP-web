@@ -112,19 +112,19 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nom du serveur avec éditeur BeamMP */}
           <div className="space-y-1.5">
-            <label htmlFor="config-name" className="text-xs text-zinc-400">{t('server_name_label')}</label>
+            <label htmlFor="config-name" className="inline-block text-xs text-zinc-400">{t('server_name_label')}</label>
             <BeamMPTextEditor id="config-name" name="Name" value={name} onChange={setName} placeholder={t('server_name_placeholder')} />
           </div>
 
           {/* Description avec éditeur BeamMP (multiline) */}
           <div className="space-y-1.5">
-            <label htmlFor="config-description" className="text-xs text-zinc-400">{t('description')}</label>
+            <label htmlFor="config-description" className="inline-block text-xs text-zinc-400">{t('description')}</label>
             <BeamMPTextEditor id="config-description" name="Description" value={desc2} onChange={setDesc2} multiline placeholder={t('description_placeholder')} />
           </div>
 
           {CONFIG_KEY_DEFS.map(({key, labelKey, type}) => (
             <div key={key} className="space-y-1.5">
-              <label htmlFor={`config-${key}`} className="text-xs text-zinc-400">{t(labelKey)}</label>
+              <label htmlFor={`config-${key}`} className="inline-block text-xs text-zinc-400">{t(labelKey)}</label>
               {type === 'toggle' ? (
                 <div className="flex items-center gap-2">
                   <Toggle

@@ -144,13 +144,13 @@ export function SectionUpload({ instanceId, onRefresh }: { instanceId: string; o
                 <div className="grid grid-cols-2 gap-3">
                   {/* Nom */}
                   <div className="space-y-1">
-                    <label htmlFor={`upload-name-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_display_name')} <span className="text-red-400">*</span></label>
+                    <label htmlFor={`upload-name-${idx}`} className="inline-block text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_display_name')} <span className="text-red-400">*</span></label>
                     <input id={`upload-name-${idx}`} value={item.name} onChange={e => update(idx, { name: e.target.value })}
                       className="input text-xs w-full" placeholder={t('mod_name')} />
                   </div>
                   {/* Type */}
                   <div className="space-y-1">
-                    <label htmlFor={`upload-type-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_type')} <span className="text-red-400">*</span></label>
+                    <label htmlFor={`upload-type-${idx}`} className="inline-block text-[10px] text-zinc-400 uppercase tracking-wider">{t('mod_type')} <span className="text-red-400">*</span></label>
                     <select id={`upload-type-${idx}`} value={item.type} onChange={e => update(idx, { type: e.target.value as UploadItem['type'] })}
                       className="input text-xs w-full">
                       <option value="mod">{t('mod')}</option>
@@ -161,20 +161,20 @@ export function SectionUpload({ instanceId, onRefresh }: { instanceId: string; o
                   {/* Map ID (only for map type) */}
                   {item.type === 'map' && (
                     <div className="col-span-2 space-y-1">
-                      <label htmlFor={`upload-mapid-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('map_id_label')} <span className="text-red-400">*</span></label>
+                      <label htmlFor={`upload-mapid-${idx}`} className="inline-block text-[10px] text-zinc-400 uppercase tracking-wider">{t('map_id_label')} <span className="text-red-400">*</span></label>
                       <input id={`upload-mapid-${idx}`} value={item.mapId} onChange={e => update(idx, { mapId: e.target.value })}
                         className="input text-xs w-full font-mono" placeholder="/levels/nomdelacarte/info.json" />
                     </div>
                   )}
                   {/* Description */}
                   <div className="col-span-2 space-y-1">
-                    <label htmlFor={`upload-desc-${idx}`} className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('description')}</label>
+                    <label htmlFor={`upload-desc-${idx}`} className="inline-block text-[10px] text-zinc-400 uppercase tracking-wider">{t('description')}</label>
                     <textarea id={`upload-desc-${idx}`} value={item.description} onChange={e => update(idx, { description: e.target.value })}
                       className="input text-xs w-full resize-none" rows={2} placeholder={t('no_description')} />
                   </div>
                   {/* Image */}
                   <div className="col-span-2 space-y-1">
-                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider">{t('image_label')}</label>
+                    <label className="inline-block text-[10px] text-zinc-400 uppercase tracking-wider">{t('image_label')}</label>
                     <div className="flex items-center gap-3">
                       {item.imagePreview ? (
                         <img src={item.imagePreview} alt="preview" className="w-20 h-14 object-contain rounded-lg bg-zinc-800 shrink-0" />

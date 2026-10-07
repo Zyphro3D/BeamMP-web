@@ -31,12 +31,12 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
         ) : (
           <>
             <div className="space-y-1">
-              <label htmlFor="current-password" className="text-xs text-zinc-400">{t('current_password')}</label>
+              <label htmlFor="current-password" className="inline-block text-xs text-zinc-400">{t('current_password')}</label>
               <input id="current-password" type="password" value={currentPassword}
                 onChange={e => setCurrentPassword(e.target.value)} className="input" autoComplete="current-password" />
             </div>
             <div className="space-y-1">
-              <label htmlFor="new-password-self" className="text-xs text-zinc-400">{t('initial_password_min')}</label>
+              <label htmlFor="new-password-self" className="inline-block text-xs text-zinc-400">{t('initial_password_min')}</label>
               <input id="new-password-self" type="password" value={newPassword}
                 onChange={e => setNewPassword(e.target.value)} placeholder={t('initial_password_min')}
                 className="input" autoComplete="new-password" />

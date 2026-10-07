@@ -44,7 +44,7 @@ export function LangToggle({ className = '' }: { className?: string }) {
     <div ref={ref} className={`relative ${className}`}>
       <button
         onClick={handleToggle}
-        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+        className="flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-bold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
       >
         {lang}
         <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />

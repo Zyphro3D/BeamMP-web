@@ -43,7 +43,7 @@ export function DescriptionEditor({ instanceId, mod, onClose, onSaved }: { insta
         )}
         {langs.map(({ lang, text }, i) => (
           <div key={lang} className="space-y-1">
-            <label htmlFor={`desc-${lang}`} className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{lang}</label>
+            <label htmlFor={`desc-${lang}`} className="inline-block text-xs font-bold text-zinc-400 uppercase tracking-wider">{lang}</label>
             <textarea
               id={`desc-${lang}`}
               value={text}
