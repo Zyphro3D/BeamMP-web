@@ -4,6 +4,33 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [1.3.1] — 2026-10-07
+
+Version corrective de sécurité : mise à jour des dépendances pour solder les
+alertes Dependabot ouvertes depuis la 1.3.0. Aucun changement fonctionnel ni
+de configuration.
+
+### Sécurité
+
+- **Backend** (`npm audit fix`, aucune montée majeure) :
+  - `fastify` 5.12.3 → 5.12.5 — déni de service via les trailers HTTP/2
+    (GHSA-4mh8-r7rc-xpvc) ;
+  - `ip-address` 10.7.0 → 10.7.3 (via `@fastify/rate-limit`) — comparaison
+    IPv4/IPv6 erronée dans `isInSubnet()` (GHSA-j6r3-76f7-8jcv) et
+    diagnostic de parsing non borné (GHSA-h3mg-xc3c-68pw) ;
+  - `brace-expansion` 5.0.9 → 5.0.12 (via `@fastify/static`) — récursion non
+    bornée ;
+  - `fast-uri` 4.1.4 → 4.2.1 et 3.1.7 → 3.1.8 (via `fastify` / `ajv`) —
+    normalisation de casse de l'hôte (GHSA-hrr3-gc8f-f4qj) et injection
+    d'en-têtes `mailto` (GHSA-jvvf-x445-j334) ;
+  - `sharp` 0.35.4 → 0.35.5 — librsvg embarquée vulnérable
+    (GHSA-wq5f-xc86-pv6w).
+- **Frontend** : `source-map-js` mis à jour (outillage de build uniquement).
+  Restent signalés par `npm audit` : `braces`, `micromatch` et
+  `postcss-selector-parser` tirés par Tailwind CSS 3 — outillage de build qui
+  ne traite que les sources du projet, rien n'est exposé à l'exécution ; la
+  correction impose la migration vers Tailwind 4.
+
 ## [1.3.0] — 2026-09-26
 
 > **Changement de configuration** — `TRUST_PROXY_HOPS` est remplacé par
