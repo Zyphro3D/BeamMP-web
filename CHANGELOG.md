@@ -42,7 +42,8 @@ livrer une appli prête à l'emploi sous Linux et Windows, sans Docker ni base
 - Une clé de config absente du fichier est ajoutée dans `[General]`, plus en
   fin de fichier (où elle tombait dans `[Misc]`, que BeamMP ignore).
 - Uptime : celui du serveur BeamMP (dernier démarrage lu dans le journal),
-  plus celui du panel.
+  plus celui du panel. Le conteneur prend le fuseau de l'hôte (`TZ`, défaut
+  `Europe/Paris`) pour lire les heures du journal comme BeamMP les écrit.
 - Multi-instance : la vérification de cohérence ne signale plus comme
   orphelines, et ne supprime plus, les images d'une autre instance.
 - Remplacer l'image d'un mod supprime l'ancienne au lieu de la laisser

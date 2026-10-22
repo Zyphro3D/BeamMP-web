@@ -88,9 +88,12 @@ def rank_label(count: int) -> str | None:
 
 def _parse_ts(stamp: str) -> float | None:
     try:
-        return datetime.strptime(stamp, "%d/%m/%y %H:%M:%S").timestamp()  # heure locale, comme BeamMP
+        ts = datetime.strptime(stamp, "%d/%m/%y %H:%M:%S").timestamp()  # heure locale, comme BeamMP
     except ValueError:
         return None
+    # Une heure dans le futur = fuseau du panel différent de celui du
+    # serveur (variable TZ) : mieux vaut aucune valeur qu'un uptime faux.
+    return ts if ts <= time.time() + 60 else None
 
 
 async def handle_join(inst: InstanceConfig, username: str) -> None:

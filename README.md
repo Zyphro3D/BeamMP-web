@@ -545,6 +545,7 @@ qu'une fois par site V1 source.
 | `DB_PATH` | `DATA_DIR/panel.db` | | Chemin de la base SQLite |
 | `IMAGES_PATH` | `DATA_DIR/images` (`/app/images` en Docker) | | Images de mods |
 | `INSTANCE_NAME` | `BeamMP Server` | | Nom affiché en mode instance unique |
+| `TZ` | `Europe/Paris` | | Fuseau horaire de l'hôte (Docker) : BeamMP écrit `Server.log` en heure locale, le panel doit lire les mêmes heures |
 
 ### Base de données
 

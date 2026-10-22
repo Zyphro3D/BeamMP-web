@@ -13,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 RUN useradd --create-home --uid 1000 panel \
- && apt-get update && apt-get install -y --no-install-recommends gosu \
+ && apt-get update && apt-get install -y --no-install-recommends gosu tzdata \
  && rm -rf /var/lib/apt/lists/*
 
 COPY server/requirements.txt ./

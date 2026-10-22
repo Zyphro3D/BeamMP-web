@@ -18,6 +18,9 @@ services:
       # Statut en direct par le port de jeu (paquet I) : le serveur BeamMP
       # tourne sur l'hôte, joignable depuis le conteneur par ce nom.
       BEAMMP_INFO_HOST: ${BEAMMP_INFO_HOST:-host.docker.internal}
+      # Fuseau de l'hôte : BeamMP écrit Server.log en heure locale, le panel
+      # doit lire les mêmes heures (uptime, horodatages).
+      TZ: ${TZ:-Europe/Paris}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
