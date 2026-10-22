@@ -4,6 +4,69 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [3.0.0] — 2026-10-22
+
+Nouveau moteur : le backend Node.js/Fastify + PostgreSQL est réécrit en
+Python (Starlette) + SQLite. L'interface et l'API HTTP ne changent pas
+(mêmes routes, mêmes réponses, même cookie de session). Objectif : pouvoir
+livrer une appli prête à l'emploi sous Linux et Windows, sans Docker ni base
+à installer. Passage depuis une v2 en place : `scripts/upgrade-to-v3.sh`.
+
+### Ajouté
+
+- **Statut en direct par le port de jeu** : le panel interroge le serveur
+  BeamMP en local (paquet « I », réponse native du serveur) avant la liste
+  publique BeamMP. Joueurs, carte, mods et poids total des mods à jour sans
+  les 15 à 30 s de retard de la liste publique, et aussi pour un serveur
+  privé. Nouvelle variable `BEAMMP_INFO_HOST`.
+- **Import de la v2** : `python -m beammp_panel.importer` lit une sauvegarde
+  `pg_dump` (ou une connexion PostgreSQL) et la recopie dans SQLite, mêmes
+  identifiants, mots de passe conservés.
+- `scripts/backup-db.sh` : sauvegarde à chaud de la base SQLite ;
+  `backup-postgres.sh` l'appelle, les crons existants continuent de marcher.
+- Lancement sans Docker : `python -m beammp_panel --env .env`.
+- Suite de tests de l'API (27 tests : routes, rôles, formats, import).
+
+### Corrigé
+
+- **Suivi des joueurs** : les expressions de la v2 (`Connected: x (`,
+  `Disconnected: x`) ne correspondaient à aucune ligne de BeamMP-Server 3.x
+  (`x : Connected`, `x Connection Terminated`) : arrivées, départs, temps de
+  jeu, joueurs connus et notifications Discord ne fonctionnaient plus. Les
+  deux formats sont reconnus ; une connexion refusée n'est plus comptée
+  comme un départ, et un message de chat n'est plus pris pour une arrivée.
+- Une carte envoyée alors qu'une autre est active va dans `inactive_map/`
+  (elle était écrite dans `Client/`, donc téléchargée par les joueurs).
+- `Map =` n'est plus doublé (`/levels//levels/x/info.json/info.json`) quand
+  le map_id saisi est déjà un chemin complet.
+- Une clé de config absente du fichier est ajoutée dans `[General]`, plus en
+  fin de fichier (où elle tombait dans `[Misc]`, que BeamMP ignore).
+- Uptime : celui du serveur BeamMP (dernier démarrage lu dans le journal),
+  plus celui du panel.
+- Multi-instance : la vérification de cohérence ne signale plus comme
+  orphelines, et ne supprime plus, les images d'une autre instance.
+- Remplacer l'image d'un mod supprime l'ancienne au lieu de la laisser
+  orpheline.
+- `GET /api/admin/requests` : une ligne par demande (la jointure par pseudo
+  la dupliquait pour chaque instance).
+- Supprimer un compte qui a validé des demandes ne bloque plus.
+- Envoi de mod en flux vers le disque (le zip entier passait en mémoire).
+- Activation d'une carte en transaction ; `ServerConfig.toml` écrit de façon
+  atomique.
+- Analyse des mods : lecture du format SJSON de BeamNG (virgules
+  facultatives, commentaires), configurations livrées en `.pc` comptées,
+  aperçu `default.png` accepté, clés de traduction du jeu ignorées.
+- Lecture des journaux par la fin du fichier (plus de chargement complet de
+  `Server.log`).
+
+### Supprimé
+
+- `backend/` (Node.js/TypeScript) et le service PostgreSQL (gardé dans
+  `docker-compose.yml` sous le profil `legacy`, jamais démarré, pour un
+  retour arrière ; le volume `postgres_data` n'est pas supprimé).
+- `scripts/migrate-v1-to-v2.mjs` et `migrate-runner.mjs` : restent dans la
+  branche `v2`.
+
 ## [1.3.2] — 2026-10-07
 
 Passage du frontend à Tailwind CSS 4 pour solder la dernière alerte

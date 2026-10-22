@@ -13,27 +13,30 @@ services:
       BEAMMP_RESOURCES_PATH: /beammp/resources
       BEAMMP_LOG_PATH: /beammp/logs/Server.log
       BEAMMP_CONFIG_PATH: /beammp/ServerConfig.toml
+      DATA_DIR: /app/data
+      IMAGES_PATH: /app/images
+      # Statut en direct par le port de jeu (paquet I) : le serveur BeamMP
+      # tourne sur l'hôte, joignable depuis le conteneur par ce nom.
+      BEAMMP_INFO_HOST: ${BEAMMP_INFO_HOST:-host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
+      # Base SQLite (remplace PostgreSQL depuis la v3).
+      - app_data:/app/data
       - app_images:/app/images
       - ${BEAMMP_RESOURCES_PATH}:/beammp/resources
       # Le DOSSIER contenant Server.log, pas le fichier directement : BeamMP-Server
       # recrée ce fichier (renommé en Server.old.log) à chaque redémarrage plutôt
       # que de le tronquer sur place. Un bind mount sur un fichier unique reste
-      # accroché à l'ancien inode dans ce cas — plus aucune écriture n'est jamais
-      # revue côté conteneur après un redémarrage, silencieusement (le suivi
-      # joueurs/alertes du panel s'arrêtait net à chaque redémarrage du serveur).
-      # Monter le dossier évite le problème : le nom est résolu à chaque accès.
+      # accroché à l'ancien inode : plus aucune écriture ne serait vue après un
+      # redémarrage du serveur.
       - ${BEAMMP_LOG_DIR}:/beammp/logs:ro
       - ${BEAMMP_CONFIG_PATH}:/beammp/ServerConfig.toml
-    depends_on:
-      postgres:
-        condition: service_healthy
+      # Sauvegardes de la v2, lues une seule fois par l'import (scripts/upgrade-to-v3.sh).
+      - ./backups:/app/backups:ro
     restart: unless-stopped
     healthcheck:
-      # 127.0.0.1, pas localhost : busybox wget résout localhost en ::1 dans
-      # l'image alpine, alors que Fastify n'écoute qu'en IPv4 — avec
-      # "localhost" le healthcheck échoue en boucle même quand l'app tourne.
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/info || exit 1"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/api/info', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -45,28 +48,22 @@ services:
           memory: 1G
         reservations:
           cpus: '0.25'
-          memory: 256M
+          memory: 128M
 
+  # PostgreSQL de la v2 : plus utilisé par le panel. Gardé (profil « legacy »,
+  # jamais démarré par défaut) seulement pour pouvoir refaire un pg_dump ou
+  # revenir en arrière ; son volume postgres_data n'est jamais supprimé.
   postgres:
     image: postgres:16-alpine
+    profiles: ["legacy"]
     environment:
       POSTGRES_DB:       ${POSTGRES_DB:-beammp}
       POSTGRES_USER:     ${POSTGRES_USER:-beammp}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beammp}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beammp}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
 
 volumes:
-  postgres_data:
+  app_data:
   app_images:
+  postgres_data:

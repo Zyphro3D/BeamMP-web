@@ -9,3 +9,8 @@ backup.log
 # État local de scripts/migrate-v1-to-v2.mjs (garde-fou anti double-import,
 # spécifique à la machine qui exécute la migration)
 scripts/.migrate-v1-to-v2.state.json
+.venv/
+**/__pycache__/
+.pytest_cache/
+server/data/
+data/

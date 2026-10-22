@@ -1,41 +1,32 @@
-# ─── Stage 1 : Build frontend ─────────────────────────────────
+# ─── Étape 1 : interface React ─────────────────────────────────
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-# ─── Stage 2 : Build backend ──────────────────────────────────
-FROM node:22-alpine AS backend-builder
-WORKDIR /app/backend
-COPY backend/package*.json ./
-RUN npm install
-COPY backend/ ./
-RUN npm run build
-
-# ─── Stage 3 : Production image ───────────────────────────────
-FROM node:22-alpine AS production
+# ─── Étape 2 : moteur Python ───────────────────────────────────
+FROM python:3.12-slim AS production
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    DATA_DIR=/app/data IMAGES_PATH=/app/images
 WORKDIR /app
 
-# Install only production deps
-COPY backend/package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+RUN useradd --create-home --uid 1000 panel \
+ && apt-get update && apt-get install -y --no-install-recommends gosu \
+ && rm -rf /var/lib/apt/lists/*
 
-# Copy built artifacts
-COPY --from=backend-builder /app/backend/dist ./dist
-COPY --from=frontend-builder /app/frontend/dist ./public
+COPY server/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# su-exec : passe de root à node après avoir corrigé les droits des volumes
-RUN apk add --no-cache su-exec
+COPY server/beammp_panel ./beammp_panel
+COPY --from=frontend-builder /app/frontend/dist ./beammp_panel/static
 
-# Directories for BeamMP mounts
-RUN mkdir -p /beammp/resources /app/images && \
-    chown -R node:node /app /beammp
+RUN mkdir -p /beammp/resources /app/images /app/data && chown -R panel:panel /app /beammp
 
 COPY docker-entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["node", "dist/index.js"]
+CMD ["python", "-m", "beammp_panel", "--env", "/dev/null"]

@@ -1,15 +1,16 @@
 # BeamMP Panel
 
 Interface d'administration web pour serveur BeamMP.
-Gestion des mods, cartes, configuration, logs et joueurs — déployable en un seul conteneur Docker.
+Gestion des mods, cartes, configuration, logs et joueurs — un seul conteneur
+Docker, ou directement en Python sans Docker.
 
-Fonctionne sur **Linux** et **Windows** (Docker Desktop).
+Fonctionne sur **Linux** et **Windows**.
 
-> **Branche `v2` (par défaut) = version actuelle** — Node.js/TypeScript +
-> PostgreSQL, un seul conteneur. La branche `main` contient l'ancienne V1
-> (PHP/MariaDB), conservée pour historique uniquement et plus maintenue.
-> Pour migrer une installation V1, voir
-> [Migration depuis la V1](#migration-depuis-la-v1-mariadb).
+> **v3 = moteur Python + SQLite** (branche `v3-python`). Même interface et
+> même API que la v2, sans PostgreSQL ni Node.js à l'exécution. La branche
+> `v2` garde l'ancien moteur Node.js/TypeScript + PostgreSQL ; la branche
+> `main` l'ancienne V1 (PHP/MariaDB). Passer d'une v2 en place à la v3 :
+> [Passage de la v2 à la v3](#passage-de-la-v2-à-la-v3).
 
 ---
 
@@ -71,6 +72,7 @@ Fonctionne sur **Linux** et **Windows** (Docker Desktop).
   - Linux : Docker CE (dépôt officiel `get.docker.com`)
   - Windows : Docker Desktop
 - Un serveur BeamMP fonctionnel sur la même machine
+- Sans Docker : Python 3.11+ (voir [Sans Docker](#sans-docker))
 
 ---
 
@@ -92,9 +94,6 @@ cp .env.example .env
 ```env
 # Clé secrète JWT — générer avec : openssl rand -hex 32
 JWT_SECRET=
-
-# Mot de passe PostgreSQL
-POSTGRES_PASSWORD=
 
 # Compte SuperAdmin créé automatiquement si la base est vide
 SUPERADMIN_USERNAME=admin
@@ -386,8 +385,8 @@ git pull
 docker compose up -d --build
 ```
 
-Les données PostgreSQL sont conservées dans le volume `postgres_data`.
-Les migrations de schéma s'appliquent automatiquement au démarrage.
+La base SQLite est conservée dans le volume `app_data` (`/app/data/panel.db`).
+Le schéma se crée et se met à jour automatiquement au démarrage.
 
 Voir [CHANGELOG.md](./CHANGELOG.md) pour le détail des versions.
 
@@ -401,36 +400,91 @@ Voir [CHANGELOG.md](./CHANGELOG.md) pour le détail des versions.
 
 ## Sauvegarde
 
-Le volume `postgres_data` est la seule copie des comptes, joueurs connus, mods et
-historique — sans sauvegarde, sa perte (erreur `docker volume rm`, disque
-corrompu, migration de machine) est irréversible.
+Le volume `app_data` (base SQLite `panel.db`) est la seule copie des comptes,
+joueurs connus, mods et configs — sans sauvegarde, sa perte est irréversible.
 
 ```bash
-./scripts/backup-postgres.sh            # dump vers ./backups/, gardé 14 jours
-./scripts/backup-postgres.sh /mnt/nas    # ou un dossier externe au host Docker
+./scripts/backup-db.sh            # copie à chaud vers ./backups/, gardée 14 jours
+./scripts/backup-db.sh /mnt/nas    # ou un dossier externe à l'hôte Docker
 ```
 
-À planifier via cron sur l'hôte (pas dans le conteneur) — chemin absolu vers
-le script obligatoire (cron ne démarre pas dans le dossier du projet), et
-`/var/log/` n'est en général pas accessible en écriture pour un utilisateur
-non-root, d'où un fichier de log dans le dossier du projet plutôt que
-`/var/log/` :
+À planifier via cron sur l'hôte, avec un chemin absolu :
 
 ```cron
-0 3 * * * /opt/app-docker/beammp-panel/scripts/backup-postgres.sh >> /opt/app-docker/beammp-panel/backup.log 2>&1
+0 3 * * * /opt/app-docker/beammp-panel/scripts/backup-db.sh >> /opt/app-docker/beammp-panel/backup.log 2>&1
 ```
 
-Restauration (adapter `$POSTGRES_USER`/`$POSTGRES_DB` à votre `.env` si personnalisés) :
+`scripts/backup-postgres.sh` (nom de la v2) est gardé et appelle
+`backup-db.sh` : un cron existant continue de fonctionner tel quel.
+
+Restauration :
 
 ```bash
-gunzip -c backups/beammp-panel-20260101-030000.sql.gz | docker compose exec -T postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
+docker compose stop app
+gunzip -c backups/beammp-panel-20260101-030000.sqlite.gz > /tmp/panel.db
+docker compose cp /tmp/panel.db app:/app/data/panel.db
+docker compose start app
 ```
 
 > Testez périodiquement une restauration réelle — une sauvegarde jamais restaurée n'est qu'une hypothèse.
 
 ---
 
+## Passage de la v2 à la v3
+
+Depuis le dossier d'une installation v2 en place :
+
+```bash
+./scripts/upgrade-to-v3.sh
+```
+
+Le script fait une sauvegarde `pg_dump` fraîche (avec la v2 encore en
+marche), bascule le code, construit l'image, **importe la sauvegarde dans
+SQLite** (comptes et mots de passe, joueurs connus, mods, configs, mêmes
+identifiants), démarre la v3 et vérifie qu'elle répond. Avec le même
+`JWT_SECRET`, les sessions ouvertes restent valides.
+
+Le volume `postgres_data` n'est jamais supprimé. Retour arrière :
+
+```bash
+git checkout v2 && docker compose up -d --build
+```
+
+Import manuel (autre machine, autre sauvegarde) :
+
+```bash
+python -m beammp_panel.importer --dump backups/beammp-panel-XXXX.sql.gz --db data/panel.db
+```
+
+---
+
+## Sans Docker
+
+Le moteur v3 est un programme Python ordinaire : il lit directement les
+fichiers du serveur BeamMP, aucune base à installer.
+
+```bash
+cd server
+python -m venv .venv && .venv/bin/pip install -r requirements.txt   # Windows : .venv\Scripts\pip
+(cd ../frontend && npm ci && npm run build)                          # une fois, pour l'interface
+.venv/bin/python -m beammp_panel --env ../.env
+```
+
+Dans le `.env`, donner les vrais chemins de l'hôte :
+`BEAMMP_RESOURCES_PATH`, `BEAMMP_LOG_PATH` (le fichier `Server.log`),
+`BEAMMP_CONFIG_PATH`, et éventuellement `DATA_DIR` (base et images,
+défaut `./data`). `BEAMMP_INFO_HOST` vaut `127.0.0.1` par défaut : le
+statut est lu en direct sur le port de jeu.
+
+Un paquet prêt à l'emploi (Linux et Windows, avec mise à jour depuis le
+panel) est prévu dans une prochaine version.
+
+---
+
 ## Migration depuis la V1 (MariaDB)
+
+> Ce script fait partie de la branche `v2` (il écrit dans PostgreSQL) : pour
+> une installation V1, migrer d'abord vers la v2, puis passer en v3.
 
 `scripts/migrate-v1-to-v2.mjs` reprend les données de l'ancien panel (PHP +
 MariaDB) une fois les mods déjà enregistrés en V2 via **Scan & Import**.
@@ -486,18 +540,17 @@ qu'une fois par site V1 source.
 | `SUPERADMIN_USERNAME` | — | | Login du superadmin (premier démarrage uniquement) |
 | `SUPERADMIN_PASSWORD` | — | | Mot de passe min 8 chars (premier démarrage uniquement) |
 | `PORT` | `3000` | | Avancé — port interne au conteneur. Ne pas confondre avec `APP_PORT` |
-| `IMAGES_PATH` | `/app/images` | | Avancé — chemin interne au conteneur pour les images de mods |
+| `HOST` | `0.0.0.0` | | Adresse d'écoute (sans Docker : `127.0.0.1` derrière un reverse proxy) |
+| `DATA_DIR` | `./data` (`/app/data` en Docker) | | Dossier des données : base SQLite, images par défaut |
+| `DB_PATH` | `DATA_DIR/panel.db` | | Chemin de la base SQLite |
+| `IMAGES_PATH` | `DATA_DIR/images` (`/app/images` en Docker) | | Images de mods |
 | `INSTANCE_NAME` | `BeamMP Server` | | Nom affiché en mode instance unique |
 
 ### Base de données
 
-| Variable | Défaut | Description |
-|---|---|---|
-| `POSTGRES_HOST` | `postgres` | Hôte PostgreSQL |
-| `POSTGRES_PORT` | `5432` | Port PostgreSQL |
-| `POSTGRES_DB` | `beammp` | Nom de la base |
-| `POSTGRES_USER` | `beammp` | Utilisateur |
-| `POSTGRES_PASSWORD` | `beammp` | **Changer en production** |
+SQLite, un seul fichier (`DB_PATH`) : rien à configurer. Les variables
+`POSTGRES_*` de la v2 ne servent plus, sauf à l'outil d'import
+(`--dsn`) ; elles peuvent rester dans le `.env`.
 
 ### Instance BeamMP
 
@@ -508,6 +561,7 @@ qu'une fois par site V1 source.
 | `BEAMMP_RESOURCES_PATH` | — | Chemin hôte vers `Resources/` |
 | `BEAMMP_LOG_DIR` | — | Chemin hôte vers le **dossier** contenant `Server.log` (pas le fichier — voir note plus haut) |
 | `BEAMMP_CONFIG_PATH` | — | Chemin hôte vers `ServerConfig.toml` |
+| `BEAMMP_INFO_HOST` | `127.0.0.1` (`host.docker.internal` en Docker) | Hôte interrogé en direct sur le port de jeu (`BEAMMP_SERVER_PORT`, défaut 30814) pour le statut : joueurs, carte, mods, même en serveur privé. Vide = désactivé |
 | `BEAMMP_API_HOST` | `localhost` | Host de l'API HTTP BeamMP (optionnel) |
 | `BEAMMP_API_PORT` | `4444` | Port de l'API HTTP BeamMP |
 
@@ -591,7 +645,8 @@ fixer un mot de passe temporaire à un compte nouvellement créé.
 - Mots de passe bcrypt coût 12 — migration transparente depuis les anciens hashes scrypt
 - Uploads validés par magic bytes (signature ZIP `PK\x03\x04`)
 - Conteneur non-root (UID 1000)
-- Headers de sécurité via `@fastify/helmet`, CSP sans `unsafe-inline` sur les scripts
+- Headers de sécurité identiques à la v2 (CSP sans `unsafe-inline` sur les scripts,
+  X-Frame-Options, nosniff…)
 - Rate limiting par IP : `/api/auth/login` et `/api/auth/request-account`
   (5 req/min chacun), redémarrage serveur (3 req/min) — voir `TRUST_PROXY`
   si le panel est derrière un reverse proxy, sinon le rate-limit reste basé
