@@ -435,7 +435,7 @@ docker compose start app
 Depuis le dossier d'une installation v2 en place :
 
 ```bash
-./scripts/upgrade-to-v3.sh
+git fetch origin && git show origin/v3-python:scripts/upgrade-to-v3.sh | sh -s
 ```
 
 Le script fait une sauvegarde `pg_dump` fraîche (avec la v2 encore en

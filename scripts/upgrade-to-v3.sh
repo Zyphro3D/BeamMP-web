@@ -2,7 +2,9 @@
 # Passage de BeamMP Panel v2 (Node + PostgreSQL) à v3 (Python + SQLite).
 #
 # À lancer UNE fois, depuis la racine du projet, par l'utilisateur qui gère
-# Docker :   ./scripts/upgrade-to-v3.sh [branche-ou-tag]   (défaut : v3-python)
+# Docker. Le script n'existe pas encore dans une copie v2 : on le lit
+# directement dans la branche v3 :
+#   git fetch origin && git show origin/v3-python:scripts/upgrade-to-v3.sh | sh -s -- [branche-ou-tag]
 #
 # Étapes : sauvegarde pg_dump fraîche (avec la v2 encore en place) → bascule
 # du code → construction → import de la sauvegarde dans SQLite → démarrage
@@ -10,7 +12,8 @@
 # possible (voir la fin du script).
 
 set -eu
-cd "$(dirname "$0")/.."
+# Dossier courant s'il contient le projet (cas « | sh -s »), sinon celui du script.
+if [ -f docker-compose.yml ] && [ -d .git ]; then :; else cd "$(dirname "$0")/.."; fi
 
 TARGET="${1:-v3-python}"
 PREV_REF=$(git rev-parse --abbrev-ref HEAD)
