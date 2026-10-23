@@ -4,6 +4,41 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [3.2.0] — 2026-10-23
+
+**Appli Windows prête à l'emploi.** Un zip à décompresser (Python embarqué,
+aucune installation), un double-clic, un assistant. Sous Linux, le panel
+reste en Docker ; Linux sans Docker n'est plus pris en charge.
+
+### Ajouté
+
+- **Assistant de premier lancement** (`/setup`) : dossier du serveur BeamMP,
+  téléchargement automatique de BeamMP-Server (release officielle, empreinte
+  vérifiée), nom et clé d'authentification du serveur, compte
+  administrateur. Accepté seulement depuis le PC du panel et tant qu'il n'est
+  pas configuré. Réglages dans `%APPDATA%\BeamMP Panel\settings.json`, secret
+  de session généré tout seul.
+- **Le panel gère BeamMP-Server lui-même** (sans systemd ni agent) : démarrage
+  avec le panel, relance automatique en cas de plantage (5 fois au plus en
+  10 min), boutons Démarrer / Arrêter, redémarrage et mise à jour du serveur
+  par les boutons existants ; le serveur s'arrête toujours avec le panel
+  (rattachement à un « job » Windows).
+- **Mise à jour du panel en un clic** (Configuration → Mise à jour du panel) :
+  manifeste signé Ed25519 publié dans chaque release GitHub, paquet de code
+  d'environ 200 Ko, échange au redémarrage ; si la nouvelle version ne démarre
+  pas, la précédente revient au lancement suivant et la version fautive n'est
+  plus proposée.
+- Port déjà pris sur le PC (3000) : le panel prend le suivant libre et s'en
+  souvient ; un second lancement ouvre simplement la page.
+- Alerte « clé AuthKey absente » quand BeamMP-Server refuse de démarrer.
+- Fabrication et publication : `build/make_windows.sh`, `tools/release.py`
+  (signature locale, jamais en CI), tests sur un vrai Windows
+  (`build/windows-test/`).
+
+### Supprimé
+
+- Lancement Linux sans Docker (section « Sans Docker » du README).
+
 ## [3.1.0] — 2026-10-23
 
 ### Ajouté

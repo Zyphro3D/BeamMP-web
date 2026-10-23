@@ -15,7 +15,7 @@ from starlette.requests import Request
 from starlette.routing import Route
 
 from .activity import log_activity
-from .agent import restart_via_agent
+from .agent import can_restart, restart_via_agent
 from .db import db, dumps, now_iso
 from .discord import send_discord_notification
 from .modstate import activate_map, set_mod_active
@@ -112,7 +112,7 @@ async def apply_preset(request: Request):
     await send_discord_notification("preset_applied", f"Config **{preset['name']}** appliquée{suffix}")
 
     restarted, restart_error = False, None
-    if inst.agent:
+    if can_restart(inst):
         restarted, restart_error = await restart_via_agent(inst)
     return ok({"applied": preset["name"], "modsActivated": len(wanted), "modsMissing": missing,
                "mapApplied": map_applied, "mapError": map_error, "restarted": restarted,

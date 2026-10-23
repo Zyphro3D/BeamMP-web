@@ -39,6 +39,11 @@ LEAVE_RES = [re.compile(r"^(.+?) Connection Terminated$"),
 ALIVE_RE = re.compile(r"ALL SYSTEMS STARTED SUCCESSFULLY", re.I)
 
 CRITICAL_PATTERNS = [{
+    "type": "auth_key_missing",
+    "re": re.compile(r"No AuthKey specified", re.I),
+    "hint": ("Aucune clé AuthKey : BeamMP-Server refuse de démarrer. Créez une clé sur https://keymaster.beammp.com/ "
+             "puis mettez-la dans ServerConfig.toml (ligne AuthKey) et redémarrez le serveur."),
+}, {
     "type": "auth_key_invalid",
     "re": re.compile(r"Backend REFUSED the auth key\.\s*(.*)", re.I),
     "hint": ("Clé AuthKey invalide ou expirée — le serveur est invisible dans la liste BeamMP officielle "

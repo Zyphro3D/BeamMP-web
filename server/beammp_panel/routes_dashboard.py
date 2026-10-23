@@ -15,7 +15,7 @@ from starlette.routing import Route
 
 from . import config as C
 from .activity import log_activity
-from .agent import check_for_update, restart_via_agent, update_via_agent
+from .agent import can_restart, check_for_update, restart_via_agent, update_via_agent
 from .analyzer import analyze_upload, to_webp
 from .db import db, dumps, now_iso
 from .discord import send_discord_notification
@@ -295,7 +295,7 @@ async def server_restart(request: Request):
     inst = instance_or_404(request.path_params["instanceId"])
     # Une session admin volée ne doit pas pouvoir faire tourner le serveur en boucle.
     limiter.check(request, f"restart:{inst.id}", 3, 60)
-    if not inst.agent:
+    if not can_restart(inst):
         raise ApiError(501, "beammp-agent non configuré pour cette instance — voir BEAMMP_AGENT_URL/TOKEN/SERVICE dans .env")
     good, err = await restart_via_agent(inst)
     if not good:
@@ -315,7 +315,7 @@ async def server_update(request: Request):
     require_admin(request)
     inst = instance_or_404(request.path_params["instanceId"])
     limiter.check(request, f"update:{inst.id}", 2, 300)
-    if not inst.agent or not inst.agent.asset:
+    if not (await check_for_update(inst))["enabled"]:
         raise ApiError(501, "Mise à jour non configurée pour cette instance — voir BEAMMP_AGENT_ASSET dans .env")
     good, result = await update_via_agent(inst)
     if not good:

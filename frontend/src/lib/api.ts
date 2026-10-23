@@ -131,6 +131,17 @@ export const api = {
   activeMods: (instanceId: string) => request<Mod[]>(`${i(instanceId)}/mods/active`),
   catalog: (instanceId: string) => request<CatalogItem[]>(`${i(instanceId)}/catalog`),
 
+  // Appli Windows : premier lancement, serveur géré par le panel, mise à jour du panel
+  setupStatus: () => request<SetupStatus>('/api/setup'),
+  setup: (data: SetupRequest) =>
+    request<{ configured: boolean }>('/api/setup', { method: 'POST', body: JSON.stringify(data) }),
+  serverState: (instanceId: string) => request<LocalServerState>(`${i(instanceId)}/server/state`),
+  serverStart: (instanceId: string) => request<LocalServerState>(`${i(instanceId)}/server/start`, { method: 'POST' }),
+  serverStop:  (instanceId: string) => request<LocalServerState>(`${i(instanceId)}/server/stop`, { method: 'POST' }),
+  panelUpdate:        () => request<PanelUpdate>('/api/panel/update'),
+  panelUpdateCheck:   () => request<PanelUpdate>('/api/panel/update/check', { method: 'POST' }),
+  panelUpdateInstall: () => request<PanelUpdate & { restarting: boolean }>('/api/panel/update/install', { method: 'POST' }),
+
   // Admin — consistency
   checkConsistency: (instanceId: string) =>
     request<ConsistencyReport>(`/api/admin/i/${instanceId}/consistency`),
@@ -286,6 +297,43 @@ export interface Mod {
   is_official: boolean
   metadata: ModMetadata | null
   created_at: string
+}
+
+export interface SetupStatus {
+  appMode: boolean
+  needed: boolean
+  hasAdmin: boolean
+  serverDir: string
+  serverInstalled: boolean
+}
+
+export interface SetupRequest {
+  serverDir: string
+  downloadServer: boolean
+  serverName?: string
+  authKey?: string
+  username?: string
+  password?: string
+}
+
+export interface LocalServerState {
+  managed: boolean
+  installed?: boolean
+  running?: boolean
+  wanted?: boolean
+  pid?: number | null
+  error?: string
+}
+
+export interface PanelUpdate {
+  enabled: boolean
+  phase: 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'ready' | 'error' | 'disabled'
+  current: string
+  version: string | null
+  notes: Record<string, string>
+  size: number
+  error: string
+  fullRequired: boolean
 }
 
 // Catalogue public (page d'accueil) : tous les mods/cartes de l'instance,

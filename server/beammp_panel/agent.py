@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from . import supervisor
 from .config import InstanceConfig
 
 GITHUB_RELEASES_URL = "https://api.github.com/repos/BeamMP/BeamMP-Server/releases/latest"
@@ -29,7 +30,25 @@ def _error_from(res: httpx.Response) -> str:
         return f"HTTP {res.status_code}"
 
 
+def can_restart(inst: InstanceConfig) -> bool:
+    return inst.agent is not None or bool(inst.server_exe)
+
+
+def _asset(inst: InstanceConfig) -> str | None:
+    """Suffixe d'asset de mise à jour : celui de l'agent, ou celui du système en supervision locale."""
+    if inst.server_exe:
+        return supervisor.asset_name() or None
+    return inst.agent.asset if inst.agent else None
+
+
 async def restart_via_agent(inst: InstanceConfig) -> tuple[bool, str | None]:
+    local = supervisor.get(inst)
+    if local:
+        try:
+            await local.restart()
+        except OSError as err:
+            return False, str(err)
+        return True, None
     if not inst.agent:
         return False, "beammp-agent non configuré pour cette instance (BEAMMP_AGENT_URL/TOKEN/SERVICE)"
     try:
@@ -57,7 +76,7 @@ def _disabled() -> dict[str, Any]:
 
 
 async def check_for_update(inst: InstanceConfig) -> dict[str, Any]:
-    if not inst.agent or not inst.agent.asset:
+    if not _asset(inst):
         return _disabled()
     cached = _update_cache.get(inst.id)
     if cached and time.monotonic() - cached[0] < UPDATE_CACHE_TTL_S:
@@ -69,26 +88,31 @@ async def check_for_update(inst: InstanceConfig) -> dict[str, Any]:
 
 async def _fetch_update_info(inst: InstanceConfig) -> dict[str, Any]:
     agent = inst.agent
-    assert agent is not None
+    local = supervisor.get(inst)
     base = {"enabled": True, "currentVersion": None, "latestVersion": None,
             "updateAvailable": False, "releaseUrl": None}
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            version_res = await client.get(f"{agent.url}/version",
-                                           headers={"Authorization": f"Bearer {agent.token}"})
+            if local:
+                raw_version = await local.version()
+            else:
+                assert agent is not None
+                version_res = await client.get(f"{agent.url}/version",
+                                               headers={"Authorization": f"Bearer {agent.token}"})
+                if version_res.status_code >= 400:
+                    return {**base, "error": _error_from(version_res)}
+                raw_version = version_res.json().get("version", "")
             release_res = await client.get(GITHUB_RELEASES_URL)
     except httpx.HTTPError as err:
         return {**base, "error": str(err) or "Vérification impossible"}
 
-    if version_res.status_code >= 400:
-        return {**base, "error": _error_from(version_res)}
     if release_res.status_code >= 400:
         return {**base, "error": f"GitHub API: HTTP {release_res.status_code}"}
 
-    current = _semver(version_res.json().get("version", ""))
+    current = _semver(raw_version)
     release = release_res.json()
     latest = _semver(release.get("tag_name", ""))
-    asset_name = f"BeamMP-Server.{agent.asset}"
+    asset_name = f"BeamMP-Server.{_asset(inst)}"
     asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
     result = {**base, "currentVersion": current, "latestVersion": latest,
               "releaseUrl": release.get("html_url")}
@@ -101,7 +125,8 @@ async def _fetch_update_info(inst: InstanceConfig) -> dict[str, Any]:
 async def update_via_agent(inst: InstanceConfig) -> tuple[bool, str]:
     """Renvoie (ok, version installée ou message d'erreur)."""
     agent = inst.agent
-    if not agent or not agent.asset:
+    local = supervisor.get(inst)
+    if not _asset(inst):
         return False, "Mise à jour non configurée pour cette instance (BEAMMP_AGENT_ASSET manquant)"
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -111,12 +136,21 @@ async def update_via_agent(inst: InstanceConfig) -> tuple[bool, str]:
     if release_res.status_code >= 400:
         return False, "Impossible de contacter GitHub pour récupérer la dernière release"
     release = release_res.json()
-    asset_name = f"BeamMP-Server.{agent.asset}"
+    asset_name = f"BeamMP-Server.{_asset(inst)}"
     asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
     digest = (asset or {}).get("digest") or ""
     if not asset or not digest.startswith("sha256:"):
         return False, f'Asset "{asset_name}" introuvable ou sans empreinte sha256 dans la dernière release'
 
+    if local:
+        try:
+            await local.install(asset["browser_download_url"], digest[len("sha256:"):])
+        except (OSError, ValueError, RuntimeError, httpx.HTTPError) as err:
+            return False, str(err)
+        _update_cache.pop(inst.id, None)
+        return True, release.get("tag_name", "")
+
+    assert agent is not None
     try:
         async with httpx.AsyncClient(timeout=180) as client:  # téléchargement + installation + redémarrage
             res = await client.post(

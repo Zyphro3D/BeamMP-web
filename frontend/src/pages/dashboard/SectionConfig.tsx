@@ -4,6 +4,7 @@ import { api, type UpdateCheck } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { Toggle } from '../../components/ui/Toggle'
 import { BeamMPTextEditor } from '../../components/ui/BeamMPTextEditor'
+import { LocalServerControls, PanelUpdateCard } from '../../components/admin/AppControls'
 
 const CONFIG_KEY_DEFS = [
   { key: 'MaxPlayers', labelKey: 'max_players_label', type: 'number' },
@@ -182,6 +183,8 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
             {updateError && <p className="text-xs text-red-400">{updateError}</p>}
           </div>
         )}
+        <LocalServerControls instanceId={instanceId} />
+        <PanelUpdateCard />
       </div>
     </div>
   )

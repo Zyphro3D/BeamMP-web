@@ -16,6 +16,8 @@ beammp-panel/
 ├── frontend/               React + Vite SPA (TypeScript)
 ├── agent/                  Optional host restart/update agent (Python 3, no deps) + systemd unit
 ├── scripts/                backup-db.sh, upgrade-to-v3.sh
+├── build/                  Windows app: make_windows.sh, _start.cmd, update_public.b64, windows-test/
+├── tools/release.py        signed Windows release (manifest + code/full packages)
 ├── docker-compose.yml
 ├── Dockerfile              Multi-stage build (frontend → Python image)
 └── .env.example            All available configuration variables
@@ -57,6 +59,22 @@ docker compose up --build
 ```
 
 ---
+
+### Windows app (packaging and release)
+
+```bash
+./build/make_windows.sh                 # dist/BeamMP-Panel-<v>-win64.zip (embedded Python, built from Linux)
+.venv/bin/python tools/release.py       # dist/release/<v>/ : full zip, code zip, latest-stable.json + .sig
+gh release upload v<v> dist/release/<v>/*
+```
+
+- Supported targets: **Windows = this app**, **Linux = Docker**. Linux without Docker is not supported.
+- The signing key (`~/.config/beammp-panel-release/update.key`) never leaves the release machine;
+  signing is never done in CI. `build/update_public.b64` is the matching public key embedded in the app.
+- Bump `RUNTIME_API` in `updater.py` when Python or a dependency changes: a code-only update is then refused
+  and users are asked to download the full app.
+- Real-Windows tests: `build/windows-test/test-panel.ps1` (install, setup, server, restart, stop) and
+  `test-update.ps1` (update, health confirmation, rollback of a broken version).
 
 ## Submitting changes
 

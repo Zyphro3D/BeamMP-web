@@ -75,6 +75,9 @@ class InstanceConfig:
     server_port: str
     beammp: BeamMPPaths
     agent: AgentConfig | None
+    # Exécutable BeamMP-Server lancé et surveillé par le panel lui-même
+    # (appli Windows). Vide = le serveur est géré ailleurs (systemd + agent).
+    server_exe: str = ""
 
 
 @dataclass
@@ -133,6 +136,7 @@ def _parse_instances() -> list[InstanceConfig]:
                 info_host=env("BEAMMP_INFO_HOST", "127.0.0.1"),
             ),
             agent=_build_agent(env("BEAMMP_AGENT_SERVICE"), env("BEAMMP_AGENT_ASSET")),
+            server_exe=env("BEAMMP_SERVER_EXE"),
         )]
 
     # Multi-instance : INSTANCES=main,event → INSTANCE_MAIN_*, INSTANCE_EVENT_*
@@ -155,6 +159,7 @@ def _parse_instances() -> list[InstanceConfig]:
                 info_host=env(f"{p}BEAMMP_INFO_HOST", "127.0.0.1"),
             ),
             agent=_build_agent(env(f"{p}AGENT_SERVICE"), env(f"{p}AGENT_ASSET")),
+            server_exe=env(f"{p}SERVER_EXE"),
         ))
     return instances
 

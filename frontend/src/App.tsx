@@ -1,8 +1,10 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Home }      from './pages/Home'
 import { Login }     from './pages/Login'
 import { Dashboard } from './pages/dashboard/Dashboard'
+import { Setup }     from './pages/Setup'
+import { api }       from './lib/api'
 import { CookieBanner } from './components/ui/CookieBanner'
 import { ThemeProvider } from './context/ThemeContext'
 import { I18nProvider }  from './context/I18nContext'
@@ -75,6 +77,18 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// ── Premier lancement (appli Windows) ─────────────────────────
+// Tant que le panel n'est pas configuré, toute page renvoie vers l'assistant.
+function SetupGate() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  useEffect(() => {
+    if (location.pathname === '/setup') return
+    api.setupStatus().then(s => { if (s.needed) navigate('/setup', { replace: true }) }).catch(() => {})
+  }, [location.pathname, navigate])
+  return null
+}
+
 // ── App ───────────────────────────────────────────────────────
 export default function App() {
   return (
@@ -82,8 +96,10 @@ export default function App() {
       <ThemeProvider>
         <I18nProvider>
           <BrowserRouter>
+            <SetupGate />
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/setup" element={<Setup />} />
               <Route path="/login" element={<Login />} />
               <Route
                 path="/dashboard"

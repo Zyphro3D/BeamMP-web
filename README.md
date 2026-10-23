@@ -1,10 +1,12 @@
 # BeamMP Panel
 
 Interface d'administration web pour serveur BeamMP.
-Gestion des mods, cartes, configuration, logs et joueurs — un seul conteneur
-Docker, ou directement en Python sans Docker.
+Gestion des mods, cartes, configuration, logs et joueurs.
 
-Fonctionne sur **Linux** et **Windows**.
+| Système | Installation |
+|---|---|
+| **Windows** | **Appli prête à l'emploi** : un zip à décompresser, un double-clic, un assistant. Le panel installe, démarre et surveille BeamMP-Server lui-même, et se met à jour en un clic. → [Windows](#windows-appli-prête-à-lemploi) |
+| **Linux** | **Docker** (un conteneur, à côté de BeamMP-Server géré par systemd). → [Installation](#installation) |
 
 > **v3 = moteur Python + SQLite** (branche `v3-python`). Même interface et
 > même API que la v2, sans PostgreSQL ni Node.js à l'exécution. La branche
@@ -51,7 +53,8 @@ Fonctionne sur **Linux** et **Windows**.
 ## Sommaire
 
 1. [Fonctionnalités](#fonctionnalités)
-2. [Prérequis](#prérequis)
+1. [Windows (appli prête à l'emploi)](#windows-appli-prête-à-lemploi)
+2. [Prérequis (Linux, Docker)](#prérequis-linux-docker)
 3. [Installation](#installation)
 4. [Configuration `.env`](#configuration-env)
 5. [Démarrage](#démarrage)
@@ -69,15 +72,50 @@ Fonctionne sur **Linux** et **Windows**.
 
 ---
 
-## Prérequis
+## Windows (appli prête à l'emploi)
 
-- **Docker Engine 24+** et **Docker Compose v2**
-  - Linux : Docker CE (dépôt officiel `get.docker.com`)
-  - Windows : Docker Desktop
+1. Télécharger `BeamMP-Panel-<version>-win64.zip` dans la
+   [dernière release](https://github.com/Zyphro3D/BeamMP-web/releases/latest).
+2. Le décompresser où vous voulez, puis double-cliquer sur
+   **« Lancer BeamMP Panel.bat »** : la page s'ouvre dans le navigateur.
+   (Alerte Windows : « Debloquer si alerte Windows.bat », ou « Informations
+   complémentaires » → « Exécuter quand même ».)
+3. L'assistant demande le dossier du serveur BeamMP — il peut télécharger
+   BeamMP-Server pour vous —, la clé d'authentification BeamMP
+   ([keymaster.beammp.com](https://keymaster.beammp.com/), obligatoire : le
+   serveur ne démarre pas sans) et votre compte administrateur.
+
+Ensuite :
+- le panel **démarre BeamMP-Server**, le **relance s'il plante** (5 fois
+  maximum en 10 min) et l'arrête avec lui ; boutons Démarrer / Arrêter /
+  Redémarrer dans *Configuration* ;
+- **mise à jour du serveur BeamMP** depuis la release officielle (empreinte
+  vérifiée, retour à l'ancien exécutable s'il ne démarre pas) ;
+- **mise à jour du panel** en un clic (*Configuration* → *Mise à jour du
+  panel*) : manifeste signé Ed25519 publié avec chaque release, paquet de
+  quelques centaines de Ko, et si la nouvelle version ne démarre pas, la
+  précédente revient au lancement suivant (et la version fautive n'est plus
+  proposée) ;
+- si le port 3000 est déjà pris sur le PC, le panel prend le suivant libre et
+  s'en souvient ;
+- données dans `%APPDATA%\BeamMP Panel` (base, images, `settings.json`,
+  journal `panel.log`), jamais touchées par une mise à jour.
+
+Par défaut le panel n'écoute que sur ce PC (`http://127.0.0.1:3000`). Pour y
+accéder depuis le réseau : `"host": "0.0.0.0"` dans `settings.json`, puis
+relancer (et ouvrir le port dans le pare-feu Windows).
+
+Testé sur Windows 10 (compte utilisateur sans droits d'administrateur).
+
+---
+
+## Prérequis (Linux, Docker)
+
+- **Docker Engine 24+** et **Docker Compose v2** (Docker CE, dépôt officiel
+  `get.docker.com`)
 - Un serveur BeamMP fonctionnel sur la même machine
-- Windows : la v3 n'a pas encore été testée sous Windows (Docker Desktop ou
-  natif) ; le redémarrage par beammp-agent demande systemd (Linux)
-- Sans Docker : Python 3.11+ (voir [Sans Docker](#sans-docker))
+- Linux sans Docker n'est pas pris en charge : sous Linux, le panel tourne en
+  conteneur ; sous Windows, utilisez l'appli ci-dessus.
 
 ---
 
@@ -463,29 +501,6 @@ python -m beammp_panel.importer --dump backups/beammp-panel-XXXX.sql.gz --db dat
 
 ---
 
-## Sans Docker
-
-Le moteur v3 est un programme Python ordinaire : il lit directement les
-fichiers du serveur BeamMP, aucune base à installer.
-
-```bash
-cd server
-python -m venv .venv && .venv/bin/pip install -r requirements.txt   # Windows : .venv\Scripts\pip
-(cd ../frontend && npm ci && npm run build)                          # une fois, pour l'interface
-.venv/bin/python -m beammp_panel --env ../.env
-```
-
-Dans le `.env`, donner les vrais chemins de l'hôte :
-`BEAMMP_RESOURCES_PATH`, `BEAMMP_LOG_PATH` (le fichier `Server.log`),
-`BEAMMP_CONFIG_PATH`, et éventuellement `DATA_DIR` (base et images,
-défaut `./data`). `BEAMMP_INFO_HOST` vaut `127.0.0.1` par défaut : le
-statut est lu en direct sur le port de jeu.
-
-Un paquet prêt à l'emploi (Linux et Windows, avec mise à jour depuis le
-panel) est prévu dans une prochaine version.
-
----
-
 ## Migration depuis la V1 (MariaDB)
 
 > Ce script fait partie de la branche `v2` (il écrit dans PostgreSQL) : pour
@@ -545,10 +560,10 @@ qu'une fois par site V1 source.
 | `SUPERADMIN_USERNAME` | — | | Login du superadmin (premier démarrage uniquement) |
 | `SUPERADMIN_PASSWORD` | — | | Mot de passe min 8 chars (premier démarrage uniquement) |
 | `PORT` | `3000` | | Avancé — port interne au conteneur. Ne pas confondre avec `APP_PORT` |
-| `HOST` | `0.0.0.0` | | Adresse d'écoute (sans Docker : `127.0.0.1` derrière un reverse proxy) |
-| `DATA_DIR` | `./data` (`/app/data` en Docker) | | Dossier des données : base SQLite, images par défaut |
+| `HOST` | `0.0.0.0` | | Adresse d'écoute |
+| `DATA_DIR` | `/app/data` | | Dossier des données : base SQLite, images par défaut |
 | `DB_PATH` | `DATA_DIR/panel.db` | | Chemin de la base SQLite |
-| `IMAGES_PATH` | `DATA_DIR/images` (`/app/images` en Docker) | | Images de mods |
+| `IMAGES_PATH` | `/app/images` | | Images de mods |
 | `INSTANCE_NAME` | `BeamMP Server` | | Nom affiché en mode instance unique |
 | `TZ` | `Europe/Paris` | | Fuseau horaire de l'hôte (Docker) : BeamMP écrit `Server.log` en heure locale, le panel doit lire les mêmes heures |
 
@@ -567,7 +582,7 @@ SQLite, un seul fichier (`DB_PATH`) : rien à configurer. Les variables
 | `BEAMMP_RESOURCES_PATH` | — | Chemin hôte vers `Resources/` |
 | `BEAMMP_LOG_DIR` | — | Chemin hôte vers le **dossier** contenant `Server.log` (pas le fichier — voir note plus haut) |
 | `BEAMMP_CONFIG_PATH` | — | Chemin hôte vers `ServerConfig.toml` |
-| `BEAMMP_INFO_HOST` | `127.0.0.1` (`host.docker.internal` en Docker) | Hôte interrogé en direct sur le port de jeu (`BEAMMP_SERVER_PORT`, défaut 30814) pour le statut : joueurs, carte, mods, même en serveur privé. Vide = désactivé |
+| `BEAMMP_INFO_HOST` | `host.docker.internal` | Hôte interrogé en direct sur le port de jeu (`BEAMMP_SERVER_PORT`, défaut 30814) pour le statut : joueurs, carte, mods, même en serveur privé. Vide = désactivé |
 | `BEAMMP_API_HOST` | `localhost` | Host de l'API HTTP BeamMP (optionnel) |
 | `BEAMMP_API_PORT` | `4444` | Port de l'API HTTP BeamMP |
 

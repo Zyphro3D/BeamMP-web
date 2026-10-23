@@ -17,7 +17,8 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import VERSION, logwatch, routes_admin, routes_auth, routes_dashboard, routes_presets, routes_public
+from . import (VERSION, appmode, logwatch, routes_admin, routes_app, routes_auth, routes_dashboard, routes_presets,
+               routes_public, supervisor, updater)
 from . import config as C
 from .db import db, init_db, now_iso
 from .security import ApiError, hash_password
@@ -124,6 +125,17 @@ def create_initial_superadmin() -> None:
     log.info('SuperAdmin "%s" créé', username)
 
 
+def local_url() -> str:
+    host = C.config.host if C.config.host not in ("0.0.0.0", "::") else "127.0.0.1"
+    return f"http://{host}:{C.config.port}/"
+
+
+def _open_browser() -> None:
+    import webbrowser
+    target = local_url() + ("setup" if appmode.enabled() and not appmode.configured() else "")
+    webbrowser.open(target)
+
+
 def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) -> Starlette:
     frontend = frontend_dir if frontend_dir is not None else default_frontend_dir()
     images = C.config.images_path
@@ -143,6 +155,7 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
 
     routes = [
         *routes_public.routes,
+        *routes_app.routes,
         *routes_auth.routes,
         *routes_dashboard.routes,
         *routes_admin.routes,
@@ -157,19 +170,47 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
                                      allow_credentials=True, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
                                      allow_headers=["Content-Type", "Authorization"]))
 
+    tasks: list[asyncio.Task] = []
+
+    async def start_runtime() -> None:
+        if start_watchers:
+            tasks.extend(logwatch.start_log_watchers())
+            # Appli Windows : le panel lance et surveille BeamMP-Server lui-même.
+            await supervisor.start_all(C.config.instances)
+
+    async def stop_runtime() -> None:
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        tasks.clear()
+        await supervisor.stop_all()
+
+    async def reload_runtime() -> None:
+        # Après l'assistant de premier lancement : nouveaux chemins BeamMP.
+        await stop_runtime()
+        appmode.apply_to_environ()
+        C.set_config(C.load_config())
+        await start_runtime()
+
+    routes_app.reload_runtime = reload_runtime
+
     @contextlib.asynccontextmanager
     async def lifespan(app):
         init_db(C.config.db_path)
         create_initial_superadmin()
-        tasks = logwatch.start_log_watchers() if start_watchers else []
+        await start_runtime()
+        if appmode.layout():
+            updater.mark_healthy_later()
+            if start_watchers:
+                asyncio.get_running_loop().create_task(updater.check())
+        if os.environ.get("BEAMMP_PANEL_OPEN") == "1":
+            asyncio.get_running_loop().call_later(1.0, _open_browser)
         log.info("BeamMP Panel %s — instances : %s — base : %s", VERSION,
                  ", ".join(i.id for i in C.config.instances), C.config.db_path)
         try:
             yield
         finally:
-            for t in tasks:
-                t.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await stop_runtime()
 
     return Starlette(routes=routes, middleware=middleware, lifespan=lifespan,
                      exception_handlers={ApiError: api_error, HTTPException: http_error, Exception: server_error})

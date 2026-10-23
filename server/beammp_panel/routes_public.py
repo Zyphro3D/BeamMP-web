@@ -12,6 +12,7 @@ from starlette.routing import Route
 
 from . import config as C
 from .activity import get_activity
+from .agent import can_restart
 from .db import db
 from .logwatch import server_started_at
 from .status import get_server_status, offline_status
@@ -52,7 +53,7 @@ def catalog(instance_id: str) -> list[dict]:
 
 
 async def instances(request: Request):
-    return ok([{"id": i.id, "name": i.name, "canRestart": i.agent is not None} for i in C.config.instances])
+    return ok([{"id": i.id, "name": i.name, "canRestart": can_restart(i)} for i in C.config.instances])
 
 
 async def instance_status(request: Request):
