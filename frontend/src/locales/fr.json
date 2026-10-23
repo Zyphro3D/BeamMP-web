@@ -278,5 +278,11 @@
   "analyzing": "Analyse en cours…",
   "analyze_result": "{n} mod(s) analysé(s)",
   "analyze_result_errors": "{n} erreur(s)",
-  "analyze_result_remaining": "d'autres mods restent à analyser — relancez l'analyse"
+  "analyze_result_remaining": "d'autres mods restent à analyser — relancez l'analyse",
+  "catalog_title": "Catalogue du serveur",
+  "catalog_subtitle": "Tout ce que ce serveur propose. Les éléments « En jeu » sont actifs en ce moment.",
+  "catalog_search": "Rechercher une carte, un véhicule, une marque…",
+  "catalog_in_game": "En jeu",
+  "catalog_empty": "Aucun résultat.",
+  "catalog_show_more": "Voir plus ({n} restants)"
 }

@@ -37,6 +37,18 @@ def test_public_routes(client):
     assert client.get("/api/activity").json() == []
 
 
+def test_public_catalog(admin, env):
+    upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
+    upload(admin, map_zip("italy"), "italy.zip", "Italie", "map", map_id="italy")
+    upload(admin, vehicle_zip(), "car.zip", "Car", "vehicle")
+    admin.cookies.clear()  # page publique : sans session
+    cat = admin.get("/api/i/default/catalog").json()
+    assert [(m["type"], m["name"], m["active"]) for m in cat] == [
+        ("map", "Hills", True), ("map", "Italie", False), ("vehicle", "Car", True)]
+    assert all("filename" not in m for m in cat)
+    assert cat[2]["metadata"]["vehicle"]["brand"] == "Gavril"
+
+
 def test_security_headers_and_version(client):
     r = client.get("/api/instances")
     assert r.headers["x-beammp-panel-version"].startswith("3.")

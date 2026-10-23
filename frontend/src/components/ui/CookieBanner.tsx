@@ -21,7 +21,7 @@ export function CookieBanner() {
       <div className="flex items-start gap-3">
         <Cookie size={18} className="text-accent shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm font-medium text-zinc-100">{t('cookie_title')}</p>
+          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t('cookie_title')}</p>
           <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
             {t('cookie_desc')}
           </p>

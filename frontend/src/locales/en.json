@@ -278,5 +278,11 @@
   "analyzing": "Analyzing…",
   "analyze_result": "{n} mod(s) analyzed",
   "analyze_result_errors": "{n} error(s)",
-  "analyze_result_remaining": "more mods remain to analyze — run it again"
+  "analyze_result_remaining": "more mods remain to analyze — run it again",
+  "catalog_title": "Server catalogue",
+  "catalog_subtitle": "Everything this server offers. Items marked “In game” are active right now.",
+  "catalog_search": "Search a map, a vehicle, a brand…",
+  "catalog_in_game": "In game",
+  "catalog_empty": "No results.",
+  "catalog_show_more": "Show more ({n} left)"
 }

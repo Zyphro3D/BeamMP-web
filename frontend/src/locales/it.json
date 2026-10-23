@@ -278,5 +278,11 @@
   "analyzing": "Analisi in corso…",
   "analyze_result": "{n} mod analizzate",
   "analyze_result_errors": "{n} errori",
-  "analyze_result_remaining": "restano altre mod da analizzare — riavvia l'analisi"
+  "analyze_result_remaining": "restano altre mod da analizzare — riavvia l'analisi",
+  "catalog_title": "Catalogo del server",
+  "catalog_subtitle": "Tutto ciò che offre questo server. Gli elementi «In gioco» sono attivi in questo momento.",
+  "catalog_search": "Cerca una mappa, un veicolo, una marca…",
+  "catalog_in_game": "In gioco",
+  "catalog_empty": "Nessun risultato.",
+  "catalog_show_more": "Mostra altro ({n} rimanenti)"
 }

@@ -129,6 +129,7 @@ export const api = {
 
   // Public per-instance
   activeMods: (instanceId: string) => request<Mod[]>(`${i(instanceId)}/mods/active`),
+  catalog: (instanceId: string) => request<CatalogItem[]>(`${i(instanceId)}/catalog`),
 
   // Admin — consistency
   checkConsistency: (instanceId: string) =>
@@ -286,6 +287,10 @@ export interface Mod {
   metadata: ModMetadata | null
   created_at: string
 }
+
+// Catalogue public (page d'accueil) : tous les mods/cartes de l'instance,
+// actifs ou non, sans le nom de fichier.
+export type CatalogItem = Omit<Mod, 'filename' | 'created_at'>
 
 export interface ConfigPreset {
   id: number

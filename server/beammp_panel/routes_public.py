@@ -42,6 +42,15 @@ def active_mods(instance_id: str) -> list[dict]:
         "WHERE instance_id = ? AND active = 1 ORDER BY type, name", [instance_id])
 
 
+def catalog(instance_id: str) -> list[dict]:
+    # Catalogue complet, lecture seule, pour la page publique : ce qui est
+    # en jeu et ce qui est disponible sur le serveur. Pas de nom de fichier :
+    # rien de l'organisation du disque n'est exposé.
+    return db().all(
+        "SELECT id, name, type, image, description, map_id, active, is_official, metadata FROM mods "
+        "WHERE instance_id = ? ORDER BY type, active DESC, name COLLATE NOCASE", [instance_id])
+
+
 async def instances(request: Request):
     return ok([{"id": i.id, "name": i.name, "canRestart": i.agent is not None} for i in C.config.instances])
 
@@ -71,6 +80,10 @@ async def instance_stream(request: Request):
 
 async def instance_active_mods(request: Request):
     return ok(active_mods(request.path_params["instanceId"]))
+
+
+async def instance_catalog(request: Request):
+    return ok(catalog(request.path_params["instanceId"]))
 
 
 async def instance_activity(request: Request):
@@ -105,6 +118,7 @@ routes = [
     Route("/api/i/{instanceId}/status", instance_status),
     Route("/api/i/{instanceId}/stream", instance_stream),
     Route("/api/i/{instanceId}/mods/active", instance_active_mods),
+    Route("/api/i/{instanceId}/catalog", instance_catalog),
     Route("/api/i/{instanceId}/activity", instance_activity),
     Route("/api/info", info),
     Route("/api/status", legacy_status),

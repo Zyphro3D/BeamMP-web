@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Users, Package, Coffee, MessageSquare, Map } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useServerStatus } from '../hooks/useServerStatus'
-import { api, type Mod, type ServerInfo } from '../lib/api'
+import { api, type CatalogItem, type Mod, type ServerInfo } from '../lib/api'
 import { isAuthenticated } from '../lib/auth'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { LangToggle } from '../components/ui/LangToggle'
 import { useI18n } from '../context/I18nContext'
 import { desc } from '../lib/desc'
+import { ServerCatalog } from '../components/mods/ServerCatalog'
 
 export function Home() {
   const [instanceId, setInstanceId] = useState('default')
@@ -15,6 +16,7 @@ export function Home() {
   const [mods, setMods] = useState<Mod[]>([])
   const [modsLoading, setModsLoading] = useState(true)
   const [info, setInfo] = useState<ServerInfo | null>(null)
+  const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const auth = isAuthenticated()
   const { t, lang } = useI18n()
 
@@ -24,6 +26,7 @@ export function Home() {
       const id = list[0]?.id ?? 'default'
       setInstanceId(id)
       api.activeMods(id).then(setMods).catch(() => {}).finally(() => setModsLoading(false))
+      api.catalog(id).then(setCatalog).catch(() => {})
     }).catch(() => {
       api.activeMods('default').then(setMods).catch(() => {}).finally(() => setModsLoading(false))
     })
@@ -194,6 +197,9 @@ export function Home() {
         {otherMods.length > 0 && (
           <ModGrid title={t('mods')} mods={otherMods} lang={lang} />
         )}
+
+        {/* Catalogue complet du serveur (lecture seule) */}
+        <ServerCatalog items={catalog} />
 
         {/* CTA */}
         {!auth && (

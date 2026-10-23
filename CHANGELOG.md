@@ -4,6 +4,22 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [3.1.0] — 2026-10-23
+
+### Ajouté
+
+- **Catalogue public du serveur** sur la page d'accueil, en lecture seule :
+  toutes les cartes, véhicules et mods disponibles (pas seulement ceux en
+  jeu), en onglets avec compteurs, recherche (nom, description, marque),
+  badge « En jeu » sur les éléments actifs, fiches analysées (marque,
+  carrosserie, puissance, taille de carte…), affichage par pages de 24.
+  Nouvelle route publique `GET /api/i/:instanceId/catalog` (sans les noms de
+  fichiers). Textes dans les 8 langues.
+
+### Corrigé
+
+- Bandeau cookies : titre illisible en thème clair (blanc sur blanc).
+
 ## [3.0.0] — 2026-10-22
 
 Nouveau moteur : le backend Node.js/Fastify + PostgreSQL est réécrit en

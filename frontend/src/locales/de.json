@@ -278,5 +278,11 @@
   "analyzing": "Analyse läuft…",
   "analyze_result": "{n} Mod(s) analysiert",
   "analyze_result_errors": "{n} Fehler",
-  "analyze_result_remaining": "weitere Mods müssen noch analysiert werden — erneut ausführen"
+  "analyze_result_remaining": "weitere Mods müssen noch analysiert werden — erneut ausführen",
+  "catalog_title": "Server-Katalog",
+  "catalog_subtitle": "Alles, was dieser Server anbietet. „Im Spiel“ markierte Inhalte sind gerade aktiv.",
+  "catalog_search": "Karte, Fahrzeug, Marke suchen…",
+  "catalog_in_game": "Im Spiel",
+  "catalog_empty": "Keine Ergebnisse.",
+  "catalog_show_more": "Mehr anzeigen (noch {n})"
 }
