@@ -66,7 +66,7 @@ We will credit researchers in the release notes unless you request anonymity.
 
 ### Docker
 - The application container runs as the **non-root `panel` user** (UID 1000)
-- Volume ownership is corrected at startup by `docker-entrypoint.sh` using `su-exec`
+- Volume ownership is corrected at startup by `docker-entrypoint.sh` using `gosu`
 - Resource limits (CPU/RAM) are set in `docker-compose.yml`
 
 ### Security headers
