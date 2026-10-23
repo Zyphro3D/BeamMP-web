@@ -45,7 +45,7 @@ We will credit researchers in the release notes unless you request anonymity.
 ### Authentication
 - Sessions use **httpOnly + Secure + SameSite=Strict** cookies — no token stored in localStorage
 - Passwords hashed with **bcrypt** (cost 12) — legacy hashes are transparently migrated on next login
-- Login endpoint is rate-limited (5 attempts / minute per IP) via `@fastify/rate-limit`
+- Login endpoint is rate-limited (5 attempts / minute per IP) (limiteur intégré au panel, par IP)
 - JWT secret **must** be at least 32 characters — the app exits at startup if it is missing or default
 
 ### Transport
@@ -65,12 +65,12 @@ We will credit researchers in the release notes unless you request anonymity.
 - The agent verifies a **Bearer token** on every request and only accepts pre-configured service names
 
 ### Docker
-- The application container runs as the **non-root `node` user** (UID 1000)
+- The application container runs as the **non-root `panel` user** (UID 1000)
 - Volume ownership is corrected at startup by `docker-entrypoint.sh` using `su-exec`
 - Resource limits (CPU/RAM) are set in `docker-compose.yml`
 
 ### Security headers
-- `@fastify/helmet` adds standard security headers (CSP, X-Frame-Options, etc.)
+- The panel adds standard security headers on every response (CSP, X-Frame-Options, etc.)
 - CSP is configured in `strict` mode — no external script/style sources
 
 ---

@@ -9,69 +9,70 @@ environment and submit changes.
 
 ```
 beammp-panel/
-├── backend/          Node.js + Fastify API (TypeScript)
-├── frontend/         React + Vite SPA (TypeScript)
-├── beammp-agent.py   Optional host restart agent (Python 3, no deps)
-├── beammp-agent.service  systemd unit for the agent
+├── server/                 Python engine (Starlette + SQLite) — the API
+│   ├── beammp_panel/       application package (routes_*.py, status, logwatch, analyzer…)
+│   ├── tests/              pytest suite (API contract, importer)
+│   └── requirements.txt
+├── frontend/               React + Vite SPA (TypeScript)
+├── agent/                  Optional host restart/update agent (Python 3, no deps) + systemd unit
+├── scripts/                backup-db.sh, upgrade-to-v3.sh
 ├── docker-compose.yml
-├── Dockerfile        Multi-stage build (frontend → backend → production)
-└── .env.example      All available configuration variables
+├── Dockerfile              Multi-stage build (frontend → Python image)
+└── .env.example            All available configuration variables
 ```
+
+The v2 engine (Node.js + Fastify + PostgreSQL) lives on the `v2` branch.
 
 ## Development setup
 
 ### Prerequisites
 
-- Docker + Docker Compose v2
-- Node.js 20+ (for local TypeScript compilation / IDE support)
-- Python 3.8+ (if working on the agent)
+- Python 3.11+ (3.12 used in the Docker image)
+- Node.js 20+ (frontend build only)
+- Docker + Docker Compose v2 (optional, to test the image)
 
-### First run
-
-```bash
-cp beammp-panel/.env.example beammp-panel/.env
-# Edit .env: set JWT_SECRET, POSTGRES_PASSWORD, SUPERADMIN_*
-cd beammp-panel
-docker compose up --build
-```
-
-The panel is available at `http://localhost:3000`.
-
-### Backend development
+### Backend (Python engine)
 
 ```bash
-cd beammp-panel/backend
-npm install
-npm run build      # TypeScript compile
-npm run dev        # ts-node-dev watch mode (if configured)
+cd server
+python -m venv ../.venv && ../.venv/bin/pip install -r requirements.txt pytest
+../.venv/bin/python -m pytest              # API tests, no network needed
+../.venv/bin/python -m beammp_panel --env ../.env
 ```
 
 ### Frontend development
 
 ```bash
-cd beammp-panel/frontend
-npm install
+cd frontend
+npm ci
 npm run dev        # Vite dev server on :5173 (proxies /api to :3000)
-npm run build      # Production build into dist/
+npm run build      # Production build into dist/ (served by the engine)
+```
+
+### Docker image
+
+```bash
+cp .env.example .env   # set JWT_SECRET, SUPERADMIN_*, BEAMMP_* paths
+docker compose up --build
 ```
 
 ---
 
 ## Submitting changes
 
-1. **Fork** the repository and create a feature branch from `main`.
+1. **Fork** the repository and create a feature branch from the default branch.
 2. Keep commits focused — one logical change per commit.
-3. Run `npm run build` in both `backend/` and `frontend/` before opening a PR — the Docker
-   build must succeed.
-4. For **security-related changes**, read [SECURITY.md](SECURITY.md) first.
-5. Update `.env.example` if you add new environment variables.
-6. Open a Pull Request against `main` with a clear description of the change and why it is needed.
+3. Before opening a PR: `pytest` passes in `server/` and `npm run build` succeeds in
+   `frontend/` (CI runs both).
+4. The API is a contract with the frontend: a changed route or response shape needs a test.
+5. For **security-related changes**, read [SECURITY.md](SECURITY.md) first.
+6. Update `.env.example` and the README if you add environment variables.
 
 ## Code style
 
-- TypeScript strict mode is enforced — no `any` unless absolutely necessary.
-- Backend: Fastify route handlers follow the existing pattern (typed params/body, `preHandler: requireAuth`).
-- Frontend: functional components, hooks only — no class components except the Error Boundary.
+- Python: standard library first, type hints, `ApiError` for HTTP errors, blocking work
+  (zip analysis, bcrypt) in `run_in_threadpool`.
+- Frontend: TypeScript strict mode, functional components and hooks only.
 - No external dependencies without discussion — keep the dependency surface small.
 
 ## Reporting bugs

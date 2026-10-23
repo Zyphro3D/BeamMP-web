@@ -39,7 +39,10 @@ Fonctionne sur **Linux** et **Windows**.
 - **Comptes et rôles** — moderator / admin / superadmin, demandes de compte
   validées par un superadmin,
   changement de mot de passe en libre-service.
-- **Page publique** — statut du serveur en temps réel, carte et mods actifs.
+- **Page publique** — statut du serveur en temps réel (lu directement sur
+  le port de jeu), carte et mods actifs, et **catalogue complet** du serveur
+  en lecture seule : toutes les cartes, véhicules et mods, avec recherche et
+  badge « En jeu ».
 - **Notifications Discord** (optionnelles), interface en 8 langues
   (fr, en, de, es, it, pl, pt, ru), thème clair/sombre.
 
@@ -72,6 +75,8 @@ Fonctionne sur **Linux** et **Windows**.
   - Linux : Docker CE (dépôt officiel `get.docker.com`)
   - Windows : Docker Desktop
 - Un serveur BeamMP fonctionnel sur la même machine
+- Windows : la v3 n'a pas encore été testée sous Windows (Docker Desktop ou
+  natif) ; le redémarrage par beammp-agent demande systemd (Linux)
 - Sans Docker : Python 3.11+ (voir [Sans Docker](#sans-docker))
 
 ---
@@ -390,8 +395,8 @@ Le schéma se crée et se met à jour automatiquement au démarrage.
 
 Voir [CHANGELOG.md](./CHANGELOG.md) pour le détail des versions.
 
-> **Passage en 1.3.0** — `TRUST_PROXY_HOPS` n'existe plus (supprimé par
-> Fastify 5) et est **ignoré silencieusement**. Derrière un reverse proxy,
+> **Depuis la 1.3.0** — `TRUST_PROXY_HOPS` n'existe plus et est **ignoré
+> silencieusement**. Derrière un reverse proxy,
 > le remplacer par `TRUST_PROXY=<IP du proxy>` dans `.env`, sinon toutes les
 > requêtes semblent venir du proxy et le rate-limit de login devient commun
 > à tous les utilisateurs.
