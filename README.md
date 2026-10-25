@@ -678,3 +678,9 @@ fixer un mot de passe temporaire à un compte nouvellement créé.
   le unit systemd, lisible par défaut), lié à l'IP de la passerelle Docker du
   projet (pas `0.0.0.0` ni l'IP LAN), aucun endpoint fichier exposé au-delà
   du strict nécessaire
+
+---
+
+## Licence
+
+[Elastic License 2.0](LICENSE) — vous pouvez utiliser, copier, modifier et redistribuer le panneau, y compris pour une communauté ou un club qui encaisse des inscriptions. Il est interdit de le proposer à des tiers comme service hébergé ou géré et de retirer les mentions de licence. © 2026 Florian Praturlon. Même licence que [AC EVO Server Panel](https://github.com/Zyphro3D/pannel-ac-evo-server).

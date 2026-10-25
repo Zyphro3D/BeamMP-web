@@ -102,3 +102,7 @@ Open a GitHub issue with:
 - Docker / OS version
 
 For **security vulnerabilities**, see [SECURITY.md](SECURITY.md) — do not open a public issue.
+
+## License
+
+This project is distributed under the [Elastic License 2.0](LICENSE): free to use, modify and redistribute, but not to resell as a hosted or managed service. By contributing, you agree that your contribution is distributed under this license.
