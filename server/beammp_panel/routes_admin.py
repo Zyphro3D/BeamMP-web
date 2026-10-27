@@ -12,7 +12,7 @@ from . import config as C
 from .analyzer import analyze_metadata, analyze_zip
 from .db import db, dumps, now_iso
 from .files import (delete_file, ensure_dir, list_files, move_file, resolve_within, safe_basename)
-from .security import ApiError, hash_password, require_admin, require_auth, require_superadmin
+from .security import ApiError, hash_password, require_admin, require_auth, require_superadmin, revoke_tokens
 from .web import instance_or_404, int_param, json_body, ok
 
 INACTIVE_DIRS = {"map": "inactive_map", "mod": "inactive_mod", "vehicle": "inactive_mod"}
@@ -49,8 +49,11 @@ async def review_request(request: Request):
         raise ApiError(409, "Already processed")
 
     if action == "approve":
-        if not isinstance(password, str) or len(password) < 8:
-            raise ApiError(400, "Password required (min 8 chars)")
+        if not isinstance(password, str) or not (8 <= len(password) <= 200):
+            raise ApiError(400, "Password required (8 to 200 chars)")
+        # « Boss » à côté de « boss » : un sosie d'un compte existant est refusé.
+        if db().one("SELECT id FROM users WHERE username = ? COLLATE NOCASE", [row["beammp_username"]]):
+            raise ApiError(409, f'Le nom d\'utilisateur "{row["beammp_username"]}" est déjà pris')
         pw_hash = await run_in_threadpool(hash_password, password)
         # Moindre privilège : un compte demandé par un joueur démarre en
         # moderator (lecture seule) ; la promotion est un choix du SuperAdmin.
@@ -90,9 +93,16 @@ async def set_role(request: Request):
     role = (await json_body(request)).get("role")
     if role not in ("superadmin", "admin", "moderator"):
         raise ApiError(400, "Invalid role")
-    cur = db().run("UPDATE users SET role = ? WHERE id = ?", [role, user_id])
-    if cur.rowcount == 0:
-        raise ApiError(404, "Not found")
+    with db().transaction():
+        target = db().one("SELECT role FROM users WHERE id = ?", [user_id])
+        if not target:
+            raise ApiError(404, "Not found")
+        # Il doit toujours rester un superadmin, sinon plus personne ne gère les comptes.
+        if target["role"] == "superadmin" and role != "superadmin" and \
+                db().one("SELECT COUNT(*) AS n FROM users WHERE role = 'superadmin'")["n"] <= 1:
+            raise ApiError(409, "Impossible de retirer le dernier SuperAdmin")
+        db().run("UPDATE users SET role = ? WHERE id = ?", [role, user_id])
+    revoke_tokens(user_id)
     return ok(db().one("SELECT id, username, role FROM users WHERE id = ?", [user_id]))
 
 
@@ -100,12 +110,13 @@ async def reset_password(request: Request):
     require_superadmin(request)
     user_id = int_param(request, "id")
     password = (await json_body(request)).get("password")
-    if not isinstance(password, str) or len(password) < 8:
-        raise ApiError(400, "Password required (min 8 chars)")
+    if not isinstance(password, str) or not (8 <= len(password) <= 200):
+        raise ApiError(400, "Password required (8 to 200 chars)")
     pw_hash = await run_in_threadpool(hash_password, password)
     cur = db().run("UPDATE users SET password = ? WHERE id = ?", [pw_hash, user_id])
     if cur.rowcount == 0:
         raise ApiError(404, "Not found")
+    revoke_tokens(user_id)  # les sessions déjà ouvertes sur ce compte tombent
     return ok(db().one("SELECT id, username, role FROM users WHERE id = ?", [user_id]))
 
 

@@ -44,35 +44,48 @@ class ApiError(Exception):
 
 # ── Mots de passe ──────────────────────────────────────────────
 
+def _pw_bytes(password: str) -> bytes:
+    """bcrypt ne lit que 72 octets : les versions 4 tronquaient en silence,
+    la 5 lève ValueError. On tronque partout pareil, pour garder les
+    hachages déjà créés et répondre de la même façon que le compte existe ou non."""
+    return password.encode("utf-8")[:72]
+
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(BCRYPT_ROUNDS)).decode("ascii")
+    return bcrypt.hashpw(_pw_bytes(password), bcrypt.gensalt(BCRYPT_ROUNDS)).decode("ascii")
 
 
 def verify_password(password: str, stored: str) -> tuple[bool, bool]:
     """Renvoie (ok, à_rehacher)."""
-    pw = password.encode("utf-8")
     if stored.startswith(("$2b$", "$2a$", "$2y$")):
         try:
-            return bcrypt.checkpw(pw, stored.encode("ascii")), False
+            return bcrypt.checkpw(_pw_bytes(password), stored.encode("ascii")), False
         except ValueError:
             return False, False
     # Ancien scrypt à sel fixe (paramètres par défaut de Node : N=16384, r=8, p=1).
-    legacy = hashlib.scrypt(pw, salt=LEGACY_SALT, n=16384, r=8, p=1, dklen=64).hex()
-    ok = hmac.compare_digest(legacy, stored)
+    legacy = hashlib.scrypt(password.encode("utf-8"), salt=LEGACY_SALT, n=16384, r=8, p=1, dklen=64).hex()
+    try:
+        ok = hmac.compare_digest(legacy, stored)
+    except TypeError:  # valeur stockée non ASCII
+        return False, False
     return ok, ok
 
 
 def dummy_verify(password: str) -> None:
-    bcrypt.checkpw(password.encode("utf-8"), _DUMMY_HASH)
+    bcrypt.checkpw(_pw_bytes(password), _DUMMY_HASH)
 
-
-# ── Jetons ─────────────────────────────────────────────────────
 
 def sign_token(user: dict[str, Any]) -> str:
     now = int(time.time())
     payload = {"id": user["id"], "username": user["username"], "role": user["role"],
-               "iat": now, "exp": now + TOKEN_TTL_S}
+               "tv": int(user.get("token_version") or 0), "iat": now, "exp": now + TOKEN_TTL_S}
     return jwt.encode(payload, C.config.jwt_secret, algorithm="HS256")
+
+
+def revoke_tokens(user_id: int) -> None:
+    """Invalide tous les jetons déjà émis pour ce compte (déconnexion,
+    changement ou réinitialisation du mot de passe, changement de rôle)."""
+    db().run("UPDATE users SET token_version = token_version + 1 WHERE id = ?", [user_id])
 
 
 def _token_from_request(request: Request) -> str | None:
@@ -90,17 +103,19 @@ def authenticate(request: Request) -> dict[str, Any]:
 
     Le jeton seul prouve « je suis l'utilisateur N » pendant 7 jours ; relire
     la base à chaque requête fait qu'un changement de rôle ou une suppression
-    de compte s'applique tout de suite, pas à l'expiration du cookie.
+    de compte s'applique tout de suite, pas à l'expiration du cookie. La
+    version de jeton (`tv`) révoque les sessions déjà ouvertes : un jeton
+    sans `tv` (v2, ou 3.2.0) vaut la version 0.
     """
     token = _token_from_request(request)
     if not token:
         raise ApiError(401, "Unauthorized")
     try:
-        payload = jwt.decode(token, C.config.jwt_secret, algorithms=["HS256"])
+        payload = jwt.decode(token, C.config.jwt_secret, algorithms=["HS256"], options={"require": ["exp"]})
     except jwt.PyJWTError:
         raise ApiError(401, "Unauthorized")
-    user = db().one("SELECT id, username, role FROM users WHERE id = ?", [payload.get("id")])
-    if not user:
+    user = db().one("SELECT id, username, role, token_version FROM users WHERE id = ?", [payload.get("id")])
+    if not user or payload.get("tv", 0) != user["token_version"]:
         raise ApiError(401, "Unauthorized")
     return user
 
@@ -174,9 +189,18 @@ class RateLimiter:
         self._lock = threading.Lock()
 
     def check(self, request: Request, bucket: str, max_hits: int, window_s: float) -> None:
-        key = (bucket, client_ip(request))
+        self._hit((bucket, client_ip(request)), max_hits, window_s)
+
+    def check_key(self, key: str, max_hits: int, window_s: float) -> None:
+        """Même limite, sur une clé choisie (par exemple un compte) plutôt que l'IP."""
+        self._hit((key, ""), max_hits, window_s)
+
+    def _hit(self, key: tuple[str, str], max_hits: int, window_s: float) -> None:
         now = time.monotonic()
         with self._lock:
+            if len(self._hits) > 10_000:  # purge des clés vides (IP de passage)
+                for k in [k for k, v in self._hits.items() if not v or now - v[-1] > 3600]:
+                    del self._hits[k]
             hits = self._hits[key]
             while hits and now - hits[0] > window_s:
                 hits.popleft()

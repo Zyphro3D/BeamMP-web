@@ -9,7 +9,8 @@ from starlette.routing import Route
 from . import config as C
 from .db import db, now_iso
 from .security import (COOKIE_NAME, TOKEN_TTL_S, ApiError, dummy_verify, hash_password, limiter,
-                       require_auth, sign_token, verify_password)
+                       revoke_tokens, require_auth, sign_token, verify_password)
+from .security import authenticate
 from .web import json_body, ok, require_str
 
 
@@ -19,7 +20,7 @@ async def login(request: Request):
     username = require_str(body, "username", 1, 100)
     password = require_str(body, "password", 1, 200)
 
-    user = db().one("SELECT id, username, password, role FROM users WHERE username = ?", [username])
+    user = db().one("SELECT id, username, password, role, token_version FROM users WHERE username = ?", [username])
     if not user:
         await run_in_threadpool(dummy_verify, password)  # même durée qu'un vrai essai : n'indique pas si le compte existe
         raise ApiError(401, "Identifiants invalides")
@@ -31,12 +32,21 @@ async def login(request: Request):
 
     public = {"id": user["id"], "username": user["username"], "role": user["role"]}
     response = ok({"user": public})
-    response.set_cookie(COOKIE_NAME, sign_token(public), max_age=TOKEN_TTL_S, path="/",
-                        httponly=True, samesite="strict", secure=C.config.cookie_secure)
+    _set_session(response, user)
     return response
 
 
+def _set_session(response, user: dict) -> None:
+    response.set_cookie(COOKIE_NAME, sign_token(user), max_age=TOKEN_TTL_S, path="/",
+                        httponly=True, samesite="strict", secure=C.config.cookie_secure)
+
+
 async def logout(request: Request):
+    # Révoque aussi le jeton côté serveur : une copie du cookie ne sert plus.
+    try:
+        revoke_tokens(authenticate(request)["id"])
+    except ApiError:
+        pass
     response = ok({"ok": True})
     response.delete_cookie(COOKIE_NAME, path="/")
     return response
@@ -57,6 +67,8 @@ async def request_account(request: Request):
 
 async def change_password(request: Request):
     user = require_auth(request)
+    limiter.check(request, "password", 5, 60)
+    limiter.check_key(f"password-user:{user['id']}", 5, 60)
     body = await json_body(request)
     current = require_str(body, "currentPassword", 1, 200)
     new = require_str(body, "newPassword", 8, 200)
@@ -67,7 +79,11 @@ async def change_password(request: Request):
     if not good:
         raise ApiError(401, "Mot de passe actuel incorrect")
     db().run("UPDATE users SET password = ? WHERE id = ?", [await run_in_threadpool(hash_password, new), user["id"]])
-    return ok({"ok": True})
+    # Les autres sessions de ce compte tombent ; celle-ci reçoit un jeton neuf.
+    revoke_tokens(user["id"])
+    response = ok({"ok": True})
+    _set_session(response, db().one("SELECT id, username, role, token_version FROM users WHERE id = ?", [user["id"]]))
+    return response
 
 
 routes = [

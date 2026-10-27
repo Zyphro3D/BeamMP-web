@@ -20,9 +20,10 @@ CREATE TABLE IF NOT EXISTS users (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   username    TEXT UNIQUE NOT NULL,
   password    TEXT NOT NULL,
-  role        TEXT NOT NULL DEFAULT 'admin'
+  role        TEXT NOT NULL DEFAULT 'moderator'
               CHECK (role IN ('superadmin', 'admin', 'moderator')),
-  created_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL,
+  token_version INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS known_players (
@@ -126,6 +127,10 @@ class Database:
     def migrate(self) -> None:
         with self._lock:
             self._conn.executescript(SCHEMA)
+            # Bases créées avant la 3.2.1 : version de jeton (révocation des sessions).
+            cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(users)").fetchall()}
+            if "token_version" not in cols:
+                self._conn.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
 
     def all(self, sql: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:
         with self._lock:
