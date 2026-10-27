@@ -4,7 +4,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
-## À venir
+## [3.2.1] — 2026-10-28
 
 **Correctifs de sécurité** issus de l'audit complet du 27/10/2026.
 
