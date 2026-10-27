@@ -34,9 +34,12 @@ locked down further. /update-server writes to exactly one path (BINARY_PATH,
 whitelisted via systemd's ReadWritePaths=) rather than reintroducing that.
 """
 
+import hmac
 import os
+import posixpath
 import sys
 import subprocess
+import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse
@@ -50,6 +53,37 @@ HOST             = os.environ.get('AGENT_HOST', '127.0.0.1')
 PORT             = int(os.environ.get('AGENT_PORT', '4445'))
 
 OFFICIAL_RELEASE_PREFIX = 'https://github.com/BeamMP/BeamMP-Server/releases/download/'
+OFFICIAL_RELEASE_PATH   = '/BeamMP/BeamMP-Server/releases/download/'
+RELEASE_API             = 'https://api.github.com/repos/BeamMP/BeamMP-Server/releases/tags/'
+MAX_BINARY_BYTES        = 200 * 1024 * 1024
+MAX_BODY_BYTES          = 64 * 1024
+_update_lock            = threading.Lock()
+
+
+def official_asset(url: str):
+    """(tag, nom du fichier) si l'URL désigne bien un fichier publié de
+    BeamMP/BeamMP-Server, sinon None. On analyse l'URL au lieu de comparer
+    son début : « …/download/../../autre/depot/… » passerait sinon."""
+    try:
+        u = urlparse(url)
+    except ValueError:
+        return None
+    if u.scheme != 'https' or u.netloc != 'github.com' or u.query or u.fragment or u.params:
+        return None
+    path = u.path
+    if '%' in path or '\\' in path or posixpath.normpath(path) != path:
+        return None
+    if not path.startswith(OFFICIAL_RELEASE_PATH):
+        return None
+    rest = path[len(OFFICIAL_RELEASE_PATH):].split('/')
+    if len(rest) != 2 or not all(rest) or any(p in ('.', '..') for p in rest):
+        return None
+    return rest[0], rest[1]
+
+
+def _allowed_redirect(url: str) -> bool:
+    host = urlparse(url).hostname or ''
+    return urlparse(url).scheme == 'https' and (host == 'github.com' or host.endswith('.githubusercontent.com'))
 
 if not RESTART_TOKEN:
     sys.exit('[beammp-agent] RESTART_TOKEN must be set — generate with: openssl rand -hex 32')
@@ -78,7 +112,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def check_auth(self) -> bool:
         auth = self.headers.get('Authorization', '')
-        if auth != f'Bearer {RESTART_TOKEN}':
+        if not hmac.compare_digest(auth.encode(), f'Bearer {RESTART_TOKEN}'.encode()):
             self.send_json(401, {'error': 'Unauthorized'})
             return False
         return True
@@ -87,6 +121,8 @@ class Handler(BaseHTTPRequestHandler):
         import json
         try:
             length = int(self.headers.get('Content-Length', 0))
+            if length > MAX_BODY_BYTES:
+                return None
             return json.loads(self.rfile.read(length)) if length > 0 else {}
         except (ValueError, json.JSONDecodeError):
             return None
@@ -117,7 +153,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         if path == '/health':
-            return self.send_json(200, {'ok': True, 'services': ALLOWED_SERVICES})
+            return self.send_json(200, {'ok': True})
 
         if path == '/version':
             if not self.check_auth():
@@ -194,31 +230,75 @@ class Handler(BaseHTTPRequestHandler):
         # though download_url is built by our own trusted panel backend from
         # GitHub's release API, this is defense in depth against a
         # compromised or misconfigured caller directing us to fetch+run an
-        # arbitrary binary.
-        if not download_url.startswith(OFFICIAL_RELEASE_PREFIX):
+        # arbitrary binary. The URL is parsed (no '..' tricks) and the sha256
+        # is checked against GitHub's own release API, not only the caller's.
+        asset = official_asset(download_url)
+        if not asset:
             self.log_message('DENIED update — download_url outside BeamMP releases: %s', download_url)
             return self.send_json(403, {'error': 'download_url must be an official BeamMP-Server GitHub release asset'})
+        if not _update_lock.acquire(blocking=False):
+            return self.send_json(409, {'error': 'An update is already running'})
+        try:
+            return self._download_and_install(service, download_url, asset, sha256_expected)
+        finally:
+            _update_lock.release()
 
+    def _official_digest(self, tag: str, name: str):
+        import json
+        import urllib.parse
+        import urllib.request
+        req = urllib.request.Request(RELEASE_API + urllib.parse.quote(tag, safe=''),
+                                     headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'beammp-agent'})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            release = json.loads(resp.read(2 * 1024 * 1024))
+        for a in release.get('assets', []):
+            if a.get('name') == name:
+                digest = str(a.get('digest') or '')
+                return digest.split(':', 1)[1].lower() if digest.startswith('sha256:') else None
+        return None
+
+    def _download_and_install(self, service, download_url, asset, sha256_expected):
         import urllib.request
         import hashlib
         import shutil
+        import tempfile
         import time
 
-        tmp_path = '/tmp/beammp-server-update.bin'
         try:
-            with urllib.request.urlopen(download_url, timeout=120) as resp, open(tmp_path, 'wb') as f:
-                shutil.copyfileobj(resp, f)
+            official = self._official_digest(*asset)
         except Exception as exc:
+            return self.send_json(502, {'error': f'GitHub release lookup failed: {exc}'})
+        if not official or official != str(sha256_expected).lower():
+            self.log_message('DENIED update — sha256 not confirmed by the GitHub release API for %s', download_url)
+            return self.send_json(400, {'error': 'sha256 does not match the official GitHub release digest'})
+
+        class _Redirects(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                if not _allowed_redirect(newurl):
+                    raise urllib.error.HTTPError(newurl, code, 'redirect outside GitHub refused', headers, fp)
+                return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+        import urllib.error
+        fd, tmp_path = tempfile.mkstemp(prefix='beammp-server-update-')
+        try:
+            opener = urllib.request.build_opener(_Redirects)
+            size = 0
+            digest = hashlib.sha256()
+            with opener.open(download_url, timeout=120) as resp, os.fdopen(fd, 'wb') as f:
+                for chunk in iter(lambda: resp.read(1 << 20), b''):
+                    size += len(chunk)
+                    if size > MAX_BINARY_BYTES:
+                        raise ValueError('download larger than 200 MiB')
+                    digest.update(chunk)
+                    f.write(chunk)
+        except Exception as exc:
+            os.remove(tmp_path)
             return self.send_json(502, {'error': f'Download failed: {exc}'})
 
-        digest = hashlib.sha256()
-        with open(tmp_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(1 << 20), b''):
-                digest.update(chunk)
         sha256_actual = digest.hexdigest()
-        if sha256_actual.lower() != sha256_expected.lower():
+        if sha256_actual != official:
             os.remove(tmp_path)
-            self.log_message('DENIED update — sha256 mismatch (expected %s, got %s)', sha256_expected, sha256_actual)
+            self.log_message('DENIED update — sha256 mismatch (expected %s, got %s)', official, sha256_actual)
             return self.send_json(400, {'error': 'sha256 mismatch — download corrupted or unexpected file, aborted'})
 
         backup_path = f'{BINARY_PATH}.bak-{int(time.time())}'
