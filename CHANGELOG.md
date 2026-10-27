@@ -4,6 +4,51 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## À venir
+
+**Correctifs de sécurité** issus de l'audit complet du 27/10/2026.
+
+### Sécurité
+
+- **Valeurs d'exemple refusées** : le panel ne démarre plus si `JWT_SECRET`
+  contient « change-me » (la valeur de `.env.example` passait le contrôle et
+  permettait de forger une session SuperAdmin), et ne crée plus le SuperAdmin
+  initial avec un mot de passe d'exemple connu (`changeme123`…).
+  `.env.example` laisse ces deux valeurs vides. **Si votre `.env` contient
+  encore la valeur d'exemple, générez-en une (`openssl rand -hex 32`) avant
+  la mise à jour : sinon le panel refuse de démarrer.**
+- **Sessions révocables** : la déconnexion, le changement de mot de passe, la
+  réinitialisation par un SuperAdmin et le changement de rôle invalident les
+  jetons déjà émis (copie de cookie comprise). Les sessions ouvertes avant la
+  mise à jour restent valides jusqu'au prochain de ces gestes.
+- **Connexion** : un mot de passe de plus de 72 octets ne révèle plus si le
+  compte existe (erreur 500 avec bcrypt 5) et peut de nouveau être choisi.
+  Changement de mot de passe limité à 5 essais par minute.
+- **ServerConfig.toml** : l'identifiant de carte (`map_id`) est validé
+  (lettres, chiffres, `. _ -`) et échappé ; il ne peut plus ajouter des clés
+  réservées (`AllowGuests`, `InformationPacket`…). Tous les caractères de
+  contrôle sont retirés des valeurs ; nombres négatifs ramenés à 0.
+- **Assistant de premier lancement** : refusé si l'en-tête `Host` ou
+  `Origin` n'est pas local (page web d'un autre site, rebinding DNS),
+  SuperAdmin exigé dès qu'un compte existe, dossier sur un partage réseau
+  refusé. `GET /api/setup` ne donne plus le dossier une fois configuré.
+- **API** : les corps JSON doivent être envoyés en `application/json` et
+  sont limités à 1 Mo.
+- **Journal du serveur** : une ligne sans en-tête `[date] [niveau]` (suite
+  d'un message de chat) ne compte plus comme une arrivée de joueur ; noms
+  limités à 100 caractères sans caractère de contrôle. Notifications
+  Discord : aucune mention ne notifie, mise en forme des noms neutralisée.
+- **Agent hôte** (`agent/beammp-agent.py`, à recopier dans
+  `/opt/beammp-agent`) : l'adresse du binaire est analysée (plus de `../`),
+  l'empreinte est confirmée auprès de l'API GitHub de la release, redirections
+  limitées à GitHub, 200 Mo au plus, une mise à jour à la fois, jeton comparé
+  en temps constant, `/health` ne liste plus les services.
+- **Divers** : une seule mise à jour de BeamMP-Server à la fois (fichier
+  temporaire supprimé en cas d'échec) ; images de plus de 64 Mpx refusées ;
+  dernier SuperAdmin non rétrogradable ; homonyme à la casse près refusé à
+  l'approbation d'un compte ; import v2 limité aux colonnes connues ; rôle par
+  défaut `moderator` pour les nouvelles bases.
+
 ## [3.2.0] — 2026-10-23
 
 **Appli Windows prête à l'emploi.** Un zip à décompresser (Python embarqué,
