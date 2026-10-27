@@ -68,7 +68,8 @@ def test_setup_wizard(app_env):
     from beammp_panel.app import create_app
     server_dir = app_env / "BeamMP-Server"
     fake_server(server_dir)
-    with TestClient(create_app(start_watchers=False, frontend_dir="")) as client:
+    # L'assistant n'accepte que l'hôte local (en-tête Host compris).
+    with TestClient(create_app(start_watchers=False, frontend_dir=""), base_url="http://127.0.0.1:3000") as client:
         st = client.get("/api/setup").json()
         assert st["appMode"] and st["needed"] and not st["hasAdmin"]
         assert client.post("/api/setup", json={"serverDir": "relatif", "username": "a", "password": "motdepasse"}).status_code == 400

@@ -27,6 +27,30 @@ reload_runtime: Callable[[], Awaitable[None]] | None = None
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
+def _host_name(value: str) -> str:
+    """Nom d'hôte d'un en-tête Host ou d'une origine, sans port ni crochets IPv6."""
+    value = value.strip().lower()
+    if "://" in value:
+        value = value.split("://", 1)[1]
+    value = value.split("/", 1)[0]
+    if value.startswith("["):
+        return value[1:value.find("]")] if "]" in value else value
+    return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
+
+
+def _require_local_request(request: Request) -> None:
+    """La connexion vient de ce PC, et ni d'un autre site ouvert dans le
+    navigateur (Origin), ni d'un nom DNS qui pointerait sur 127.0.0.1 (Host)."""
+    peer = request.client.host if request.client else ""
+    if peer not in LOCAL_HOSTS:
+        raise ApiError(403, "La configuration initiale se fait depuis le PC où le panel est installé")
+    if _host_name(request.headers.get("host", "")) not in LOCAL_HOSTS:
+        raise ApiError(403, "Ouvrez le panel par http://127.0.0.1 ou http://localhost")
+    origin = request.headers.get("origin")
+    if origin is not None and _host_name(origin) not in LOCAL_HOSTS:
+        raise ApiError(403, "Requête refusée : elle vient d'un autre site")
+
+
 def _setup_needed() -> bool:
     if not appmode.enabled():
         return False
@@ -47,7 +71,8 @@ async def setup_status(request: Request):
         "appMode": appmode.enabled(),
         "needed": _setup_needed(),
         "hasAdmin": db().one("SELECT COUNT(*) AS n FROM users")["n"] > 0,
-        "serverDir": server_dir,
+        # Le chemin (profil Windows) ne sert qu'à l'assistant.
+        "serverDir": server_dir if _setup_needed() else None,
         "serverInstalled": exe.is_file(),
     })
 
@@ -56,14 +81,19 @@ async def setup(request: Request):
     if not _setup_needed():
         raise ApiError(409, "Le panel est déjà configuré")
     # Tant qu'aucun compte n'existe, n'importe qui pourrait se déclarer
-    # administrateur : l'assistant n'est accepté que depuis ce PC.
-    peer = request.client.host if request.client else ""
-    if peer not in LOCAL_HOSTS:
-        raise ApiError(403, "La configuration initiale se fait depuis le PC où le panel est installé")
+    # administrateur : l'assistant n'est accepté que depuis ce PC. Si un
+    # compte existe déjà (dossier du serveur seulement à refaire), il faut en
+    # plus être connecté en SuperAdmin.
+    _require_local_request(request)
+    if db().one("SELECT COUNT(*) AS n FROM users")["n"] > 0:
+        require_superadmin(request)
     body = await json_body(request)
     server_dir = str(body.get("serverDir") or "").strip().strip('"')
     if not server_dir or not os.path.isabs(server_dir):
         raise ApiError(400, "Indiquez le chemin complet du dossier du serveur BeamMP")
+    # Le panel lancera l'exécutable de ce dossier : pas de partage réseau.
+    if server_dir.startswith(("\\\\", "//")):
+        raise ApiError(400, "Le dossier du serveur doit être sur un disque de ce PC, pas un partage réseau")
     exe = Path(appmode.server_paths(server_dir)["BEAMMP_SERVER_EXE"])
     if not exe.is_file():
         if not body.get("downloadServer"):

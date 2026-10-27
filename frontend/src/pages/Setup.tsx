@@ -28,7 +28,7 @@ export function Setup() {
     api.setupStatus().then(s => {
       if (!s.needed) { navigate('/login', { replace: true }); return }
       setStatus(s)
-      setServerDir(s.serverDir)
+      setServerDir(s.serverDir ?? '')
       setDownload(!s.serverInstalled)
     }).catch(e => setError(e.message))
   }, [navigate])

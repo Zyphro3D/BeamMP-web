@@ -303,7 +303,7 @@ export interface SetupStatus {
   appMode: boolean
   needed: boolean
   hasAdmin: boolean
-  serverDir: string
+  serverDir: string | null
   serverInstalled: boolean
 }
 

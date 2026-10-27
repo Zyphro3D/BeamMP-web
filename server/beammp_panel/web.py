@@ -17,10 +17,28 @@ def ok(data: Any, status: int = 200) -> JSONResponse:
     return JSONResponse(data, status_code=status)
 
 
+MAX_JSON_BYTES = 1024 * 1024
+
+
 async def json_body(request: Request) -> dict[str, Any]:
-    raw = await request.body()
+    """Lit un corps JSON borné. Le type application/json est exigé : un
+    formulaire ou un text/plain d'un autre site ne passe pas sans requête
+    préalable CORS, que le panel n'accorde pas."""
+    declared = request.headers.get("content-length")
+    if declared and (not declared.isdigit() or int(declared) > MAX_JSON_BYTES):
+        raise ApiError(413, "Corps de requête trop volumineux")
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_JSON_BYTES:
+            raise ApiError(413, "Corps de requête trop volumineux")
+        chunks.append(chunk)
+    raw = b"".join(chunks)
     if not raw:
         return {}
+    ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if ctype != "application/json":
+        raise ApiError(415, "Content-Type application/json attendu")
     try:
         data = json.loads(raw)
     except ValueError:
