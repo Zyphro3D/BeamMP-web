@@ -42,7 +42,22 @@ def map_config_value(map_id: str) -> str:
     """
     m = re.match(r"^/?levels/([^/]+)(?:/info\.json)?/?$", map_id.strip())
     level = m.group(1) if m else map_id.strip().strip("/")
+    # La valeur finit dans ServerConfig.toml : un guillemet ou un retour à la
+    # ligne y injecterait des clés hors liste blanche (AllowGuests, Port…).
+    if not MAP_LEVEL_RE.match(level):
+        raise ValueError(f"Identifiant de carte invalide : {map_id!r}")
     return f"/levels/{level}/info.json"
+
+
+MAP_LEVEL_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
+
+
+def valid_map_id(map_id: str) -> bool:
+    try:
+        map_config_value(map_id)
+        return True
+    except ValueError:
+        return False
 
 
 def activate_map(inst: InstanceConfig, map_id: str) -> tuple[bool, Any]:
@@ -50,6 +65,8 @@ def activate_map(inst: InstanceConfig, map_id: str) -> tuple[bool, Any]:
 
     Renvoie (True, carte) ou (False, message d'erreur).
     """
+    if not valid_map_id(map_id):
+        return False, "Identifiant de carte invalide"
     new_map = db().one("SELECT * FROM mods WHERE map_id = ? AND type = 'map' AND instance_id = ?",
                        [map_id, inst.id])
     if not new_map:
@@ -76,7 +93,7 @@ def activate_map(inst: InstanceConfig, map_id: str) -> tuple[bool, Any]:
 
     content = read_text(inst.beammp.config_path)
     if content:
-        write_text(inst.beammp.config_path, set_toml_key(content, "Map", f'"{map_config_value(map_id)}"'))
+        write_text(inst.beammp.config_path, set_toml_key(content, "Map", format_toml_value("Map", map_config_value(map_id))))
     return True, db().one("SELECT * FROM mods WHERE id = ?", [new_map["id"]])
 
 
@@ -94,6 +111,9 @@ CONFIG_KEY_TOML_TYPE = {
 }
 
 
+CONTROL_CHARS_RE = re.compile("[\x00-\x1f\x7f\x85\u2028\u2029]")
+
+
 def format_toml_value(key: str, value: str) -> str:
     kind = CONFIG_KEY_TOML_TYPE.get(key, "string")
     if kind == "boolean":
@@ -103,9 +123,12 @@ def format_toml_value(key: str, value: str) -> str:
             n = float(value)
         except ValueError:
             return "0"
-        if n != n or n in (float("inf"), float("-inf")):
+        if n != n or n in (float("inf"), float("-inf")) or n < 0:
             return "0"
         return str(int(n)) if n.is_integer() else str(n)
+    # Aucun caractère de contrôle dans une chaîne TOML d'une ligne : un retour
+    # à la ligne ajouterait une clé, un \x00 ou \x0b rendrait le fichier invalide.
+    value = CONTROL_CHARS_RE.sub("", value)
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 

@@ -21,7 +21,7 @@ from .db import db, dumps, now_iso
 from .discord import send_discord_notification
 from .files import delete_file, ensure_dir, read_text, tail_lines, write_text
 from .logwatch import active_alerts
-from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, read_config_entries,
+from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, valid_map_id, read_config_entries,
                        set_mod_active, set_toml_key)
 from .security import ApiError, limiter, require_admin, require_auth
 from .status import invalidate_cache
@@ -68,6 +68,8 @@ async def upload_mod(request: Request):
         map_id = fields.get("map_id") or None
         if not name or type_ not in ("mod", "vehicle", "map"):
             raise ApiError(400, "name and type are required")
+        if map_id is not None and not valid_map_id(map_id):
+            raise ApiError(400, "map_id invalide (lettres, chiffres, . _ - seulement)")
 
         filename = os.path.basename(upload.filename or "")
         if os.path.splitext(filename)[1].lower() not in (".zip", ".pak"):
