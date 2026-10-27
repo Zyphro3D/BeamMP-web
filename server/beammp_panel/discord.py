@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import httpx
 
@@ -57,15 +58,22 @@ def _enabled(event: str) -> bool:
     }.get(event, True)
 
 
+def md_escape(text: str) -> str:
+    """Neutralise la mise en forme Markdown de Discord dans un texte de joueur."""
+    return re.sub(r"([\\*_~`|>\[\]()@#])", r"\\\1", text)
+
+
 async def send_discord_notification(event: str, description: str) -> None:
     url = _webhook_url(event)
     if not url or not _enabled(event):
         return
     payload = {
         "username": "BeamMP Panel",
+        # Aucune mention ne notifie personne, même si un nom de joueur en contient.
+        "allowed_mentions": {"parse": []},
         "embeds": [{
             "title": TITLES.get(event, event),
-            "description": description,
+            "description": description[:4096],
             "color": COLORS.get(event, 0x5865F2),
             "timestamp": now_iso(),
         }],

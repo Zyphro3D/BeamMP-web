@@ -19,7 +19,7 @@ from . import config as C
 from .activity import log_activity
 from .config import InstanceConfig
 from .db import db, now_iso
-from .discord import send_discord_notification
+from .discord import md_escape, send_discord_notification
 from .files import tail_lines
 from .status import mark_server_alive, player_joined, player_left
 
@@ -37,6 +37,8 @@ JOIN_RES = [re.compile(r"^(.+?) : Connected$"),
 LEAVE_RES = [re.compile(r"^(.+?) Connection Terminated$"),
              re.compile(r"^Disconnected:\s+(.+)$")]
 ALIVE_RE = re.compile(r"ALL SYSTEMS STARTED SUCCESSFULLY", re.I)
+MAX_NAME_LEN = 100  # même borne que la demande de compte
+CONTROL_RE = re.compile("[\x00-\x1f\x7f]")
 
 CRITICAL_PATTERNS = [{
     "type": "auth_key_missing",
@@ -116,7 +118,7 @@ async def handle_join(inst: InstanceConfig, username: str) -> None:
     count = row["connection_count"] if row else 1
     label = "🥚 première connexion !" if count == 1 else (rank_label(count) or f"{count}e connexion")
     log_activity(inst.id, "player_join", f"{username} s'est connecté", username)
-    await send_discord_notification("player_join", f"**{username}** — {label}")
+    await send_discord_notification("player_join", f"**{md_escape(username)}** — {label}")
 
 
 async def handle_leave(inst: InstanceConfig, username: str) -> None:
@@ -137,13 +139,26 @@ async def handle_leave(inst: InstanceConfig, username: str) -> None:
     # Session très courte : souvent un souci de connexion plutôt qu'un vrai départ.
     note = " ⚠️ Ça ne fonctionne pas ? Contacte le support admin." if 0 < seconds < 120 else ""
     log_activity(inst.id, "player_leave", f"{username} s'est déconnecté · {duration} de session", username)
-    await send_discord_notification("player_leave", f"**{username}** a joué pendant **{duration}**{note}")
+    await send_discord_notification("player_leave", f"**{md_escape(username)}** a joué pendant **{duration}**{note}")
+
+
+def _player_name(raw: str) -> str | None:
+    """Nom de joueur lu dans le journal : borné et sans caractère de contrôle."""
+    name = raw.strip()
+    if not (1 <= len(name) <= MAX_NAME_LEN) or CONTROL_RE.search(name):
+        return None
+    return name
 
 
 async def process_line(inst: InstanceConfig, line: str) -> None:
     m = LINE_RE.match(line.rstrip("\r"))
-    message = m.group(3) if m else line.strip()
-    level = m.group(2).strip() if m else ""
+    # Une ligne sans l'en-tête « [date] [niveau] » n'est pas un événement du
+    # serveur : c'est la suite d'un message (un chat sur plusieurs lignes, par
+    # exemple), donc du texte de joueur. On l'ignore.
+    if not m:
+        return
+    message = m.group(3)
+    level = m.group(2).strip()
     # Le chat est journalisé tel quel : un joueur qui écrit « x : Connected »
     # ne doit pas compter comme une arrivée.
     if level == "CHAT":
@@ -151,15 +166,19 @@ async def process_line(inst: InstanceConfig, line: str) -> None:
     for rx in JOIN_RES:
         jm = rx.match(message)
         if jm:
-            await handle_join(inst, jm.group(1).strip())
+            name = _player_name(jm.group(1))
+            if name:
+                await handle_join(inst, name)
             return
     for rx in LEAVE_RES:
         lm = rx.match(message)
         if lm:
-            await handle_leave(inst, lm.group(1).strip())
+            name = _player_name(lm.group(1))
+            if name:
+                await handle_leave(inst, name)
             return
     if ALIVE_RE.search(message):
-        ts = _parse_ts(m.group(1)) if m else None
+        ts = _parse_ts(m.group(1))
         _server_started[inst.id] = ts or time.time()
         mark_server_alive(inst.id)
         return
