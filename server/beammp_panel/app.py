@@ -100,10 +100,22 @@ async def server_error(request: Request, exc: Exception):
     return JSONResponse({"error": "Internal Server Error"}, status_code=500)
 
 
+# Valeurs d'exemple publiques (.env.example, anciennes docs) : quiconque a lu
+# le dépôt pourrait signer des jetons ou se connecter avec.
+PLACEHOLDER_MARKS = ("change-me", "changeme", "change_me")
+DEFAULT_PASSWORDS = {"changeme123", "changeme", "password", "motdepasse", "admin123"}
+
+
+def _is_placeholder(value: str) -> bool:
+    low = value.lower()
+    return any(mark in low for mark in PLACEHOLDER_MARKS)
+
+
 def check_startup() -> None:
     secret = C.config.jwt_secret
-    if not secret or secret in ("change-me", "change-me-in-production"):
-        raise SystemExit("[FATAL] JWT_SECRET doit être une valeur aléatoire forte (openssl rand -hex 32)")
+    if not secret or _is_placeholder(secret):
+        raise SystemExit("[FATAL] JWT_SECRET doit être une valeur aléatoire forte (openssl rand -hex 32), "
+                         "pas la valeur d'exemple de .env.example")
     if len(secret) < 32:
         raise SystemExit("[FATAL] JWT_SECRET trop court — 32 caractères minimum")
     if not C.config.allowed_origin:
@@ -119,6 +131,9 @@ def create_initial_superadmin() -> None:
         return
     if len(password) < 8:
         log.warning("SUPERADMIN_PASSWORD trop court (8 caractères minimum) — ignoré")
+        return
+    if password.lower() in DEFAULT_PASSWORDS or _is_placeholder(password):
+        log.warning("SUPERADMIN_PASSWORD est une valeur d'exemple connue — compte non créé, choisissez un vrai mot de passe")
         return
     db().run("INSERT INTO users (username, password, role, created_at) VALUES (?, ?, 'superadmin', ?)",
              [username, hash_password(password), now_iso()])
