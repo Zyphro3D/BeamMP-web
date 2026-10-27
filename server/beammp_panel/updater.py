@@ -1,4 +1,4 @@
-"""Mise à jour du panel depuis le panel (appli Windows), sur le modèle de ZCoach.
+"""Mise à jour du panel depuis le panel (appli Windows et Docker), sur le modèle de ZCoach.
 
 Un manifeste JSON SIGNÉ (Ed25519) publié avec chaque release GitHub annonce
 la dernière version. Le panel vérifie la signature avec la clé publique
@@ -8,6 +8,13 @@ _start.cmd échange app et app.new ; si la nouvelle version n'atteint pas
 l'état « sain » (20 s de fonctionnement), le démarrage suivant revient à
 l'ancienne. Les données (%APPDATA%\\BeamMP Panel) ne sont jamais touchées.
 Rien n'est envoyé hors de la requête HTTPS elle-même.
+
+En Docker (installation par install.sh), le panel n'a aucun droit sur
+l'hôte : le bouton dépose seulement une DEMANDE (update/request.json).
+L'unité systemd posée par install.sh relance alors le script installé, qui
+revérifie la signature avec sa propre clé, refuse toute version plus
+ancienne, reconstruit le conteneur et revient en arrière si le panel ne
+répond plus. L'avancement arrive dans update/status.json.
 """
 
 from __future__ import annotations
@@ -47,6 +54,10 @@ try:
 except ImportError:
     PUBLIC_KEY_B64 = os.environ.get("BEAMMP_PANEL_UPDKEY", "")
 
+# Dossier partagé avec l'hôte (docker-compose.yml) : demande, avancement, présence de l'agent.
+UPDATE_DIR = Path(os.environ.get("BEAMMP_PANEL_UPDATE_DIR", "/app/update"))
+STATUS_STALE_S = 2 * 3600
+
 STATE: dict[str, Any] = {"phase": "idle", "current": VERSION, "version": None, "notes": {},
                          "size": 0, "error": "", "fullRequired": False, "checked": 0, "enabled": False}
 _lock = threading.Lock()
@@ -84,8 +95,27 @@ def verify_manifest(raw: bytes, sig_b64: str, pub_b64: str | None = None) -> dic
     return m
 
 
+def docker_mode() -> bool:
+    """Installation Docker faite par install.sh : l'agent de l'hôte s'est signalé."""
+    return appmode.layout() is None and (UPDATE_DIR / "agent.json").is_file()
+
+
 def enabled() -> bool:
-    return appmode.layout() is not None and bool(PUBLIC_KEY_B64)
+    return bool(PUBLIC_KEY_B64) and (appmode.layout() is not None or docker_mode())
+
+
+def host_status() -> dict[str, Any]:
+    """Avancement écrit par install.sh sur l'hôte (Docker), et demande encore en attente."""
+    st: dict[str, Any] = {}
+    try:
+        raw = json.loads((UPDATE_DIR / "status.json").read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            st = {k: raw[k] for k in ("phase", "message", "version", "updated_at") if k in raw}
+    except (OSError, ValueError):
+        pass
+    if st and time.time() - float(st.get("updated_at") or 0) > STATUS_STALE_S:
+        st = {}
+    return {"host": st, "pending": (UPDATE_DIR / "request.json").is_file()}
 
 
 def base_url() -> str:
@@ -135,7 +165,8 @@ async def check() -> dict[str, Any]:
             elif newer(m["version"], VERSION):
                 STATE.update(phase="available", version=m["version"], notes=m.get("notes") or {},
                              size=int((m.get("code") or {}).get("size", 0)),
-                             fullRequired=int(m.get("min_runtime", 0)) > RUNTIME_API, manifest=m)
+                             fullRequired=not docker_mode() and int(m.get("min_runtime", 0)) > RUNTIME_API,
+                             manifest=m)
             else:
                 STATE.update(phase="current", version=m["version"], notes={}, fullRequired=False)
     except httpx.HTTPStatusError as err:
@@ -154,7 +185,11 @@ async def check() -> dict[str, Any]:
 
 def public_state() -> dict[str, Any]:
     with _lock:
-        return {k: v for k, v in STATE.items() if k != "manifest"}
+        state = {k: v for k, v in STATE.items() if k != "manifest"}
+    state["docker"] = docker_mode()
+    if state["docker"]:
+        state |= host_status()
+    return state
 
 
 def extract_code(data: bytes, dest: Path) -> None:
@@ -173,8 +208,29 @@ def extract_code(data: bytes, dest: Path) -> None:
         raise ValueError("paquet de code incomplet")
 
 
+def request_host_update() -> dict[str, Any]:
+    """Docker : dépose la demande lue par l'agent de l'hôte (écriture atomique).
+    Seule la version est transmise ; l'hôte retélécharge et revérifie tout."""
+    with _lock:
+        m = STATE.get("manifest")
+    if not m or not docker_mode():
+        raise ValueError("aucune mise à jour à installer")
+    if not (m.get("docker") or {}).get("name"):
+        raise ValueError("cette version ne publie pas de paquet Docker")
+    version = m["version"]
+    parse(version)
+    tmp = UPDATE_DIR / f".request-{os.getpid()}.tmp"
+    tmp.write_text(json.dumps({"version": version, "requested_at": int(time.time())}))
+    os.replace(tmp, UPDATE_DIR / "request.json")
+    with _lock:
+        STATE.update(phase="requested", error="")
+    return public_state()
+
+
 async def install() -> dict[str, Any]:
     """Télécharge et prépare la version annoncée (app.new) ; le redémarrage l'active."""
+    if docker_mode():
+        return request_host_update()
     lay = appmode.layout()
     with _lock:
         m = STATE.get("manifest")

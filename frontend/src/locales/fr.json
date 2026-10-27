@@ -308,5 +308,6 @@
   "panel_update": "Mise à jour du panel",
   "panel_update_check": "Vérifier",
   "panel_update_restarting": "Installation… le panel redémarre, la page se recharge toute seule.",
+  "panel_update_failed": "Mise à jour annulée, version précédente rétablie :",
   "panel_update_full": "La version {v} demande de retélécharger l'appli complète."
 }

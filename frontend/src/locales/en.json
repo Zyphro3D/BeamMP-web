@@ -308,5 +308,6 @@
   "panel_update": "Panel update",
   "panel_update_check": "Check",
   "panel_update_restarting": "Installing… the panel restarts, the page reloads by itself.",
+  "panel_update_failed": "Update cancelled, previous version restored:",
   "panel_update_full": "Version {v} requires downloading the full app again."
 }

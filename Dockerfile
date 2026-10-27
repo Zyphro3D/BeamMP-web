@@ -21,6 +21,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY server/beammp_panel ./beammp_panel
 COPY --from=frontend-builder /app/frontend/dist ./beammp_panel/static
+# Clé publique des mises à jour signées (la clé privée ne quitte jamais la machine qui publie)
+COPY build/update_public.b64 /tmp/update_public.b64
+RUN printf 'PUBLIC_KEY_B64 = "%s"\n' "$(tr -d '\n' < /tmp/update_public.b64)" > beammp_panel/_updkey.py \
+ && rm /tmp/update_public.b64
 
 RUN mkdir -p /beammp/resources /app/images /app/data && chown -R panel:panel /app /beammp
 

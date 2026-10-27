@@ -5,6 +5,7 @@ Entrée : dist/BeamMP Panel (fabriqué par build/make_windows.sh).
 Sortie : dist/release/<version>/ (à joindre à la release GitHub v<version>) :
   BeamMP-Panel-<v>-win64.zip     appli complète (première installation)
   beammp-panel-code-<v>.zip      code seul (mise à jour depuis le panel)
+  beammp-panel-docker-<v>.zip    installation Docker (install.sh), tirée de git (HEAD)
   latest-stable.json + .sig      manifeste signé Ed25519 (clé ~/.config/beammp-panel-release/update.key)
 La clé privée ne quitte jamais cette machine : la signature se fait ici, jamais en CI.
 """
@@ -18,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -58,6 +60,23 @@ def zip_dir(src: Path, dest: Path, arc_root: Path) -> None:
                 z.write(path, path.relative_to(arc_root).as_posix())
 
 
+def docker_zip(dest: Path) -> None:
+    """Archive du dépôt tel que commité (HEAD) : ce qu'install.sh déploie sous Linux.
+    Refusée si des fichiers suivis sont modifiés, pour signer exactement le code relu."""
+    def git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True)
+    if git("diff", "--quiet", "HEAD").returncode != 0:
+        sys.exit("fichiers suivis modifiés : commiter avant de publier (le paquet Docker vient de HEAD)")
+    if git("archive", "--format=zip", "-9", "-o", str(dest), "HEAD").returncode != 0:
+        sys.exit("git archive a échoué")
+    with zipfile.ZipFile(dest) as z:
+        names = set(z.namelist())
+    for required in ("install.sh", "docker-compose.yml", "Dockerfile", "build/update_public.b64",
+                     "agent/beammp-agent.py", "server/beammp_panel/__init__.py"):
+        if required not in names:
+            sys.exit(f"paquet Docker incomplet : {required} absent")
+
+
 def b64(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
@@ -85,6 +104,8 @@ def main() -> None:
     zip_dir(PKG, full, PKG.parent)
     code = out / f"beammp-panel-code-{v}.zip"
     zip_dir(PKG / "app", code, PKG / "app")
+    docker = out / f"beammp-panel-docker-{v}.zip"
+    docker_zip(docker)
 
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     raw_key = Path(a.key).read_text().strip()
@@ -100,6 +121,7 @@ def main() -> None:
         "min_runtime": runtime_api(),
         "code": {"name": code.name, "size": code.stat().st_size, "sha256": sha(code), "url": base + code.name},
         "full": {"name": full.name, "size": full.stat().st_size, "sha256": sha(full), "url": base + full.name},
+        "docker": {"name": docker.name, "size": docker.stat().st_size, "sha256": sha(docker), "url": base + docker.name},
         "notes": {"fr": a.notes_fr or changelog_notes(v)},
     }
     body = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

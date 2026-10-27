@@ -21,6 +21,9 @@ services:
       # Fuseau de l'hôte : BeamMP écrit Server.log en heure locale, le panel
       # doit lire les mêmes heures (uptime, horodatages).
       TZ: ${TZ:-Europe/Paris}
+      # Mise à jour depuis le panel (installation par install.sh) : le panel
+      # dépose une demande ici, l'hôte fait la mise à jour.
+      BEAMMP_PANEL_UPDATE_DIR: /app/update
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -37,6 +40,7 @@ services:
       - ${BEAMMP_CONFIG_PATH}:/beammp/ServerConfig.toml
       # Sauvegardes de la v2, lues une seule fois par l'import (scripts/upgrade-to-v3.sh).
       - ./backups:/app/backups:ro
+      - ./update:/app/update
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/api/info', timeout=5)"]

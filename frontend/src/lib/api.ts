@@ -327,13 +327,17 @@ export interface LocalServerState {
 
 export interface PanelUpdate {
   enabled: boolean
-  phase: 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'ready' | 'error' | 'disabled'
+  phase: 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'ready' | 'requested' | 'error' | 'disabled'
   current: string
   version: string | null
   notes: Record<string, string>
   size: number
   error: string
   fullRequired: boolean
+  // Installation Docker : la mise à jour est faite par l'hôte (install.sh)
+  docker?: boolean
+  pending?: boolean
+  host?: { phase?: string; message?: string; version?: string; updated_at?: number }
 }
 
 // Catalogue public (page d'accueil) : tous les mods/cartes de l'instance,

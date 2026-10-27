@@ -46,7 +46,7 @@ export function LocalServerControls({ instanceId }: { instanceId: string }) {
   )
 }
 
-// Mise à jour du panel lui-même (appli Windows) : vérifier, installer, redémarrer.
+// Mise à jour du panel lui-même (appli Windows, ou Docker par l'hôte) : vérifier, installer, redémarrer.
 export function PanelUpdateCard() {
   const { t, lang } = useI18n()
   const [u, setU] = useState<PanelUpdate | null>(null)
@@ -57,13 +57,22 @@ export function PanelUpdateCard() {
   useEffect(() => { api.panelUpdate().then(setU).catch(() => {}) }, [])
 
   // Après l'installation, le panel redémarre : on attend qu'il réponde à nouveau.
+  // En Docker, l'ancien conteneur répond pendant toute la reconstruction : on suit
+  // l'avancement écrit par l'hôte et on recharge quand la version a changé.
+  const docker = !!u?.docker
+  const startedOn = u?.current
   useEffect(() => {
     if (!restarting) return
     const id = setInterval(() => {
-      api.info().then(() => window.location.reload()).catch(() => {})
+      if (!docker) { api.info().then(() => window.location.reload()).catch(() => {}); return }
+      api.panelUpdate().then((next) => {
+        if (next.current !== startedOn) window.location.reload()
+        else if (next.host?.phase === 'rolled_back' || next.host?.phase === 'error') { setRestarting(false); setU(next) }
+        else setU(next)
+      }).catch(() => {})  // conteneur en cours de remplacement
     }, 3000)
     return () => clearInterval(id)
-  }, [restarting])
+  }, [restarting, docker, startedOn])
 
   if (!u?.enabled) return null
 
@@ -78,6 +87,7 @@ export function PanelUpdateCard() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : t('error')); setBusy(false) }
   }
   const notes = u.notes?.[lang] ?? u.notes?.en ?? u.notes?.fr ?? ''
+  const hostFailed = u.docker && (u.host?.phase === 'rolled_back' || u.host?.phase === 'error')
 
   return (
     <div className="p-3 border-t border-surface-border shrink-0 space-y-2">
@@ -85,8 +95,8 @@ export function PanelUpdateCard() {
         <span className="text-zinc-500">{t('panel_update')}</span>
         <span className="text-zinc-600 font-mono">v{u.current}</span>
       </div>
-      {restarting ? (
-        <p className="text-xs text-zinc-500">{t('panel_update_restarting')}</p>
+      {restarting || (u.docker && u.pending) ? (
+        <p className="text-xs text-zinc-500">{u.docker && u.host?.message && !hostFailed ? `${u.host.message}…` : t('panel_update_restarting')}</p>
       ) : u.phase === 'available' && u.version ? (
         <>
           {u.fullRequired ? (
@@ -108,6 +118,9 @@ export function PanelUpdateCard() {
             <RefreshCw size={12} className={busy ? 'animate-spin' : ''} />{t('panel_update_check')}
           </button>
         </div>
+      )}
+      {hostFailed && !restarting && u.host?.message && (
+        <p className="text-xs text-red-400">{t('panel_update_failed')} {u.host.message}</p>
       )}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>

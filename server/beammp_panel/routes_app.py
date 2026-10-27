@@ -188,6 +188,9 @@ async def panel_update_install(request: Request):
         raise ApiError(400, str(err))
     except Exception as err:
         raise ApiError(502, f"Mise à jour impossible : {err}")
+    if state.get("docker"):
+        # L'hôte prend le relais : il reconstruit puis recrée ce conteneur.
+        return ok(state | {"restarting": True})
 
     async def restart_soon() -> None:
         await asyncio.sleep(1.5)  # laisser partir la réponse

@@ -216,8 +216,8 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
         await start_runtime()
         if appmode.layout():
             updater.mark_healthy_later()
-            if start_watchers:
-                asyncio.get_running_loop().create_task(updater.check())
+        if start_watchers and updater.enabled():
+            asyncio.get_running_loop().create_task(updater.check())
         if os.environ.get("BEAMMP_PANEL_OPEN") == "1":
             asyncio.get_running_loop().call_later(1.0, _open_browser)
         log.info("BeamMP Panel %s — instances : %s — base : %s", VERSION,
