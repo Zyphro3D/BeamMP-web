@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import re
+import warnings
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,8 @@ MAX_CONFIGS_SCANNED = 80
 MAX_CONFIGS_LISTED = 12
 
 Image.MAX_IMAGE_PIXELS = 64_000_000  # refuse les images aberrantes (bombe de décompression)
+# Pillow ne fait qu'avertir entre 1 et 2 fois la limite : on refuse aussi.
+warnings.simplefilter("error", Image.DecompressionBombWarning)
 
 
 # ── SJSON (format des fichiers BeamNG) ─────────────────────────

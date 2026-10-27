@@ -92,6 +92,7 @@ class ServerProcess:
         self.crashes: list[float] = []
         self.last_error = ""
         self._lock = asyncio.Lock()
+        self._installing = False
         self._task: asyncio.Task | None = None
 
     # ── état ──────────────────────────────────────────────────
@@ -207,21 +208,34 @@ class ServerProcess:
 
     async def install(self, download_url: str, sha256: str) -> None:
         """Télécharge, vérifie l'empreinte, remplace l'exécutable, redémarre ; restaure l'ancien si échec."""
-        if not download_url.startswith(RELEASE_URL_PREFIX):
+        if not download_url.startswith(RELEASE_URL_PREFIX) or ".." in download_url or "%" in download_url:
             raise ValueError("Adresse de téléchargement inattendue")
+        if self._installing:
+            raise ValueError("Une mise à jour de BeamMP-Server est déjà en cours")
+        self._installing = True
+        try:
+            await self._install(download_url, sha256)
+        finally:
+            self._installing = False
+
+    async def _install(self, download_url: str, sha256: str) -> None:
         tmp = self.exe.with_name(self.exe.name + ".download")
         digest = hashlib.sha256()
         size = 0
-        async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
-            async with client.stream("GET", download_url) as res:
-                res.raise_for_status()
-                with open(tmp, "wb") as out:
-                    async for chunk in res.aiter_bytes(1024 * 1024):
-                        size += len(chunk)
-                        if size > MAX_BINARY:
-                            raise ValueError("Fichier trop gros")
-                        digest.update(chunk)
-                        out.write(chunk)
+        try:
+            async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+                async with client.stream("GET", download_url) as res:
+                    res.raise_for_status()
+                    with open(tmp, "wb") as out:
+                        async for chunk in res.aiter_bytes(1024 * 1024):
+                            size += len(chunk)
+                            if size > MAX_BINARY:
+                                raise ValueError("Fichier trop gros")
+                            digest.update(chunk)
+                            out.write(chunk)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
         if digest.hexdigest().lower() != sha256.lower():
             tmp.unlink(missing_ok=True)
             raise ValueError("Empreinte sha256 différente : téléchargement corrompu, rien n'est remplacé")

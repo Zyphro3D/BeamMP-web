@@ -138,6 +138,14 @@ def import_rows(db_path: str, rows: Iterator[tuple[str, dict[str, Any]]], *, for
     buffered: dict[str, list[dict[str, Any]]] = {t: [] for t in TABLES}
     for table, row in rows:
         buffered[table].append(_convert(table, row))
+    # Les noms de colonnes viennent de l'en-tête COPY du dump : on n'accepte que
+    # ceux du schéma, car ils sont recopiés tels quels dans la requête INSERT.
+    known = {t: {c["name"] for c in db.all(f"PRAGMA table_info({t})")} for t in TABLES}
+    for table in TABLES:
+        for row in buffered[table]:
+            unknown = set(row) - known[table]
+            if unknown:
+                raise SystemExit(f"Colonnes inconnues dans {table} : {', '.join(sorted(unknown))}")
     with db.transaction() as t:
         for table in reversed(TABLES):
             t.run(f"DELETE FROM {table}")
