@@ -4,12 +4,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
-## À venir (3.3.0)
+## [3.3.0] — 2026-10-28
 
 ### Ajouté
 
 - **Installation en une commande sous Linux** :
-  `curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh | sudo bash`.
+  `curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh -o beammp-install.sh && sudo bash beammp-install.sh`.
   Docker (proposé s'il manque), release vérifiée (manifeste signé Ed25519 +
   empreinte SHA-256), `.env` avec clé de session et mot de passe aléatoires,
   BeamMP-Server et son service, beammp-agent limité au réseau Docker du

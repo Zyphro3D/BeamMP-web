@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installation et mise à jour de BeamMP Panel sous Linux (Docker).
 #
-#   curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh -o beammp-install.sh && sudo bash beammp-install.sh
 #
 # Relancer la même commande met le panel à jour : réglages (.env), base de données, mods et
 # serveur BeamMP sont conservés. Fait tout ce qui était manuel : Docker (proposé s'il manque),
@@ -89,7 +89,7 @@ status() {
     mv -f "$tmp" "$DIR/update/status.json"
 }
 
-[ "$(id -u)" -eq 0 ] || die "À lancer en root : curl -fsSL https://raw.githubusercontent.com/$REPO/HEAD/install.sh | sudo bash"
+[ "$(id -u)" -eq 0 ] || die "À lancer en root : sudo bash ${BASH_SOURCE[0]:-beammp-install.sh}"
 
 # Version du code en place (vide à la première installation)
 installed_version() {

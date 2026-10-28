@@ -126,8 +126,11 @@ Testé sur Windows 10 (compte utilisateur sans droits d'administrateur).
 ### En une commande (recommandé, depuis la 3.3.0)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh -o beammp-install.sh && sudo bash beammp-install.sh
 ```
+
+Le script est téléchargé avant d'être lancé : `sudo` peut ainsi demander le mot
+de passe, et vous pouvez le relire avant.
 
 Le script fait tout ce qui est décrit plus bas à la main :
 
@@ -149,7 +152,7 @@ Options : `--dir DOSSIER` (défaut `/opt/beammp-panel`), `--server-dir DOSSIER`
 `--yes` (installe Docker sans poser la question).
 
 Sans clé AuthKey, le panel fonctionne mais BeamMP-Server attend sa clé :
-relancez la même commande avec `--auth-key VOTRE_CLÉ` (`... | sudo bash -s -- --auth-key VOTRE_CLÉ`).
+relancez-le avec `--auth-key VOTRE_CLÉ` (`sudo bash beammp-install.sh --auth-key VOTRE_CLÉ`).
 Port à ouvrir vers la machine pour les joueurs : **30814 TCP+UDP**.
 
 ### Reprendre une installation faite à la main (git)
@@ -157,8 +160,8 @@ Port à ouvrir vers la machine pour les joueurs : **30814 TCP+UDP**.
 Relancez la commande avec le dossier existant :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh \
-  | sudo bash -s -- --dir /opt/app-docker/beammp-panel --server-dir /chemin/de/BeamMP-Server
+curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh -o beammp-install.sh
+sudo bash beammp-install.sh --dir /opt/app-docker/beammp-panel --server-dir /chemin/de/BeamMP-Server
 ```
 
 Le `.env`, la base (volume `app_data`), les mods, les services BeamMP et
