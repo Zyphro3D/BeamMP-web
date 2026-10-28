@@ -112,8 +112,10 @@ Testé sur Windows 10 (compte utilisateur sans droits d'administrateur).
 ## Prérequis (Linux, Docker)
 
 - **Docker Engine 24+** et **Docker Compose v2** (Docker CE, dépôt officiel
-  `get.docker.com`)
-- Un serveur BeamMP fonctionnel sur la même machine
+  `get.docker.com`) : `install.sh` propose de l'installer s'il manque
+- systemd, accès root (`sudo`)
+- Le serveur BeamMP sur la même machine : `install.sh` l'installe s'il n'y
+  en a pas
 - Linux sans Docker n'est pas pris en charge : sous Linux, le panel tourne en
   conteneur ; sous Windows, utilisez l'appli ci-dessus.
 
@@ -121,12 +123,72 @@ Testé sur Windows 10 (compte utilisateur sans droits d'administrateur).
 
 ## Installation
 
+### En une commande (recommandé, depuis la 3.3.0)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh | sudo bash
+```
+
+Le script fait tout ce qui est décrit plus bas à la main :
+
+- télécharge la dernière release et vérifie sa **signature** (Ed25519, clé
+  publique écrite dans le script) et l'empreinte SHA-256 de l'archive ;
+- crée `.env` (droits 600) avec une clé de session et un mot de passe
+  SuperAdmin aléatoires, affichés à la fin ;
+- installe BeamMP-Server (binaire officiel, empreinte confirmée par GitHub)
+  et son service `beammp.service` ;
+- installe **beammp-agent** (boutons Redémarrer / Mettre à jour le serveur),
+  qui n'écoute que sur le réseau Docker du panel ;
+- construit et démarre le panel, puis attend qu'il réponde ;
+- pose l'unité `beammp-panel-update` : le bouton **Mettre à jour** du panel
+  relance ce script sur l'hôte (voir [Mise à jour](#mise-à-jour)).
+
+Options : `--dir DOSSIER` (défaut `/opt/beammp-panel`), `--server-dir DOSSIER`
+(défaut `DOSSIER/beammp-server`), `--auth-key CLÉ` (clé du serveur sur
+[keymaster.beammp.com](https://keymaster.beammp.com)), `--version vX.Y.Z`,
+`--yes` (installe Docker sans poser la question).
+
+Sans clé AuthKey, le panel fonctionne mais BeamMP-Server attend sa clé :
+relancez la même commande avec `--auth-key VOTRE_CLÉ` (`... | sudo bash -s -- --auth-key VOTRE_CLÉ`).
+Port à ouvrir vers la machine pour les joueurs : **30814 TCP+UDP**.
+
+### Reprendre une installation faite à la main (git)
+
+Relancez la commande avec le dossier existant :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh \
+  | sudo bash -s -- --dir /opt/app-docker/beammp-panel --server-dir /chemin/de/BeamMP-Server
+```
+
+Le `.env`, la base (volume `app_data`), les mods, les services BeamMP et
+l'unité de beammp-agent sont gardés tels quels ; seul le code du panel et de
+l'agent est remplacé par celui de la release. Les fichiers du dossier sont
+alors ceux de la release, plus ceux de git : n'utilisez plus `git pull` dans
+ce dossier (les mises à jour passent par le bouton du panel ou la même
+commande). Si vous aviez modifié `docker-compose.yml`, reportez vos
+changements dans `docker-compose.override.yml` avant (sinon ils sont
+remplacés).
+
+> **Dossier d'installation appartenant à un utilisateur** — le script garde
+> ce propriétaire, mais l'unité de mise à jour lance `DOSSIER/install.sh` **en
+> root**, et Docker construit ce que contient le dossier : quiconque peut
+> écrire dans ce dossier peut donc obtenir les droits root sur la machine.
+> C'est sans effet si cet utilisateur est déjà administrateur (`sudo`, groupe
+> `docker`) ; sinon, donnez le dossier à root
+> (`sudo chown -R root:root DOSSIER`, en gardant `update/` à l'uid 1000).
+
+### À la main
+
 ```bash
 git clone <repo> beammp-panel
 cd beammp-panel
 cp .env.example .env
 # Éditer .env (voir section ci-dessous)
 ```
+
+Puis [beammp-agent](#redémarrage-du-serveur) et le [démarrage](#démarrage).
+Le bouton **Mettre à jour** du panel n'est disponible qu'avec `install.sh`.
 
 ---
 
@@ -422,6 +484,16 @@ partir d'une configuration déjà en place.
 ---
 
 ## Mise à jour
+
+**Installé avec `install.sh`** : bouton **Mettre à jour** de la carte « Mise à
+jour du panel » (Administration). Le panel ne fait que déposer une demande
+dans `update/` ; l'hôte relance `install.sh`, qui revérifie la signature,
+refuse toute version plus ancienne que celle en place, reconstruit le
+conteneur et **revient à la version précédente** si le panel ne répond pas
+dans la nouvelle. Journal : `DOSSIER/update.log`. Relancer la commande
+d'installation fait la même chose à la main.
+
+**Installé avec git** :
 
 ```bash
 git pull

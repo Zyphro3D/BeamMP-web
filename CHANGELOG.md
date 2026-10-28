@@ -4,6 +4,39 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## À venir (3.3.0)
+
+### Ajouté
+
+- **Installation en une commande sous Linux** :
+  `curl -fsSL https://raw.githubusercontent.com/Zyphro3D/BeamMP-web/HEAD/install.sh | sudo bash`.
+  Docker (proposé s'il manque), release vérifiée (manifeste signé Ed25519 +
+  empreinte SHA-256), `.env` avec clé de session et mot de passe aléatoires,
+  BeamMP-Server et son service, beammp-agent limité au réseau Docker du
+  panel, démarrage et attente que le panel réponde. Voir le README,
+  [Installation](README.md#installation).
+- **Mise à jour depuis le panel en Docker** : le bouton « Mettre à jour »
+  dépose une demande que l'hôte traite (le panel n'a toujours aucun droit sur
+  l'hôte). Signature revérifiée par l'hôte, version plus ancienne refusée,
+  retour automatique à la version précédente si la nouvelle ne répond pas.
+  Avancement affiché dans la carte « Mise à jour du panel ».
+- Chaque release publie un paquet Docker (`beammp-panel-docker-X.Y.Z.zip`)
+  dans son manifeste signé.
+
+### Migration d'une installation faite avec git
+
+Relancer `install.sh` avec `--dir` (dossier existant) et `--server-dir`
+(dossier de BeamMP-Server) : `.env`, base, mods, services BeamMP et unité de
+l'agent sont gardés, seul le code est remplacé. Ensuite, ne plus faire
+`git pull` dans ce dossier. Modifications locales de `docker-compose.yml` :
+les reporter dans `docker-compose.override.yml` avant.
+
+> **Attention : dossier d'installation appartenant à un utilisateur.**
+> L'unité de mise à jour lance `install.sh` de ce dossier en root : un
+> utilisateur qui peut y écrire peut obtenir les droits root. Sans effet s'il
+> est déjà administrateur (`sudo`, groupe `docker`) ; sinon, donner le dossier
+> à root (détail dans le README).
+
 ## [3.2.1] — 2026-10-28
 
 **Correctifs de sécurité** issus de l'audit complet du 27/10/2026.
