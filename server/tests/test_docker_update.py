@@ -150,3 +150,13 @@ def test_install_sh_unzips_with_fresh_dates():
     fichiers dont la taille ou la date change (VERSION de même longueur sinon resté l'ancien)."""
     text = (ROOT / "install.sh").read_text()
     assert re.search(r'^unzip -q -DD "\$TMP/panel\.zip"', text, re.M)
+
+
+def test_install_sh_reads_owner_before_copying():
+    """« cp -a src/. DIR/ » donne au dossier le propriétaire du dossier temporaire (root) : relu
+    après la copie, le propriétaire d'une installation faite avec git était perdu."""
+    text = (ROOT / "install.sh").read_text()
+    copy = text.index('cp -a "$TMP/src/." "$DIR/"')
+    assert text.index('owner="$(stat -c %u:%g "$DIR")"') < copy
+    assert text.index('mode="$(stat -c %a "$DIR")"') < copy
+    assert text.index('chmod "$mode" "$DIR"') > copy

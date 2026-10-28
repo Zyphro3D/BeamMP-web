@@ -258,13 +258,16 @@ if [ "$FIRST_INSTALL" -eq 0 ] && [ -n "$APP_CID" ]; then
 fi
 
 mkdir -p "$DIR"
+# Dossier appartenant à un utilisateur (installation faite à la main avec git) : les fichiers
+# copiés lui reviennent, pour qu'il garde la main dessus. Relevé avant la copie : « cp -a src/. »
+# donne aussi au dossier lui-même le propriétaire et les droits du dossier temporaire (root).
+owner="$(stat -c %u:%g "$DIR")"
+mode="$(stat -c %a "$DIR")"
 # Les données de l'utilisateur ne sont pas dans l'archive (.env, base dans un volume Docker, mods,
 # serveur) : la copier par-dessus remplace le code et garde tout le reste.
 cp -a "$TMP/src/." "$DIR/"
+chmod "$mode" "$DIR"
 cd "$DIR"
-# Dossier appartenant à un utilisateur (installation faite à la main avec git) : les fichiers
-# copiés lui reviennent, pour qu'il garde la main dessus
-owner="$(stat -c %u:%g "$DIR")"
 [ "$owner" = "0:0" ] || chown -R --from=0:0 "$owner" "$DIR"
 ok "Panel $VERSION copié dans $DIR"
 
