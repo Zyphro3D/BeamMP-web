@@ -102,3 +102,51 @@ def test_install_sh_refuses_older_version_from_panel():
         return subprocess.run(["bash", "-c", fn + f'version_lt "{a}" "{b}"']).returncode == 0
     assert lt("3.2.1", "3.3.0") and lt("3.3.0-beta.1", "3.3.0") and lt(VERSION, "99.0.0")
     assert not lt("3.3.0", "3.2.1") and not lt("3.3.0", "3.3.0")
+    # même ordre que updater.parse
+    assert lt("3.3.0-beta.9", "3.3.0-beta.10") and lt("3.3.0-beta.1", "3.3.0-beta.2")
+    assert not lt("3.3.0-beta.2", "3.3.0-beta.1")
+
+
+def _sh_function(name: str) -> str:
+    text = (ROOT / "install.sh").read_text()
+    return re.search(rf"^{name}\(\) \{{\n.*?^\}}\n", text, re.M | re.S).group(0)
+
+
+def _strict_bash(script: str, stdin: str = "") -> subprocess.CompletedProcess:
+    return subprocess.run(["bash", "-c", "set -euo pipefail\n" + script], input=stdin,
+                          capture_output=True, text=True)
+
+
+def test_install_sh_reads_prerelease_request():
+    """Demande du panel : une préversion (3.3.0-beta.2) est lue entière, le reste est ignoré."""
+    fn = _sh_function("requested_version")
+    def read(req):
+        res = _strict_bash(fn + "requested_version", req)
+        assert res.returncode == 0, res.stderr
+        return res.stdout.strip()
+    assert read('{"version": "3.3.0-beta.2", "requested_at": 1}') == "3.3.0-beta.2"
+    assert read('{"version":"3.4.0"}') == "3.4.0"
+    assert read('{"version": "3.4.0; rm -rf /"}') == ""
+    assert read("") == ""
+
+
+def test_install_sh_first_install_has_no_version(tmp_path):
+    """Première installation : pas de code en place, et le script ne doit pas s'arrêter là
+    (sed échoue sur le fichier absent ; avec set -e -o pipefail le script sortait sans message)."""
+    fn = _sh_function("installed_version")
+    res = _strict_bash(f'DIR="{tmp_path}"\n' + fn + 'v="$(installed_version)"\necho "ok:$v"')
+    assert res.returncode == 0 and res.stdout.strip() == "ok:", res.stderr
+
+
+def test_install_sh_keeps_its_version_variable():
+    """/etc/os-release définit VERSION : le lire dans le script même remplaçait la version du panel
+    (le panel était attendu en « 13 (trixie) » et l'installation échouait)."""
+    text = (ROOT / "install.sh").read_text()
+    assert not re.search(r"^\s*(\.|source)\s+/etc/os-release", text, re.M)
+
+
+def test_install_sh_unzips_with_fresh_dates():
+    """Les fichiers copiés doivent être datés de maintenant : BuildKit ne renvoie au build que les
+    fichiers dont la taille ou la date change (VERSION de même longueur sinon resté l'ancien)."""
+    text = (ROOT / "install.sh").read_text()
+    assert re.search(r'^unzip -q -DD "\$TMP/panel\.zip"', text, re.M)

@@ -48,7 +48,7 @@ AGENT_DIR="/opt/beammp-agent"
 AGENT_PORT=4445
 GAME_PORT=30814
 # Clé publique des releases (build/update_public.b64, au format PEM) : la clé privée ne quitte
-# jamais la machine qui publie. tests/test_install_sh.py vérifie que les deux concordent.
+# jamais la machine qui publie. server/tests/test_docker_update.py vérifie que les deux concordent.
 PUBKEY_PEM="-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAMkjI5f04gQW7TolQYoViqCxZoPI4efwjaxKFrWFNPYE=
 -----END PUBLIC KEY-----"
@@ -93,7 +93,8 @@ status() {
 
 # Version du code en place (vide à la première installation)
 installed_version() {
-    sed -nE 's/^VERSION = "([^"]+)"/\1/p' "$DIR/server/beammp_panel/__init__.py" 2>/dev/null | head -1
+    # || true : sans fichier, sed échoue et « set -e -o pipefail » arrêterait le script sans message
+    { sed -nE 's/^VERSION = "([^"]+)"/\1/p' "$DIR/server/beammp_panel/__init__.py" 2>/dev/null || true; } | head -1
 }
 # version_lt A B : A < B (X.Y.Z, suffixe -beta… plus ancien que la version finale)
 version_lt() {
@@ -103,19 +104,26 @@ def key(v):
     m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?", v.strip().lstrip("v"))
     if not m:
         sys.exit(2)
-    return tuple(int(x) for x in m.groups()[:3]) + ((1,) if m.group(4) is None else (0, m.group(4)))
+    pre = m.group(4)   # même ordre que updater.parse : beta.10 après beta.9
+    return tuple(int(x) for x in m.groups()[:3]) + ((1,) if pre is None else (0,) + tuple(
+        (0, int(x), "") if x.isdigit() else (1, 0, x) for x in pre.split(".")),)
 sys.exit(0 if key(sys.argv[1]) < key(sys.argv[2]) else 1)
 EOF
+}
+
+# Version X.Y.Z[-suffixe] lue dans la demande du panel (entrée standard), vide sinon
+requested_version() {
+    { grep -oE '"version": *"[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?"' || true; } | head -1 | sed -E 's/.*"([^"]+)"$/\1/'
 }
 
 if [ "$FROM_PANEL" -eq 1 ]; then
     exec >>"$DIR/update.log" 2>&1
     echo "──── $(date '+%F %T') mise à jour demandée depuis le panel"
-    # Demande déposée par le panel : seule une version X.Y.Z est lue, et la demande est consommée
-    # tout de suite (l'unité ne se redéclenche pas en boucle si quelque chose échoue).
+    # Demande déposée par le panel : seule une version X.Y.Z[-suffixe] est lue, et la demande est
+    # consommée tout de suite (l'unité ne se redéclenche pas en boucle si quelque chose échoue).
     req="$(head -c 4096 "$DIR/update/request.json" 2>/dev/null || true)"
     rm -f "$DIR/update/request.json"
-    v="$(printf '%s' "$req" | grep -oE '"version": *"[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+    v="$(printf '%s' "$req" | requested_version)"
     [ -n "$v" ] || die "Demande de mise à jour illisible"
     VERSION="v$v"
     # Le panel ne peut demander qu'une version plus récente : pas de retour vers une version
@@ -217,7 +225,10 @@ curl -fsSL --max-filesize "$M_SIZE" -o "$TMP/panel.zip" "$M_URL" || die "Téléc
 ok "Signature et empreinte vérifiées ($VERSION)"
 
 mkdir -p "$TMP/src"
-unzip -q "$TMP/panel.zip" -d "$TMP/src"
+# -DD : fichiers datés de maintenant. BuildKit ne renvoie au build que les fichiers dont la taille
+# ou la date a changé : avec les dates de l'archive, un fichier modifié sans changer de taille
+# (VERSION = "3.3.0" → "3.3.1") resterait l'ancien dans l'image.
+unzip -q -DD "$TMP/panel.zip" -d "$TMP/src"
 [ -f "$TMP/src/docker-compose.yml" ] && [ -f "$TMP/src/install.sh" ] || die "Archive inattendue (pas de docker-compose.yml)"
 
 FIRST_INSTALL=1
@@ -303,9 +314,11 @@ EOF
 install_server() {
     local user="$1" arch id ver
     arch="$(uname -m)"; [ "$arch" = aarch64 ] && arch=arm64
+    # Lu dans un sous-shell : /etc/os-release définit VERSION, qui écraserait celle du panel
     # shellcheck disable=SC1091
-    . /etc/os-release
-    id="${ID:-debian}"; ver="${VERSION_ID:-}"
+    id="$(. /etc/os-release && printf '%s' "${ID:-debian}")"
+    # shellcheck disable=SC1091
+    ver="$(. /etc/os-release && printf '%s' "${VERSION_ID:-}")"
     ASSET="BeamMP-Server.$id.$ver.$arch"
     mkdir -p "$SERVER_DIR/Resources/Client" "$SERVER_DIR/Resources/Server"
     if [ ! -x "$SERVER_DIR/BeamMP-Server" ]; then
@@ -329,11 +342,15 @@ else:
         ok "BeamMP-Server installé (empreinte confirmée par GitHub)"
     fi
     # Bibliothèques manquantes (Lua 5.3 selon les versions de BeamMP-Server)
-    if ldd "$SERVER_DIR/BeamMP-Server" 2>/dev/null | grep -q "liblua.*not found" && command -v apt-get >/dev/null; then
+    # Sortie de ldd lue en entier (pas de « ldd | grep -q » : SIGPIPE + pipefail)
+    local libs
+    libs="$(ldd "$SERVER_DIR/BeamMP-Server" 2>/dev/null || true)"
+    if printf '%s\n' "$libs" | grep -q "liblua.*not found" && command -v apt-get >/dev/null; then
         pkg_install liblua5.3-0
+        libs="$(ldd "$SERVER_DIR/BeamMP-Server" 2>/dev/null || true)"
     fi
-    if ldd "$SERVER_DIR/BeamMP-Server" 2>/dev/null | grep -q "not found"; then
-        warn "Bibliothèques manquantes pour BeamMP-Server : $(ldd "$SERVER_DIR/BeamMP-Server" | grep 'not found' | awk '{print $1}' | tr '\n' ' ')"
+    if printf '%s\n' "$libs" | grep -q "not found"; then
+        warn "Bibliothèques manquantes pour BeamMP-Server : $(printf '%s\n' "$libs" | grep 'not found' | awk '{print $1}' | tr '\n' ' ')"
     fi
     if [ ! -f "$SERVER_DIR/ServerConfig.toml" ]; then
         cat > "$SERVER_DIR/ServerConfig.toml" <<EOF
@@ -414,10 +431,11 @@ APP_PORT="$(grep -m1 '^APP_PORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '\r' ||
 APP_PORT="${APP_PORT:-3000}"
 
 panel_up() {   # le panel répond, dans la version attendue
-    local deadline=$(( $(date +%s) + ${2:-300} ))
+    local deadline=$(( $(date +%s) + ${2:-300} )) headers
     while [ "$(date +%s)" -lt "$deadline" ]; do
-        if curl -fsS -m 5 -D - -o /dev/null "http://127.0.0.1:$APP_PORT/api/info" 2>/dev/null \
-            | tr -d '\r' | grep -qi "^x-beammp-panel-version: ${1#v}$"; then
+        # En-têtes lus en entier d'abord : « curl | grep -q » ferait échouer curl (SIGPIPE) avec pipefail
+        headers="$(curl -fsS -m 5 -D - -o /dev/null "http://127.0.0.1:$APP_PORT/api/info" 2>/dev/null || true)"
+        if printf '%s\n' "$headers" | tr -d '\r' | grep -Fxqi "x-beammp-panel-version: ${1#v}"; then
             return 0
         fi
         sleep 5
@@ -427,7 +445,7 @@ panel_up() {   # le panel répond, dans la version attendue
 
 # Chemin du code de l'agent d'après son unité (installations faites à la main comprises)
 agent_script() {
-    sed -nE 's|^ExecStart=.*python3 +([^ ]+beammp-agent\.py).*|\1|p' "/etc/systemd/system/$AGENT_UNIT" 2>/dev/null | head -1
+    { sed -nE 's|^ExecStart=.*python3 +([^ ]+beammp-agent\.py).*|\1|p' "/etc/systemd/system/$AGENT_UNIT" 2>/dev/null || true; } | head -1
 }
 # Recopie le code de l'agent du dossier courant, puis le redémarre s'il tournait
 install_agent_code() {
@@ -449,10 +467,18 @@ rollback() {
     docker tag beammp-panel-rollback:app "$APP_IMAGE"
     # --force-recreate : seul le contenu de l'image a changé, compose garderait le conteneur cassé
     docker compose up -d --no-build --force-recreate app
-    panel_up "$CURRENT" 180
     install_agent_code
-    status rolled_back "$1"
-    printf '\033[1;31m ✗\033[0m %s\n' "Mise à jour annulée ($1) : version précédente rétablie" >&2
+    if panel_up "$CURRENT" 180; then
+        # Version précédente revenue : la sauvegarde ne sert plus
+        rm -rf "$DIR/.rollback"
+        docker rmi beammp-panel-rollback:app >/dev/null 2>&1
+        status rolled_back "$1"
+        printf '\033[1;31m ✗\033[0m %s\n' "Mise à jour annulée ($1) : version précédente rétablie" >&2
+    else
+        # Sauvegarde gardée ($DIR/.rollback, image beammp-panel-rollback:app) pour réparer à la main
+        status error "$1, et la version précédente ne répond pas non plus"
+        printf '\033[1;31m ✗\033[0m %s\n' "Mise à jour annulée ($1), mais $CURRENT ne répond pas : docker compose -f $DIR/docker-compose.yml logs app" >&2
+    fi
     exit 1
 }
 
