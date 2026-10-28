@@ -3,6 +3,8 @@
 Interface d'administration web pour serveur BeamMP.
 Gestion des mods, cartes, configuration, logs et joueurs.
 
+**Site, captures et installation pas à pas : <https://beammp-web.zyphro.fr>** · Blog et autres outils : <https://zyphro.fr>
+
 | Système | Installation |
 |---|---|
 | **Windows** | **Appli prête à l'emploi** : un zip à décompresser, un double-clic, un assistant. Le panel installe, démarre et surveille BeamMP-Server lui-même, et se met à jour en un clic. → [Windows](#windows-appli-prête-à-lemploi) |
