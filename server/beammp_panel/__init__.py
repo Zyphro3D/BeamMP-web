@@ -7,4 +7,4 @@ native lourde (Pillow remplace sharp), pour pouvoir livrer une appli prête
 """
 
 # Garder en phase avec la dernière entrée de CHANGELOG.md.
-VERSION = "3.3.0"
+VERSION = "3.3.1"

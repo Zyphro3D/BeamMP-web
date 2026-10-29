@@ -4,7 +4,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
-## À venir (non publié)
+## [3.3.1] — 2026-10-29
 
 ### Messages Discord revus
 
