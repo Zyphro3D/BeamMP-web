@@ -20,6 +20,7 @@ from pathlib import Path
 
 import httpx
 
+from . import discord
 from .config import InstanceConfig
 
 log = logging.getLogger("beammp_panel.supervisor")
@@ -175,8 +176,11 @@ class ServerProcess:
                 self.last_error = (f"BeamMP-Server s'est arrêté {CRASH_MAX} fois en {CRASH_WINDOW_S // 60} min "
                                    f"(code {code}) : relance automatique suspendue. Voir les journaux.")
                 log.error(self.last_error)
+                await discord.notify_crash_loop(self.inst, len(self.crashes), CRASH_WINDOW_S // 60, code)
                 continue
             log.warning("BeamMP-Server arrêté (code %s), relance dans 5 s", code)
+            notice = discord.CrashNotice(self.inst)
+            await notice.crashed(code)
             await asyncio.sleep(5)
             if self.wanted and not self.running():
                 try:
@@ -184,6 +188,12 @@ class ServerProcess:
                         await asyncio.to_thread(self._spawn)
                 except OSError as err:
                     self.last_error = str(err)
+            # Le message ne passe au vert qu'après quelques secondes de bonne marche.
+            if self.running():
+                back_at = time.time()
+                await asyncio.sleep(HEALTHY_AFTER_S)
+                if self.running():
+                    await notice.recovered(back_at, len(self.crashes), CRASH_WINDOW_S // 60)
 
     async def shutdown(self) -> None:
         if self._task:

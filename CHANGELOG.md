@@ -4,6 +4,39 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## À venir (non publié)
+
+### Messages Discord revus
+
+- Le nom du serveur passe en en-tête de chaque message (utile avec plusieurs
+  serveurs) et l'heure est celle de Discord, affichée dans le fuseau de chaque
+  lecteur.
+- Arrivées et départs tiennent en une ligne, avec le nombre de joueurs en
+  ligne ; le rang d'ancienneté passe en sous-ligne. Un départ est gris (ce
+  n'est pas une alerte) ; une session de moins de 2 min garde son conseil,
+  en plus discret.
+- Redémarrage : joueurs qui étaient connectés et carte en cours. Mise à jour
+  de BeamMP-Server : ancienne et nouvelle version.
+- **Plantages signalés** (serveur lancé par le panel) : « Plantage, relance
+  automatique », qui passe au vert (« Relancé après plantage ») quand le
+  serveur repart, avec le délai et le nombre de plantages des 10 dernières
+  minutes. Un message dédié prévient quand la relance automatique est
+  suspendue.
+- Changement de carte : « Prochaine carte » au lieu de « carte active »
+  (elle s'applique au prochain redémarrage), ancienne carte barrée et
+  vignette de la nouvelle, envoyée en pièce jointe (aucune adresse publique
+  du panel n'est nécessaire).
+- Mod ajouté : type, taille, actif ou non. Config appliquée : carte, nombre
+  de mods actifs, et si le serveur a été redémarré.
+
+### Ajouté
+
+- **Configuration → Discord** (superadmin) : un webhook par salon et par
+  serveur (général, serveur, joueurs, mods et cartes), bouton « Tester » pour
+  chaque webhook, et textes des messages personnalisables avec variables
+  (`{player}`, `{map}`, `{server}`…). Un champ vide reprend le `.env` ou le
+  texte par défaut ; les variables `DISCORD_*` du `.env` restent valables.
+
 ## [3.3.0] — 2026-10-28
 
 ### Ajouté

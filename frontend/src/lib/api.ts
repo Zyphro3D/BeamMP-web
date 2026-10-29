@@ -138,6 +138,13 @@ export const api = {
   serverState: (instanceId: string) => request<LocalServerState>(`${i(instanceId)}/server/state`),
   serverStart: (instanceId: string) => request<LocalServerState>(`${i(instanceId)}/server/start`, { method: 'POST' }),
   serverStop:  (instanceId: string) => request<LocalServerState>(`${i(instanceId)}/server/stop`, { method: 'POST' }),
+
+  // Per-instance — Discord (superadmin)
+  discordSettings: (instanceId: string) => request<DiscordSettings>(`${i(instanceId)}/discord`),
+  saveDiscordSettings: (instanceId: string, data: Pick<DiscordSettings, 'webhooks' | 'templates'>) =>
+    request<DiscordSettings>(`${i(instanceId)}/discord`, { method: 'PUT', body: JSON.stringify(data) }),
+  testDiscordWebhook: (instanceId: string, url: string) =>
+    request<{ ok: boolean; error: string }>(`${i(instanceId)}/discord/test`, { method: 'POST', body: JSON.stringify({ url }) }),
   panelUpdate:        () => request<PanelUpdate>('/api/panel/update'),
   panelUpdateCheck:   () => request<PanelUpdate>('/api/panel/update/check', { method: 'POST' }),
   panelUpdateInstall: () => request<PanelUpdate & { restarting: boolean }>('/api/panel/update/install', { method: 'POST' }),
@@ -323,6 +330,15 @@ export interface LocalServerState {
   wanted?: boolean
   pid?: number | null
   error?: string
+}
+
+export type DiscordChannel = 'url' | 'restart' | 'players' | 'mods'
+
+export interface DiscordSettings {
+  webhooks: Record<DiscordChannel, string>
+  envFallback: Record<DiscordChannel, boolean>
+  templates: Record<string, string>
+  defaults: Record<string, { text: string; vars: string[]; channel: Exclude<DiscordChannel, 'url'> }>
 }
 
 export interface PanelUpdate {

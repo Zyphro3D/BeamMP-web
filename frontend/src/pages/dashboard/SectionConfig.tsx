@@ -5,6 +5,8 @@ import { useI18n } from '../../context/I18nContext'
 import { Toggle } from '../../components/ui/Toggle'
 import { BeamMPTextEditor } from '../../components/ui/BeamMPTextEditor'
 import { LocalServerControls, PanelUpdateCard } from '../../components/admin/AppControls'
+import { DiscordSettingsCard } from '../../components/admin/DiscordSettings'
+import { getStoredUser } from '../../lib/auth'
 
 const CONFIG_KEY_DEFS = [
   { key: 'MaxPlayers', labelKey: 'max_players_label', type: 'number' },
@@ -186,6 +188,8 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
         <LocalServerControls instanceId={instanceId} />
         <PanelUpdateCard />
       </div>
+
+      {getStoredUser()?.role === 'superadmin' && <DiscordSettingsCard instanceId={instanceId} />}
     </div>
   )
 }

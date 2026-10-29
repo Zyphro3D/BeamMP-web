@@ -19,9 +19,9 @@ from . import config as C
 from .activity import log_activity
 from .config import InstanceConfig
 from .db import db, now_iso
-from .discord import md_escape, send_discord_notification
+from .discord import notify_player_join, notify_player_leave
 from .files import tail_lines
-from .status import mark_server_alive, player_joined, player_left
+from .status import mark_server_alive, online_players, player_joined, player_left
 
 log = logging.getLogger("beammp_panel.logwatch")
 
@@ -118,7 +118,7 @@ async def handle_join(inst: InstanceConfig, username: str) -> None:
     count = row["connection_count"] if row else 1
     label = "🥚 première connexion !" if count == 1 else (rank_label(count) or f"{count}e connexion")
     log_activity(inst.id, "player_join", f"{username} s'est connecté", username)
-    await send_discord_notification("player_join", f"**{md_escape(username)}** — {label}")
+    await notify_player_join(inst, username, label, len(online_players(inst.id)))
 
 
 async def handle_leave(inst: InstanceConfig, username: str) -> None:
@@ -136,10 +136,8 @@ async def handle_leave(inst: InstanceConfig, username: str) -> None:
                  [seconds, inst.id, username])
     mins, secs = divmod(seconds, 60)
     duration = f"{mins}m {secs}s" if mins else f"{secs}s"
-    # Session très courte : souvent un souci de connexion plutôt qu'un vrai départ.
-    note = " ⚠️ Ça ne fonctionne pas ? Contacte le support admin." if 0 < seconds < 120 else ""
     log_activity(inst.id, "player_leave", f"{username} s'est déconnecté · {duration} de session", username)
-    await send_discord_notification("player_leave", f"**{md_escape(username)}** a joué pendant **{duration}**{note}")
+    await notify_player_leave(inst, username, seconds, len(online_players(inst.id)))
 
 
 def _player_name(raw: str) -> str | None:

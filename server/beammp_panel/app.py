@@ -17,8 +17,8 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import (VERSION, appmode, logwatch, routes_admin, routes_app, routes_auth, routes_dashboard, routes_presets,
-               routes_public, supervisor, updater)
+from . import (VERSION, appmode, logwatch, routes_admin, routes_app, routes_auth, routes_dashboard, routes_discord,
+               routes_presets, routes_public, supervisor, updater)
 from . import config as C
 from .db import db, init_db, now_iso
 from .security import ApiError, hash_password
@@ -175,6 +175,7 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
         *routes_dashboard.routes,
         *routes_admin.routes,
         *routes_presets.routes,
+        *routes_discord.routes,
         Mount("/images", app=StaticFiles(directory=images, check_dir=False), name="images"),
         Route("/{path:path}", spa),
     ]

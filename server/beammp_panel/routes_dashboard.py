@@ -18,7 +18,7 @@ from .activity import log_activity
 from .agent import can_restart, check_for_update, restart_via_agent, update_via_agent
 from .analyzer import analyze_upload, to_webp
 from .db import db, dumps, now_iso
-from .discord import send_discord_notification
+from .discord import notify_map_change, notify_mod_upload, notify_restart, notify_update
 from .files import delete_file, ensure_dir, read_text, tail_lines, write_text
 from .logwatch import active_alerts
 from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, valid_map_id, read_config_entries,
@@ -123,7 +123,7 @@ async def upload_mod(request: Request):
     except sqlite3.IntegrityError:
         raise ApiError(409, f'Un mod avec le fichier "{safe_filename}" existe déjà')
     log_activity(inst.id, "mod_upload", f"Mod uploadé · {name}")
-    await send_discord_notification("mod_upload", f"**{name}** ({type_}) uploadé par un admin")
+    await notify_mod_upload(inst, name, type_, os.path.getsize(dest) if os.path.exists(dest) else 0, bool(start_active))
     return ok(db().one("SELECT * FROM mods WHERE id = ?", [cur.lastrowid]))
 
 
@@ -231,12 +231,13 @@ async def maps_activate(request: Request):
     map_id = body.get("map_id")
     if not isinstance(map_id, str) or not map_id:
         raise ApiError(400, "map_id is required")
+    previous = db().one("SELECT name FROM mods WHERE instance_id = ? AND type = 'map' AND active = 1 LIMIT 1", [inst.id])
     good, result = await run_in_threadpool(activate_map, inst, map_id)
     if not good:
         raise ApiError(404, result)
     invalidate_cache(inst.id)
     log_activity(inst.id, "map_change", f"Carte changée → {result['name']}")
-    await send_discord_notification("map_change", f"Nouvelle carte active : **{result['name']}**")
+    await notify_map_change(inst, result, previous["name"] if previous else None)
     return ok({"activated": map_id, "needsRestart": True})
 
 
@@ -293,7 +294,7 @@ async def get_alerts(request: Request):
 # ── Serveur ────────────────────────────────────────────────────
 
 async def server_restart(request: Request):
-    require_admin(request)
+    user = require_admin(request)
     inst = instance_or_404(request.path_params["instanceId"])
     # Une session admin volée ne doit pas pouvoir faire tourner le serveur en boucle.
     limiter.check(request, f"restart:{inst.id}", 3, 60)
@@ -303,7 +304,7 @@ async def server_restart(request: Request):
     if not good:
         raise ApiError(502, err or "Redémarrage impossible")
     log_activity(inst.id, "server_restart", "Serveur redémarré")
-    await send_discord_notification("server_restart", f"Le serveur **{inst.name}** a été redémarré")
+    await notify_restart(inst, user["username"])
     return ok({"restarted": True})
 
 
@@ -317,13 +318,14 @@ async def server_update(request: Request):
     require_admin(request)
     inst = instance_or_404(request.path_params["instanceId"])
     limiter.check(request, f"update:{inst.id}", 2, 300)
-    if not (await check_for_update(inst))["enabled"]:
+    before = await check_for_update(inst)
+    if not before["enabled"]:
         raise ApiError(501, "Mise à jour non configurée pour cette instance — voir BEAMMP_AGENT_ASSET dans .env")
     good, result = await update_via_agent(inst)
     if not good:
         raise ApiError(502, result)
     log_activity(inst.id, "server_update", f"Serveur mis à jour vers {result}")
-    await send_discord_notification("server_update", f"Le serveur **{inst.name}** a été mis à jour vers **{result}**")
+    await notify_update(inst, before.get("currentVersion"), str(result))
     return ok({"updated": True, "version": result})
 
 

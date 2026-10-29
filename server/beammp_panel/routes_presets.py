@@ -17,7 +17,7 @@ from starlette.routing import Route
 from .activity import log_activity
 from .agent import can_restart, restart_via_agent
 from .db import db, dumps, now_iso
-from .discord import send_discord_notification
+from .discord import notify_preset
 from .modstate import activate_map, set_mod_active
 from .security import ApiError, limiter, require_admin, require_auth
 from .status import invalidate_cache
@@ -108,12 +108,11 @@ async def apply_preset(request: Request):
 
     invalidate_cache(inst.id)
     log_activity(inst.id, "preset_applied", f"Config appliquée : {preset['name']}")
-    suffix = f" — carte : **{map_applied}**" if map_applied else ""
-    await send_discord_notification("preset_applied", f"Config **{preset['name']}** appliquée{suffix}")
 
     restarted, restart_error = False, None
     if can_restart(inst):
         restarted, restart_error = await restart_via_agent(inst)
+    await notify_preset(inst, preset["name"], map_applied, len(wanted), restarted)
     return ok({"applied": preset["name"], "modsActivated": len(wanted), "modsMissing": missing,
                "mapApplied": map_applied, "mapError": map_error, "restarted": restarted,
                "restartError": restart_error, "needsRestart": not restarted})

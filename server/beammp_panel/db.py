@@ -77,6 +77,14 @@ CREATE TABLE IF NOT EXISTS config_presets (
   created_at  TEXT NOT NULL,
   UNIQUE (instance_id, name)
 );
+
+-- Réglages Discord : webhooks par serveur, textes communs (instance_id = '*').
+CREATE TABLE IF NOT EXISTS discord_settings (
+  instance_id TEXT NOT NULL,
+  key         TEXT NOT NULL,
+  value       TEXT NOT NULL,
+  PRIMARY KEY (instance_id, key)
+);
 """
 
 # Colonnes à décoder à la lecture, par table.

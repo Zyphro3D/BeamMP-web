@@ -678,6 +678,11 @@ Côté hôte, l'agent lit `RESTART_TOKEN` (dans `/etc/beammp-agent.env`),
 
 ### Discord (optionnel)
 
+Le plus simple : **Configuration → Discord** dans le panel (superadmin). On y
+colle un webhook par salon et par serveur, on le teste, et on peut réécrire le
+texte de chaque message (variables entre accolades, ex. `{player}`, `{map}`).
+Un champ vide reprend les variables ci-dessous, puis le texte par défaut.
+
 | Variable | Défaut | Description |
 |---|---|---|
 | `DISCORD_WEBHOOK_URL` | — | Webhook global (fallback) |
@@ -689,7 +694,7 @@ Côté hôte, l'agent lit `RESTART_TOKEN` (dans `/etc/beammp-agent.env`),
 | `DISCORD_NOTIFY_LEAVE` | `true` | Notifier déconnexions |
 | `DISCORD_NOTIFY_MOD_UPLOAD` | `true` | Notifier uploads de mods |
 | `DISCORD_NOTIFY_MAP_CHANGE` | `true` | Notifier les changements de carte active |
-| `DISCORD_NOTIFY_RESTART` | `true` | Notifier redémarrages |
+| `DISCORD_NOTIFY_RESTART` | `true` | Notifier redémarrages, mises à jour et plantages |
 
 ### Public
 
