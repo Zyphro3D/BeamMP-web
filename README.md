@@ -3,7 +3,7 @@
 Interface d'administration web pour serveur BeamMP.
 Gestion des mods, cartes, configuration, logs et joueurs.
 
-**Site, captures et installation pas à pas : <https://beammp-web.zyphro.fr>** · Blog et autres outils : <https://zyphro.fr>
+**Site, captures et installation pas à pas : <https://beammp-web.zyphro.fr>** · Blog et autres outils : <https://zyphro.fr> · [Soutenir sur Patreon](https://patreon.com/Zyphro)
 
 | Système | Installation |
 |---|---|
@@ -760,6 +760,15 @@ fixer un mot de passe temporaire à un compte nouvellement créé.
   le unit systemd, lisible par défaut), lié à l'IP de la passerelle Docker du
   projet (pas `0.0.0.0` ni l'IP LAN), aucun endpoint fichier exposé au-delà
   du strict nécessaire
+
+---
+
+## Soutenir le projet
+
+Le panel est développé sur le temps libre, distribué gratuitement et maintenu activement.
+Si vous l'utilisez pour votre serveur ou votre communauté, le soutien sur Patreon aide à financer les prochaines fonctionnalités.
+
+<a href="https://patreon.com/Zyphro"><strong>Soutenir Zyphro sur Patreon</strong></a>
 
 ---
 
