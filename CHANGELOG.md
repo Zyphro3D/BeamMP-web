@@ -4,6 +4,23 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [Non publié]
+
+### Changement de carte et de config sous Docker
+
+- **Changer de carte ou modifier la config échouait sous Docker** (« internal
+  error ») : `ServerConfig.toml` est monté seul dans le conteneur et ne peut
+  pas être remplacé par renommage (`EBUSY`). Le panel réécrit désormais le
+  fichier sur place dans ce cas, après avoir préparé le contenu complet.
+- Un changement de carte écrit d'abord la config : en cas d'échec, ni la base
+  ni les fichiers ne bougent (avant, la nouvelle carte passait active en base
+  et l'ancienne était rangée, avec `Map =` resté sur l'ancienne).
+- **Import depuis le disque** : une carte posée à la main dans `Client/` reçoit
+  son identifiant de niveau (`map_id`) et peut être activée. Relancer l'import
+  complète les cartes déjà importées sans identifiant.
+- Activer une carte range toutes les autres cartes actives, pas seulement la
+  première.
+
 ## [3.3.1] — 2026-10-29
 
 ### Messages Discord revus

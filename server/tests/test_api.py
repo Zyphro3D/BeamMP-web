@@ -239,6 +239,46 @@ def test_scan_import_backfills_missing_map_id(admin, env):
     assert admin.post("/api/admin/i/default/scan-import").json()["updated"] == 0
 
 
+def test_write_text_on_single_file_mount(tmp_path, monkeypatch):
+    """ServerConfig.toml monté seul sous Docker : os.replace lève EBUSY (beammp-201, 08/11/2026)."""
+    import errno
+    import os as _os
+    from beammp_panel import files
+    target = tmp_path / "ServerConfig.toml"
+    target.write_text('Map = "/levels/a/info.json"\n')
+
+    def busy(src, dst):
+        raise OSError(errno.EBUSY, "Device or resource busy")
+    monkeypatch.setattr(files.os, "replace", busy)
+    files.write_text(str(target), 'Map = "/levels/e2r_world/info.json"\n')
+    assert target.read_text() == 'Map = "/levels/e2r_world/info.json"\n'
+    assert not (tmp_path / "ServerConfig.toml.tmp-panel").exists()
+
+    def other(src, dst):
+        raise OSError(errno.EACCES, "Permission denied")
+    monkeypatch.setattr(files.os, "replace", other)
+    with pytest.raises(OSError):
+        files.write_text(str(target), "x")
+    assert _os.path.exists(target)
+
+
+def test_activate_map_changes_nothing_when_config_unwritable(admin, env, monkeypatch):
+    """Échec d'écriture de ServerConfig.toml : base et fichiers restent tels quels."""
+    upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
+    upload(admin, map_zip("italy"), "italy.zip", "Italie", "map", map_id="italy")
+    from beammp_panel import modstate
+
+    def boom(path, content):
+        raise OSError(13, "Permission denied")
+    monkeypatch.setattr(modstate, "write_text", boom)
+    with pytest.raises(OSError):
+        admin.post("/api/i/default/maps/activate", json={"map_id": "italy"})
+    assert (env / "res" / "Client" / "hills.zip").is_file()
+    assert (env / "res" / "inactive_map" / "italy.zip").is_file()
+    active = [m["name"] for m in admin.get("/api/i/default/mods").json() if m["type"] == "map" and m["active"]]
+    assert active == ["Hills"]
+
+
 def test_level_id_ambiguous_or_absent():
     from beammp_panel.analyzer import level_id
     assert level_id(["levels/a/info.json", "levels/a/x.dae"]) == "a"

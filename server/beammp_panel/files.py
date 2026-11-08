@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import shutil
 from pathlib import Path
@@ -20,7 +21,20 @@ def write_text(path: str, content: str) -> None:
     target = Path(path)
     tmp = target.with_name(target.name + ".tmp-panel")
     tmp.write_text(content, encoding="utf-8")
-    os.replace(tmp, target)
+    try:
+        os.replace(tmp, target)
+    except OSError as err:
+        # Sous Docker, ServerConfig.toml est monté seul (docker-compose.yml) : on ne
+        # peut pas renommer par-dessus un point de montage (EBUSY, ou EXDEV selon le
+        # moteur), et chaque changement de carte ou de config échouait (08/11/2026).
+        # Repli : réécriture sur place, le contenu complet étant déjà prêt à côté.
+        if err.errno not in (errno.EBUSY, errno.EXDEV):
+            raise
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        tmp.unlink(missing_ok=True)
 
 
 def delete_file(path: str) -> None:

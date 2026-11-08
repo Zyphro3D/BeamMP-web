@@ -71,6 +71,12 @@ def activate_map(inst: InstanceConfig, map_id: str) -> tuple[bool, Any]:
                        [map_id, inst.id])
     if not new_map:
         return False, "Map not found"
+    # La config d'abord : si elle ne peut pas être écrite, ni la base ni les fichiers
+    # ne bougent (avant, un échec laissait la nouvelle carte active en base et
+    # l'ancienne rangée, avec un `Map =` toujours sur l'ancienne).
+    content = read_text(inst.beammp.config_path)
+    if content:
+        write_text(inst.beammp.config_path, set_toml_key(content, "Map", format_toml_value("Map", map_config_value(map_id))))
     client_dir = os.path.join(inst.beammp.resources_path, "Client")
     inactive_dir = os.path.join(inst.beammp.resources_path, "inactive_map")
 
@@ -94,9 +100,6 @@ def activate_map(inst: InstanceConfig, map_id: str) -> tuple[bool, Any]:
             ensure_dir(client_dir)
             move_file(src, os.path.join(client_dir, new_map["filename"]))
 
-    content = read_text(inst.beammp.config_path)
-    if content:
-        write_text(inst.beammp.config_path, set_toml_key(content, "Map", format_toml_value("Map", map_config_value(map_id))))
     return True, db().one("SELECT * FROM mods WHERE id = ?", [new_map["id"]])
 
 
