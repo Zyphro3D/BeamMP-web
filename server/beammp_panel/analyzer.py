@@ -456,7 +456,20 @@ def analyze_zip(path: str, default_dir: str, images_dir: str, base_name: str, in
                     name = n
         image = extract_preview(zf, images_dir, base_name, instance_id)
         metadata = analyze_contents(zf, type_)
-    return {"name": name, "type": type_, "imageFilename": image, "metadata": metadata}
+        map_id = level_id(names) if type_ == "map" else None
+    return {"name": name, "type": type_, "imageFilename": image, "metadata": metadata, "mapId": map_id}
+
+
+def level_id(names: list[str]) -> str | None:
+    """Le niveau qu'une carte charge (`Map =`) : celui qui a un info.json, sinon le seul dossier.
+
+    Sans lui, une carte importée depuis le disque ne pouvait pas être activée
+    (« Map not found ») et restait marquée active à côté de l'ancienne.
+    """
+    with_info = [m.group(1) for n in names if (m := re.match(r"^levels/([^/]+)/info\.json$", n, re.I))]
+    levels = level_names(names)
+    candidates = with_info or levels
+    return candidates[0] if len(set(candidates)) == 1 else None
 
 
 def analyze_upload(path: str, type_: str, images_dir: str, base_name: str, instance_id: str) -> tuple[str | None, dict[str, Any] | None]:

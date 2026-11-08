@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import os
+import zipfile
 
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.routing import Route
 
 from . import config as C
-from .analyzer import analyze_metadata, analyze_zip
+from .analyzer import analyze_metadata, analyze_zip, level_id
 from .db import db, dumps, now_iso
+from .modstate import valid_map_id
 from .files import (delete_file, ensure_dir, list_files, move_file, resolve_within, safe_basename)
 from .security import ApiError, hash_password, require_admin, require_auth, require_superadmin, revoke_tokens
 from .web import instance_or_404, int_param, json_body, ok
@@ -291,9 +293,21 @@ async def consistency_fix(request: Request):
 
 # ── Scan & Import ──────────────────────────────────────────────
 
+def _zip_level_id(path: str) -> str | None:
+    try:
+        with zipfile.ZipFile(path) as zf:
+            map_id = level_id([i.filename for i in zf.infolist() if not i.is_dir()])
+    except (zipfile.BadZipFile, OSError):
+        return None
+    return map_id if map_id and valid_map_id(map_id) else None
+
+
 def _scan_import(inst) -> dict:
     rp = inst.beammp.resources_path
-    existing = {r["filename"] for r in db().all("SELECT filename FROM mods WHERE instance_id = ?", [inst.id])}
+    rows = db().all("SELECT id, filename, type, map_id FROM mods WHERE instance_id = ?", [inst.id])
+    existing = {r["filename"] for r in rows}
+    # Cartes importées par une version précédente sans map_id : un nouvel import le complète.
+    missing_map_id = {r["filename"]: r["id"] for r in rows if r["type"] == "map" and not r["map_id"]}
     results: list[dict] = []
     for sub, active, key in (("Client", True, "client"), ("inactive_mod", False, "inactive_mod"),
                              ("inactive_map", False, "inactive_map")):
@@ -301,16 +315,25 @@ def _scan_import(inst) -> dict:
         if not os.path.isdir(directory):
             continue
         for filename in sorted(f for f in os.listdir(directory) if f.lower().endswith(".zip")):
+            if filename in missing_map_id:
+                map_id = _zip_level_id(os.path.join(directory, filename))
+                if map_id:
+                    db().run("UPDATE mods SET map_id = ? WHERE id = ? AND instance_id = ?",
+                             [map_id, missing_map_id.pop(filename), inst.id])
+                    results.append({"filename": filename, "hasImage": False, "status": "updated", "mapId": map_id})
+                    continue
             if filename in existing:
                 results.append({"filename": filename, "hasImage": False, "status": "skipped"})
                 continue
             try:
                 base = filename[:-4]
                 a = analyze_zip(os.path.join(directory, filename), key, C.config.images_path, base, inst.id)
+                map_id = a["mapId"] if a["mapId"] and valid_map_id(a["mapId"]) else None
                 db().run(
-                    "INSERT OR IGNORE INTO mods (instance_id, name, type, filename, image, active, metadata, created_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    [inst.id, a["name"], a["type"], filename, a["imageFilename"], int(active), dumps(a["metadata"]), now_iso()])
+                    "INSERT OR IGNORE INTO mods (instance_id, name, type, filename, image, active, map_id, metadata, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [inst.id, a["name"], a["type"], filename, a["imageFilename"], int(active), map_id,
+                     dumps(a["metadata"]), now_iso()])
                 existing.add(filename)
                 results.append({"filename": filename, "name": a["name"], "type": a["type"], "active": active,
                                 "hasImage": bool(a["imageFilename"]), "status": "imported"})
@@ -318,6 +341,7 @@ def _scan_import(inst) -> dict:
                 results.append({"filename": filename, "hasImage": False, "status": "error", "error": str(err)})
     return {
         "imported": sum(1 for r in results if r["status"] == "imported"),
+        "updated": sum(1 for r in results if r["status"] == "updated"),
         "skipped": sum(1 for r in results if r["status"] == "skipped"),
         "errors": sum(1 for r in results if r["status"] == "error"),
         "total": len(results),

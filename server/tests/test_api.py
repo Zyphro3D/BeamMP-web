@@ -210,6 +210,43 @@ def test_maps_activation_and_inactive_upload(admin, env):
     assert [m["name"] for m in active] == ["Italie"]
 
 
+def test_scan_import_map_gets_level_and_activates(admin, env):
+    """Carte posée à la main dans Client/ (cas EarthNG sur beammp-201, 08/11/2026)."""
+    upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
+    (env / "res" / "Client" / "earthng_planet.zip").write_bytes(map_zip("e2r_world"))
+    rep = admin.post("/api/admin/i/default/scan-import").json()
+    planet = next(r for r in rep["results"] if r["filename"] == "earthng_planet.zip")
+    assert planet["status"] == "imported" and planet["type"] == "map"
+    maps = {m["filename"]: m for m in admin.get("/api/i/default/mods").json() if m["type"] == "map"}
+    assert maps["earthng_planet.zip"]["map_id"] == "e2r_world"
+
+    r = admin.post("/api/i/default/maps/activate", json={"map_id": "e2r_world"})
+    assert r.status_code == 200
+    assert 'Map = "/levels/e2r_world/info.json"' in (env / "ServerConfig.toml").read_text()
+    assert (env / "res" / "inactive_map" / "hills.zip").is_file()
+    assert (env / "res" / "Client" / "earthng_planet.zip").is_file()
+    assert admin.get("/api/admin/i/default/consistency").json()["summary"]["errors"] == 0
+
+
+def test_scan_import_backfills_missing_map_id(admin, env):
+    """Une carte importée par la 3.3.1 (sans map_id) le reçoit au prochain import."""
+    (env / "res" / "Client" / "earthng_planet.zip").write_bytes(map_zip("e2r_world"))
+    admin.post("/api/admin/i/default/scan-import")
+    from beammp_panel.db import db
+    db().run("UPDATE mods SET map_id = NULL WHERE filename = 'earthng_planet.zip'")
+    rep = admin.post("/api/admin/i/default/scan-import").json()
+    assert rep["updated"] == 1 and rep["results"][0]["mapId"] == "e2r_world"
+    assert admin.post("/api/admin/i/default/scan-import").json()["updated"] == 0
+
+
+def test_level_id_ambiguous_or_absent():
+    from beammp_panel.analyzer import level_id
+    assert level_id(["levels/a/info.json", "levels/a/x.dae"]) == "a"
+    assert level_id(["levels/a/info.json", "levels/b/info.json"]) is None
+    assert level_id(["levels/a/main.level.json"]) == "a"
+    assert level_id(["vehicles/x/info.json"]) is None
+
+
 # ── Config, journaux, alertes ──────────────────────────────────
 
 def test_config_whitelist_and_types(admin, env):

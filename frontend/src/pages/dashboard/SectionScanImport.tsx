@@ -20,7 +20,7 @@ export function SectionScanImport({ instanceId, onRefresh }: { instanceId: strin
     try {
       const result = await api.scanImport(instanceId)
       setReport(result)
-      if (result.imported > 0) onRefresh()
+      if (result.imported > 0 || (result.updated ?? 0) > 0) onRefresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('error'))
     } finally {
@@ -43,8 +43,8 @@ export function SectionScanImport({ instanceId, onRefresh }: { instanceId: strin
     }
   }
 
-  const statusColor = (status: 'imported' | 'skipped' | 'error') => {
-    if (status === 'imported') return 'text-green-400'
+  const statusColor = (status: 'imported' | 'updated' | 'skipped' | 'error') => {
+    if (status === 'imported' || status === 'updated') return 'text-green-400'
     if (status === 'error')    return 'text-red-400'
     return 'text-zinc-500'
   }

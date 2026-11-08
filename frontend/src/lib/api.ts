@@ -431,12 +431,14 @@ export interface ScanImportResult {
   type?: string
   active?: boolean
   hasImage: boolean
-  status: 'imported' | 'skipped' | 'error'
+  status: 'imported' | 'updated' | 'skipped' | 'error'
+  mapId?: string
   error?: string
 }
 
 export interface ScanImportReport {
   imported: number
+  updated?: number
   skipped: number
   errors: number
   total: number

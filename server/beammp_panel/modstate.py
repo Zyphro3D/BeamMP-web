@@ -74,8 +74,11 @@ def activate_map(inst: InstanceConfig, map_id: str) -> tuple[bool, Any]:
     client_dir = os.path.join(inst.beammp.resources_path, "Client")
     inactive_dir = os.path.join(inst.beammp.resources_path, "inactive_map")
 
-    current = db().one("SELECT * FROM mods WHERE type = 'map' AND active = 1 AND instance_id = ? LIMIT 1", [inst.id])
-    if current and current["id"] != new_map["id"] and _has_file(current):
+    # Toutes les autres cartes actives, pas seulement la première : après un import
+    # depuis le disque, deux cartes pouvaient l'être et l'ancienne restait dans Client/.
+    for current in db().all("SELECT * FROM mods WHERE type = 'map' AND active = 1 AND instance_id = ?", [inst.id]):
+        if current["id"] == new_map["id"] or not _has_file(current):
+            continue
         src = os.path.join(client_dir, current["filename"])
         if os.path.exists(src):
             ensure_dir(inactive_dir)

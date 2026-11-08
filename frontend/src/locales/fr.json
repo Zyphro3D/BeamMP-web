@@ -237,6 +237,7 @@
   "import_col_status": "Statut",
   "import_status_imported": "Importé",
   "import_status_skipped": "Ignoré (déjà présent)",
+  "import_status_updated": "Complété (identifiant de carte ajouté)",
   "import_status_error": "Erreur",
   "cookie_title": "Cookies",
   "cookie_desc": "Ce site utilise des cookies essentiels pour la session. Aucune donnée n'est partagée avec des tiers.",

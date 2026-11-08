@@ -237,6 +237,7 @@
   "import_col_status": "Status",
   "import_status_imported": "Imported",
   "import_status_skipped": "Skipped (already exists)",
+  "import_status_updated": "Updated (map ID added)",
   "import_status_error": "Error",
   "cookie_title": "Cookies",
   "cookie_desc": "This site uses essential cookies for your session. No data is shared with third parties.",
