@@ -4,7 +4,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
-## [Non publié]
+## [3.3.2] — 2026-11-20
 
 ### Changement de carte et de config sous Docker
 
