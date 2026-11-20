@@ -440,3 +440,22 @@ def test_info_packet_status(client, env):
 def test_map_config_value(map_id, expected):
     from beammp_panel.modstate import map_config_value
     assert map_config_value(map_id) == expected
+
+
+def test_status_map_follows_server_config(admin, env):
+    """`Map =` changé hors du panel (beammp-201, 20/11/2026) : le statut suit le fichier, pas la base."""
+    upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
+    cfg = env / "ServerConfig.toml"
+    # carte inconnue du panel : son identifiant de niveau s'affiche
+    cfg.write_text(cfg.read_text().replace("gridmap_v2", "beamng_earth"))
+    st = admin.get("/api/i/default/status").json()
+    assert (st["map"], st["mapName"]) == ("beamng_earth", "beamng_earth")
+    # carte connue mais inactive en base : son nom s'affiche et la base se réaligne
+    upload(admin, map_zip("italy"), "italy.zip", "Italie", "map", map_id="italy")
+    cfg.write_text(cfg.read_text().replace("beamng_earth", "italy"))
+    from beammp_panel import status
+    status.invalidate_cache("default")  # le statut est gardé 15 s
+    st = admin.get("/api/i/default/status").json()
+    assert (st["map"], st["mapName"]) == ("italy", "Italie")
+    active = [m["name"] for m in admin.get("/api/i/default/mods").json() if m["type"] == "map" and m["active"]]
+    assert active == ["Italie"]

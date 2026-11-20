@@ -4,6 +4,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [Non publié]
+
+### Carte active
+
+- **La carte affichée suit `ServerConfig.toml`** : après un `Map =` changé hors
+  du panel (fichier édité à la main, carte déposée dans `Client/`), le statut
+  et les messages Discord gardaient l'ancienne carte. La carte du fichier fait
+  désormais foi ; la liste des cartes se réaligne quand la carte est connue du
+  panel, sinon son identifiant de niveau s'affiche.
+
 ## [3.3.2] — 2026-11-20
 
 ### Changement de carte et de config sous Docker

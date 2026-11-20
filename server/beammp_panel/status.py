@@ -103,11 +103,30 @@ def clean_sdesc(sdesc: str) -> str:
     return re.sub(r"\^[0-9a-fA-Fl-or]", "", text).strip()
 
 
-def _active_map(instance_id: str) -> dict[str, Any] | None:
+def _active_map(inst: InstanceConfig) -> dict[str, Any] | None:
+    """Carte active : celle de `Map =` dans ServerConfig.toml, qui fait foi.
+
+    La base suivait seule la carte active : un `Map =` changé hors du panel
+    (fichier édité à la main, carte déposée dans Client/) laissait l'ancienne
+    carte affichée. La base est réalignée au passage quand la carte y existe.
+    """
     try:
+        m = re.search(r"^Map\s*=\s*[\"']?/?levels/([^/\"']+)", read_text(inst.beammp.config_path), re.M)
+        if m:
+            level = m.group(1)
+            row = db().one(
+                "SELECT id, map_id, name, active FROM mods WHERE instance_id = ? AND type = 'map' AND map_id = ?",
+                [inst.id, level])
+            if not row:
+                return {"map_id": level, "name": level}
+            if not row["active"]:
+                with db().transaction() as t:
+                    t.run("UPDATE mods SET active = 0 WHERE type = 'map' AND instance_id = ?", [inst.id])
+                    t.run("UPDATE mods SET active = 1 WHERE id = ? AND instance_id = ?", [row["id"], inst.id])
+            return {"map_id": row["map_id"], "name": row["name"]}
         return db().one(
             "SELECT map_id, name FROM mods WHERE instance_id = ? AND type = 'map' AND active = 1 LIMIT 1",
-            [instance_id])
+            [inst.id])
     except Exception:  # base indisponible : le statut doit répondre quand même
         return None
 
@@ -165,7 +184,7 @@ async def _level0(inst: InstanceConfig) -> dict[str, Any] | None:
     if not info:
         return None
     players = parse_players(str(info.get("playerslist", "")))
-    active = _active_map(inst.id)
+    active = _active_map(inst)
     return {
         "online": True,
         "playerCount": _int(info.get("players"), len(players)),
@@ -213,7 +232,7 @@ async def _fetch_status(inst: InstanceConfig) -> dict[str, Any]:
                        and str(s.get("port")) == str(inst.server_port)), None)
         if server:
             players = parse_players(server.get("playerslist", ""))
-            active = _active_map(inst.id)
+            active = _active_map(inst)
             return {
                 "online": True,
                 "playerCount": _int(server.get("players"), len(players)) or len(players),
@@ -242,7 +261,7 @@ async def _fetch_status(inst: InstanceConfig) -> dict[str, Any]:
                 api_players = res.json()
                 info_res = await client.get(f"{base_url}/api/status")
                 info = info_res.json() if info_res.status_code < 400 else {}
-                active = _active_map(inst.id)
+                active = _active_map(inst)
                 return {
                     "online": True,
                     "playerCount": len(api_players),
@@ -257,7 +276,7 @@ async def _fetch_status(inst: InstanceConfig) -> dict[str, Any]:
         pass
 
     players = online_players(inst.id)
-    active = _active_map(inst.id)
+    active = _active_map(inst)
     max_players, server_name, is_private = _config_fallback(inst)
     recent = time.time() - _last_activity.get(inst.id, 0) < 5 * 60
     # Un serveur privé n'apparaît jamais dans la liste publique : son absence

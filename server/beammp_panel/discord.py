@@ -163,7 +163,7 @@ def were_connected(n: int) -> str:
 def _context(inst: InstanceConfig) -> tuple[int, str]:
     """Joueurs connectés et carte active, pour situer un événement serveur."""
     from .status import _active_map, online_players  # import tardif : status importe beaucoup
-    current = _active_map(inst.id)
+    current = _active_map(inst)
     return len(online_players(inst.id)), str(current["name"]) if current else ""
 
 
