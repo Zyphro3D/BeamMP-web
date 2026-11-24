@@ -134,6 +134,12 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ enabled, procs }),
     }),
+  earthRelease: (instanceId: string, force = false) =>
+    request<EarthRelease>(`${i(instanceId)}/earth/release${force ? '?force=1' : ''}`),
+  installEarthRelease: (instanceId: string) =>
+    request<{ installed: string; previous: string | null; needsRestart: boolean }>(`${i(instanceId)}/earth/release/install`, { method: 'POST' }),
+  restoreEarthRelease: (instanceId: string) =>
+    request<{ installed: string; needsRestart: boolean }>(`${i(instanceId)}/earth/release/restore`, { method: 'POST' }),
   deleteEarthPack: (instanceId: string, name: string) =>
     request<{ deleted: boolean }>(`${i(instanceId)}/earth/packs/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 
@@ -276,6 +282,18 @@ export interface EarthHelper {
   } | null
 }
 
+export interface EarthRelease {
+  repo: string
+  installed: string | null
+  previous: string | null
+  latest: string | null
+  updateAvailable: boolean
+  notesUrl: string | null
+  published: string | null
+  size: number | null
+  error: string | null
+}
+
 export interface EarthOverview {
   installed: boolean
   supportsSettings?: boolean
@@ -288,6 +306,7 @@ export interface EarthOverview {
   packs?: EarthPack[]
   pending?: ('clear-store' | 'reload-packs')[]
   helper?: EarthHelper
+  version?: string | null        // celle du mod installé (beamng_earth.zip)
 }
 
 export interface InstanceInfo {

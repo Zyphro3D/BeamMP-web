@@ -407,5 +407,15 @@
   "earth_helper_cache": "Map data",
   "earth_helper_oom": "Last stop: memory limit reached (try 1 process)",
   "earth_helper_exited": "Last stop: code",
-  "earth_helper_log": "Last log lines"
+  "earth_helper_log": "Last log lines",
+  "earth_version": "BeamNG.Earth version",
+  "earth_version_check": "Check the releases",
+  "earth_version_installed": "Installed on the server",
+  "earth_version_latest": "Latest release",
+  "earth_version_install_confirm": "Install the new version of the mod and plugin? Settings, store and packs stay; the server must restart, and players need the app of the same version.",
+  "earth_version_restore": "Back to",
+  "earth_version_restore_confirm": "Put back the mod and plugin of version",
+  "earth_version_help": "The mod (beamng_earth.zip) and the plugin come from the release's server zip, checksum verified. The replaced version is kept to go back.",
+  "earth_version_restart": "Installed. Restart the server to apply it: connected players will be disconnected.",
+  "earth_helper_version_mismatch": "The helper's version is not the mod's: what it works out serves no one. Run the bnge-helper Ansible role with the new version, or switch it off."
 }

@@ -33,6 +33,15 @@ dernière entrée de ce fichier.
   état lu chez son superviseur (en marche, mémoire, données de carte, dernier
   arrêt, dernières lignes du journal). Le panel écrit seulement `helper.json` :
   aucun droit en plus. Demande le rôle Ansible `bnge-helper` sur l'hôte.
+- **Version et mise à jour** : version du mod installé (lue dans
+  `beamng_earth.zip`) et dernière release du fork ; « Installer » télécharge
+  le zip serveur de la release, vérifie son empreinte sha256 (donnée par
+  GitHub : sans elle, rien n'est installé) et la version qu'il contient, puis
+  remplace le mod et le plugin en gardant la version précédente (bouton de
+  retour arrière). Réglages, stock et packs restent ; le panel propose ensuite
+  le redémarrage. Dépôt des releases : `EARTH_RELEASES_REPO`
+  (`Zyphro3D/BeamNG.Earth` par défaut). L'assistant de partage signale une
+  version différente de celle du mod.
 - Demande un plugin BeamNG.Earth qui lit `settings.json` (fork Zyphro3D,
   24/11/2026) ; avec un plugin plus ancien, la page le signale et n'écrit rien.
 

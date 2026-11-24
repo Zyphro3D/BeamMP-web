@@ -145,7 +145,7 @@ export function EarthWorld({ instanceId, data, onChanged }: Props) {
         <p className="text-[11px] text-zinc-500">{t('earth_packs_scp')}</p>
       </div>
 
-      {data.helper && <EarthHelperCard instanceId={instanceId} helper={data.helper} onChanged={onChanged} />}
+      {data.helper && <EarthHelperCard instanceId={instanceId} helper={data.helper} modVersion={data.version} onChanged={onChanged} />}
 
       {(error || notice) && (
         <p className={`lg:col-span-2 text-xs ${error ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}

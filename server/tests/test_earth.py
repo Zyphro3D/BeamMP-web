@@ -247,3 +247,133 @@ def test_helper_refused(admin, plugin, body):
 
 def test_helper_needs_an_admin(client, plugin):
     assert client.put("/api/i/default/earth/helper", json={"enabled": True}).status_code == 401
+
+
+# ── Lot 3 : version et mise à jour depuis les releases du fork ───
+
+import hashlib
+import io as _io
+import zipfile as _zipfile
+
+import httpx
+
+from beammp_panel import earth_release
+
+
+def mod_zip(version):
+    b = _io.BytesIO()
+    with _zipfile.ZipFile(b, "w") as z:
+        z.writestr("lua/ge/extensions/beamngEarth/release.lua", f"return '{version}'\n")
+        z.writestr("levels/beamng_earth/info.json", "{}")
+    return b.getvalue()
+
+
+def bundle(version, mod_version=None, plugin=b"-- BeamNG.Earth's BeamMP server plugin (new)\n"):
+    b = _io.BytesIO()
+    with _zipfile.ZipFile(b, "w") as z:
+        z.writestr("Resources/Client/beamng_earth.zip", mod_zip(mod_version or version))
+        z.writestr("Resources/Server/BeamNGEarth/main.lua", plugin)
+        z.writestr("BeamNG.Earth-README.md", "x")
+    return b.getvalue()
+
+
+@pytest.fixture()
+def github(monkeypatch):
+    """Un faux GitHub : la release 'latest' et ses fichiers. g['release'], g['files'] modifiables par le test."""
+    g = {"release": None, "files": {}, "calls": []}
+
+    def handler(request: httpx.Request):
+        g["calls"].append(str(request.url))
+        if request.url.path.endswith("/releases/latest"):
+            return httpx.Response(200, json=g["release"])
+        data = g["files"].get(str(request.url))
+        return httpx.Response(200, content=data) if data is not None else httpx.Response(404)
+    real = httpx.AsyncClient
+
+    def client(*a, **kw):
+        kw["transport"] = httpx.MockTransport(handler)
+        return real(*a, **kw)
+    monkeypatch.setattr(earth_release.httpx, "AsyncClient", client)
+    earth_release._cache.clear()
+
+    def publish(version, data, digest=True, url=None):
+        name = f"BeamNG.Earth-BeamMP-Server-{version}.zip"
+        url = url or f"https://github.com/Zyphro3D/BeamNG.Earth/releases/download/v{version}/{name}"
+        g["files"][url] = data
+        g["release"] = {"tag_name": f"v{version}", "html_url": "https://github.com/x", "published_at": "2026-11-24",
+                        "assets": [{"name": name, "size": len(data), "browser_download_url": url,
+                                    "digest": f"sha256:{hashlib.sha256(data).hexdigest()}" if digest else None}]}
+    g["publish"] = publish
+    return g
+
+
+@pytest.fixture()
+def installed(env, plugin):
+    client_dir = env / "res" / "Client"
+    (client_dir / "beamng_earth.zip").write_bytes(mod_zip("1.10.0-beta.fr.1"))
+    (plugin / "settings.json").write_text('{"weather": "rain"}')
+    return client_dir
+
+
+def test_release_status(admin, installed, github):
+    github["publish"]("1.10.0-beta.fr.2", bundle("1.10.0-beta.fr.2"))
+    r = admin.get("/api/i/default/earth/release").json()
+    assert r["installed"] == "1.10.0-beta.fr.1" and r["latest"] == "1.10.0-beta.fr.2"
+    assert r["updateAvailable"] and r["error"] is None and r["previous"] is None
+    assert admin.get("/api/i/default/earth").json()["version"] == "1.10.0-beta.fr.1"
+
+
+def test_install_then_restore(admin, installed, plugin, github):
+    github["publish"]("1.10.0-beta.fr.2", bundle("1.10.0-beta.fr.2"))
+    old_plugin = (plugin / "main.lua").read_bytes()
+    r = admin.post("/api/i/default/earth/release/install")
+    assert r.status_code == 200, r.text
+    assert r.json() == {"installed": "1.10.0-beta.fr.2", "previous": "1.10.0-beta.fr.1", "needsRestart": True}
+    assert earth_release.version_in_mod(str(installed / "beamng_earth.zip")) == "1.10.0-beta.fr.2"
+    assert earth_release.version_in_mod(str(installed / "beamng_earth.zip.previous")) == "1.10.0-beta.fr.1"
+    assert (plugin / "main.lua").read_bytes().endswith(b"(new)\n")
+    assert (plugin / "main.lua.previous").read_bytes() == old_plugin
+    assert (plugin / "settings.json").read_text() == '{"weather": "rain"}'        # (réglages gardés)
+    assert not list(installed.glob(".earth-*")) and not list(plugin.glob(".earth-*"))
+    st = admin.get("/api/i/default/earth/release").json()
+    assert st["installed"] == "1.10.0-beta.fr.2" and st["previous"] == "1.10.0-beta.fr.1" and not st["updateAvailable"]
+    acts = admin.get("/api/i/default/activity").json()
+    assert any(a["type"] == "earth_update" and "→ 1.10.0-beta.fr.2" in a["message"] for a in acts)
+    # retour arrière, puis de nouveau en avant
+    r = admin.post("/api/i/default/earth/release/restore")
+    assert r.status_code == 200 and r.json()["installed"] == "1.10.0-beta.fr.1"
+    assert (plugin / "main.lua").read_bytes() == old_plugin
+    assert admin.post("/api/i/default/earth/release/restore").json()["installed"] == "1.10.0-beta.fr.2"
+
+
+@pytest.mark.parametrize("case", ["bad_digest", "wrong_version", "no_digest", "not_zip", "no_plugin", "foreign_url"])
+def test_install_refused_changes_nothing(admin, installed, plugin, github, case):
+    v = "1.10.0-beta.fr.2"
+    if case == "wrong_version":
+        github["publish"](v, bundle(v, mod_version="1.9.0"))
+    elif case == "no_digest":
+        github["publish"](v, bundle(v), digest=False)
+    elif case == "not_zip":
+        github["publish"](v, b"PK pas un zip")
+    elif case == "no_plugin":
+        github["publish"](v, bundle(v, plugin=b"print('autre chose')"))
+    elif case == "foreign_url":
+        github["publish"](v, bundle(v), url=f"https://evil.example/BeamNG.Earth-BeamMP-Server-{v}.zip")
+    else:
+        github["publish"](v, bundle(v))
+        url = next(iter(github["files"]))
+        github["files"][url] = bundle(v, plugin=b"-- BeamNG.Earth altered\n")       # (autre contenu que l'empreinte)
+    before = {p.name: p.read_bytes() for p in list(installed.iterdir()) + list(plugin.iterdir()) if p.is_file()}
+    r = admin.post("/api/i/default/earth/release/install")
+    assert r.status_code == 502, (case, r.text)
+    after = {p.name: p.read_bytes() for p in list(installed.iterdir()) + list(plugin.iterdir()) if p.is_file()}
+    assert after == before, case
+
+
+def test_restore_without_previous(admin, installed):
+    assert admin.post("/api/i/default/earth/release/restore").status_code == 409
+
+
+def test_release_needs_an_admin(client, installed):
+    assert client.post("/api/i/default/earth/release/install").status_code == 401
+    assert client.post("/api/i/default/earth/release/restore").status_code == 401

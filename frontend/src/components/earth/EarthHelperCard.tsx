@@ -8,11 +8,12 @@ import { formatUptimeMs } from '../../lib/format'
 interface Props {
   instanceId: string
   helper: EarthHelper
+  modVersion?: string | null
   onChanged: () => void
 }
 
 /** Assistant de partage : allumé ou éteint par helper.json, état lu dans helper-state.json (superviseur sur l'hôte). */
-export function EarthHelperCard({ instanceId, helper, onChanged }: Props) {
+export function EarthHelperCard({ instanceId, helper, modVersion, onChanged }: Props) {
   const { t } = useI18n()
   const [busy, setBusy]   = useState(false)
   const [error, setError] = useState('')
@@ -67,6 +68,11 @@ export function EarthHelperCard({ instanceId, helper, onChanged }: Props) {
             <p className="text-xs text-amber-700 dark:text-amber-400">
               {st.lastExit.oom ? t('earth_helper_oom') : `${t('earth_helper_exited')} ${st.lastExit.code}`}
               {' · '}{new Date(st.lastExit.t * 1000).toLocaleString()}
+            </p>
+          )}
+          {st?.version && modVersion && st.version !== modVersion && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              {t('earth_helper_version_mismatch')} (v{st.version} ≠ v{modVersion})
             </p>
           )}
           {st?.error && <p className="text-xs text-red-600 dark:text-red-400">{st.error}</p>}

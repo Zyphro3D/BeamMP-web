@@ -9,11 +9,11 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.routing import Route
 
-from . import earth
+from . import earth, earth_release
 from .activity import log_activity
 from .files import ensure_dir, read_text
 from .routes_dashboard import _single_file
-from .security import ApiError, require_admin
+from .security import ApiError, limiter, require_admin
 from .web import instance_or_404, json_body, ok
 
 LABELS = {"listed": "liste BeamNG.Earth", "time": "heure", "timeSpeed": "vitesse de l'heure", "weather": "météo",
@@ -25,7 +25,10 @@ async def get_earth(request: Request):
     require_admin(request)
     inst = instance_or_404(request.path_params["instanceId"])
     config_text = read_text(inst.beammp.config_path)
-    return ok(await run_in_threadpool(earth.overview, inst, config_text))
+    data = await run_in_threadpool(earth.overview, inst, config_text)
+    if data.get("installed"):
+        data["version"] = await run_in_threadpool(earth_release.installed_version, inst)
+    return ok(data)
 
 
 async def put_earth_settings(request: Request):
@@ -140,6 +143,40 @@ async def put_helper(request: Request):
     return ok(control)
 
 
+# ── Version et mise à jour depuis les releases du fork ──
+
+async def get_release(request: Request):
+    require_admin(request)
+    inst = _installed_or_404(request)
+    return ok(await earth_release.status(inst, force=request.query_params.get("force") == "1"))
+
+
+async def install_release(request: Request):
+    user = require_admin(request)
+    inst = _installed_or_404(request)
+    limiter.check(request, f"earth-install:{inst.id}", 2, 300)
+    try:
+        result = await earth_release.install(inst)
+    except RuntimeError as err:
+        raise ApiError(502, str(err))
+    log_activity(inst.id, "earth_update",
+                 f"BeamNG.Earth mis à jour : {result['previous'] or '?'} → {result['installed']} (redémarrage nécessaire)",
+                 user.get("username"))
+    return ok({**result, "needsRestart": True})
+
+
+async def restore_release(request: Request):
+    user = require_admin(request)
+    inst = _installed_or_404(request)
+    try:
+        version = await run_in_threadpool(earth_release.restore_previous, inst)
+    except RuntimeError as err:
+        raise ApiError(409, str(err))
+    log_activity(inst.id, "earth_update", f"BeamNG.Earth : retour à la version {version} (redémarrage nécessaire)",
+                 user.get("username"))
+    return ok({"installed": version, "needsRestart": True})
+
+
 routes = [
     Route("/api/i/{instanceId}/earth", get_earth, methods=["GET"]),
     Route("/api/i/{instanceId}/earth/settings", put_earth_settings, methods=["PUT"]),
@@ -148,4 +185,7 @@ routes = [
     Route("/api/i/{instanceId}/earth/packs/upload", upload_pack, methods=["POST"]),
     Route("/api/i/{instanceId}/earth/packs/{name}", delete_pack, methods=["DELETE"]),
     Route("/api/i/{instanceId}/earth/helper", put_helper, methods=["PUT"]),
+    Route("/api/i/{instanceId}/earth/release", get_release, methods=["GET"]),
+    Route("/api/i/{instanceId}/earth/release/install", install_release, methods=["POST"]),
+    Route("/api/i/{instanceId}/earth/release/restore", restore_release, methods=["POST"]),
 ]

@@ -5,6 +5,7 @@ import { useI18n } from '../../context/I18nContext'
 import { Toggle } from '../../components/ui/Toggle'
 import { formatUptimeMs } from '../../lib/format'
 import { EarthWorld } from '../../components/earth/EarthWorld'
+import { EarthReleaseCard } from '../../components/earth/EarthReleaseCard'
 
 const WEATHERS: EarthWeather[] = ['real', 'clear', 'cloudy', 'rain', 'storm', 'snow', 'fog']
 const SPEEDS = [0, 1, 60]
@@ -20,7 +21,14 @@ function diff(form: EarthSettings, defaults: EarthSettings): Partial<EarthSettin
   return out
 }
 
-export function SectionEarth({ instanceId }: { instanceId: string }) {
+interface Props {
+  instanceId: string
+  canRestart: boolean
+  restarting: boolean
+  onRestart: () => void
+}
+
+export function SectionEarth({ instanceId, canRestart, restarting, onRestart }: Props) {
   const { t } = useI18n()
   const [data, setData]       = useState<EarthOverview | null>(null)
   const [form, setForm]       = useState<EarthSettings | null>(null)
@@ -68,6 +76,7 @@ export function SectionEarth({ instanceId }: { instanceId: string }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="space-y-5">
       {/* État du plugin */}
       <div className="card p-5 space-y-3">
         <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -96,6 +105,9 @@ export function SectionEarth({ instanceId }: { instanceId: string }) {
           <p className="text-xs text-zinc-500">{t(`earth_listing_${data.listing}`)}</p>
           <p className="text-[11px] text-zinc-500">{t('earth_listing_private_note')}</p>
         </div>
+      </div>
+
+      <EarthReleaseCard instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={onRestart} onChanged={load} />
       </div>
 
       {/* Réglages */}

@@ -179,7 +179,7 @@ export function Dashboard() {
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}
           {section === 'import'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionScanImport instanceId={instanceId} onRefresh={refresh} />}
           {section === 'admin'        && user?.role === 'superadmin' && <SectionAdmin />}
-          {section === 'earth'        && earth && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionEarth instanceId={instanceId} />}
+          {section === 'earth'        && earth && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionEarth instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={handleRestart} />}
         </main>
       </div>
     </div>
