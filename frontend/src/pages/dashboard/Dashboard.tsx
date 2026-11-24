@@ -15,6 +15,7 @@ import { SectionPresets } from './SectionPresets'
 import { SectionConsistency } from './SectionConsistency'
 import { SectionScanImport } from './SectionScanImport'
 import { SectionAdmin } from './SectionAdmin'
+import { SectionEarth } from './SectionEarth'
 
 // One entry per AdminSection — a new section that forgets to appear here is
 // a type error, not a silent fallback to the wrong title (which is exactly
@@ -30,6 +31,7 @@ const SECTION_TITLES: Record<AdminSection, string> = {
   consistency: 'consistency_title',
   import:      'nav_import',
   admin:       'nav_admin',
+  earth:       'earth_title',
 }
 
 export function Dashboard() {
@@ -44,6 +46,7 @@ export function Dashboard() {
   const [instanceId, setInstanceId] = useState<string>('')
   const [alerts, setAlerts] = useState<CriticalAlert[]>([])
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+  const [earth, setEarth] = useState(false)
 
   // Load instance list once
   useEffect(() => {
@@ -60,6 +63,13 @@ export function Dashboard() {
   }, [instanceId])
 
   useEffect(() => { refresh() }, [refresh])
+
+  // Section BeamNG.Earth : seulement si le plugin est installé (la route est réservée aux admins)
+  useEffect(() => {
+    const role = getStoredUser()?.role
+    if (!instanceId || (role !== 'superadmin' && role !== 'admin')) { setEarth(false); return }
+    api.earth(instanceId).then(d => setEarth(d.installed)).catch(() => setEarth(false))
+  }, [instanceId])
 
   useEffect(() => {
     if (!instanceId) return
@@ -106,7 +116,7 @@ export function Dashboard() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar section={section} onSection={setSection} modCount={modList.length + vehicles.length} instanceId={instanceId} />
+      <Sidebar section={section} onSection={setSection} modCount={modList.length + vehicles.length} instanceId={instanceId} earth={earth} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
@@ -169,6 +179,7 @@ export function Dashboard() {
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}
           {section === 'import'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionScanImport instanceId={instanceId} onRefresh={refresh} />}
           {section === 'admin'        && user?.role === 'superadmin' && <SectionAdmin />}
+          {section === 'earth'        && earth && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionEarth instanceId={instanceId} />}
         </main>
       </div>
     </div>

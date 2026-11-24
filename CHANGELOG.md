@@ -4,6 +4,26 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [À venir]
+
+### BeamNG.Earth
+
+- **Nouvelle section « BeamNG.Earth »** (admins, visible quand le plugin est
+  installé dans `Resources/Server/BeamNGEarth`) : heure (réelle ou fixe, avec
+  son écoulement), météo, liste BeamNG.Earth, taille et débit du stock partagé,
+  distance de regroupement. Le panel écrit `settings.json` à côté du plugin,
+  qui l'applique en 2 secondes sans redémarrage ; `main.lua` n'est jamais
+  modifié, une mise à jour du plugin garde donc les réglages. Seules les
+  valeurs différentes de celles du plugin sont écrites.
+- **État du plugin** lu dans `state.json` : en marche ou non, temps de
+  fonctionnement, joueurs dans le monde, avertissements du plugin sur les
+  réglages.
+- **Où les joueurs trouvent le serveur** : liste BeamNG.Earth, liste publique
+  BeamMP ou connexion directe, avec l'explication de « Serveur privé », qui
+  change de sens avec BeamNG.Earth.
+- Demande un plugin BeamNG.Earth qui lit `settings.json` (fork Zyphro3D,
+  24/11/2026) ; avec un plugin plus ancien, la page le signale et n'écrit rien.
+
 ## [3.3.3] — 2026-11-20
 
 ### Carte active

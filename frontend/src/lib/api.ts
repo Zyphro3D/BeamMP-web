@@ -113,6 +113,14 @@ export const api = {
   // Per-instance — Logs
   logs: (instanceId: string, lines = 100) =>
     request<{ lines: string[] }>(`${i(instanceId)}/logs?lines=${lines}`),
+  // Per-instance — BeamNG.Earth (plugin serveur : réglages settings.json, état state.json)
+  earth: (instanceId: string) => request<EarthOverview>(`${i(instanceId)}/earth`),
+  saveEarthSettings: (instanceId: string, settings: Partial<EarthSettings>) =>
+    request<{ file: Partial<EarthSettings>; changed: string[] }>(`${i(instanceId)}/earth/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+
   alerts: (instanceId: string) =>
     request<CriticalAlert[]>(`${i(instanceId)}/alerts`),
 
@@ -188,6 +196,50 @@ export const api = {
 }
 
 // ── Types ──────────────────────────────────────────────────────
+
+export type EarthWeather = 'real' | 'clear' | 'cloudy' | 'rain' | 'storm' | 'snow' | 'fog'
+
+export interface EarthSettings {
+  listed: boolean
+  time: string            // 'real' ou 'HH:MM'
+  timeSpeed: number
+  weather: EarthWeather
+  shareStoreMb: number
+  shareOutKbps: number
+  meetM: number
+}
+
+export interface EarthPlayer {
+  pid: number
+  name: string
+  lat: number
+  lon: number
+  h: number | null
+  joined: number | null
+}
+
+export interface EarthState {
+  t: number | null
+  fresh: boolean
+  uptime: number | null
+  settings: Partial<EarthSettings>
+  warnings: string[]
+  players: EarthPlayer[]
+  store: { bytes: number | null; items: number | null; capBytes: number | null }
+  packs: string[]
+  stats: Record<string, number>
+}
+
+export interface EarthOverview {
+  installed: boolean
+  supportsSettings?: boolean
+  defaults?: EarthSettings
+  file?: Partial<EarthSettings>
+  fileError?: string | null
+  effective?: EarthSettings
+  listing?: 'earth' | 'beammp' | 'direct'
+  state?: EarthState | null
+}
 
 export interface InstanceInfo {
   id: string
