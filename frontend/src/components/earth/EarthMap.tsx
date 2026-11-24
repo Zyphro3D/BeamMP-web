@@ -66,6 +66,18 @@ export function EarthMap({ players }: { players: EarthPlayer[] }) {
     }
   }
 
+  // Étiquettes empilées quand des joueurs sont proches (sinon elles se recouvrent) : chacune descend d'une ligne
+  // tant qu'elle touche une étiquette déjà placée.
+  const placed: { x: number; y: number }[] = []
+  const markers = players.map(p => {
+    const [px, py] = project(p.lat, p.lon, v.z)
+    const x = px - left, y = py - top
+    let dy = 0
+    while (dy < 6 * 18 && placed.some(o => Math.abs(o.x - x) < 90 && Math.abs(o.y - (y + dy)) < 18)) dy += 18
+    placed.push({ x, y: y + dy })
+    return { p, x, y, dy }
+  })
+
   const zoom = (d: number) => {
     const z = Math.max(MIN_Z, Math.min(MAX_Z, v.z + d))
     const k = 2 ** (z - v.z)
@@ -91,18 +103,18 @@ export function EarthMap({ players }: { players: EarthPlayer[] }) {
           <img key={tl.key} src={tl.src} alt="" draggable={false} width={TILE} height={TILE}
             className="absolute max-w-none" style={{ left: tl.x, top: tl.y }} />
         ))}
-        {players.map(p => {
-          const [px, py] = project(p.lat, p.lon, v.z)
+        {markers.map(({ p, x, y, dy }) => {
           return (
             <div key={p.pid} className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ left: px - left, top: py - top }}>
+              style={{ left: x, top: y }}>
               <svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"
                 style={{ transform: p.h != null ? `rotate(${p.h}deg)` : undefined }}>
                 {p.h != null
                   ? <path d="M0,-9 L7,7 L0,3 L-7,7 Z" fill="#f97316" stroke="#fff" strokeWidth="1.5" />
                   : <circle r="6" fill="#f97316" stroke="#fff" strokeWidth="2" />}
               </svg>
-              <span className="absolute left-1/2 top-6 -translate-x-1/2 whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 text-[11px] text-white">
+              <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 text-[11px] text-white"
+                style={{ top: 24 + dy }}>
                 {p.name}
               </span>
             </div>
