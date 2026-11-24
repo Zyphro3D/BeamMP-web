@@ -29,7 +29,7 @@ dernière entrée de ce fichier.
   ajout (en-tête vérifié, pas d'écrasement) et retrait ; le plugin relit ses
   packs dans les 2 secondes. Un gros pack (plus de 100 Mo, limite du proxy
   Cloudflare) se copie dans `bake/`, puis le bouton « Relire les packs ».
-- **Assistant de partage** : interrupteur et nombre de processus de calcul ;
+- **Assistant de partage** : interrupteur (1 processus de calcul) ;
   état lu chez son superviseur (en marche, mémoire, données de carte, dernier
   arrêt, dernières lignes du journal). Le panel écrit seulement `helper.json` :
   aucun droit en plus. Demande le rôle Ansible `bnge-helper` sur l'hôte.

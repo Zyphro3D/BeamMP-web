@@ -44,17 +44,9 @@ export function EarthHelperCard({ instanceId, helper, modVersion, onChanged }: P
         <>
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <Toggle checked={helper.control.enabled} onChange={() => !busy && set(!helper.control.enabled, helper.control.procs)} />
+              <Toggle checked={helper.control.enabled} onChange={() => !busy && set(!helper.control.enabled, 1)} />
               <span className="text-sm">{status}</span>
             </div>
-            <label className="flex items-center gap-2 text-xs text-zinc-400">
-              {t('earth_helper_procs')}
-              <select className="input w-auto" value={helper.control.procs} disabled={busy}
-                onChange={e => set(helper.control.enabled, Number(e.target.value))}>
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-              </select>
-            </label>
             {st?.version && <span className="text-xs text-zinc-500 font-mono">v{st.version}</span>}
           </div>
           {st?.running && (
