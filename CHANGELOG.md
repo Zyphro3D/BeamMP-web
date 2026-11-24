@@ -47,6 +47,7 @@ dernière entrée de ce fichier.
   les joueurs, zoom et déplacement, liste avec coordonnées et temps de jeu.
   Fond OpenStreetMap relayé et gardé 14 jours par le panel (la CSP n'autorise
   que ses propres images), sans nouvelle dépendance.
+- Section traduite dans les 8 langues du panel.
 - Demande un plugin BeamNG.Earth qui lit `settings.json` (fork Zyphro3D,
   24/11/2026) ; avec un plugin plus ancien, la page le signale et n'écrit rien.
 
