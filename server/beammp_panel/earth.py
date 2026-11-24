@@ -264,6 +264,55 @@ def delete_pack(inst: InstanceConfig, name: str) -> bool:
     return True
 
 
+# ── Assistant de partage (rôle Ansible bnge-helper : superviseur sur l'hôte) ────
+
+HELPER_FILE = "helper.json"
+HELPER_STATE_FILE = "helper-state.json"
+HELPER_PROCS_MAX = 2
+
+
+def validate_helper(body: Any) -> dict[str, Any]:
+    if not isinstance(body, dict) or set(body) - {"enabled", "procs"}:
+        raise ValueError("Attendu : {\"enabled\": true|false, \"procs\": 1|2}")
+    enabled, procs = body.get("enabled"), body.get("procs", 1)
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled doit être true ou false")
+    if not isinstance(procs, int) or isinstance(procs, bool) or not 1 <= procs <= HELPER_PROCS_MAX:
+        raise ValueError(f"procs doit être un entier de 1 à {HELPER_PROCS_MAX}")
+    return {"enabled": enabled, "procs": procs}
+
+
+def write_helper(inst: InstanceConfig, control: dict[str, Any]) -> None:
+    write_text(os.path.join(plugin_dir(inst), HELPER_FILE), json.dumps(control) + "\n")
+
+
+def read_helper(inst: InstanceConfig, now: float | None = None) -> dict[str, Any]:
+    """{control, state, installed} : installed = le superviseur a écrit son état il y a moins de STATE_FRESH_S."""
+    folder = plugin_dir(inst)
+    try:
+        control = json.loads(read_text(os.path.join(folder, HELPER_FILE)) or "{}")
+    except ValueError:
+        control = {}
+    if not isinstance(control, dict):
+        control = {}
+    control = {"enabled": control.get("enabled") is True,
+               "procs": control.get("procs") if control.get("procs") in range(1, HELPER_PROCS_MAX + 1) else 1}
+    try:
+        state = json.loads(read_text(os.path.join(folder, HELPER_STATE_FILE)) or "null")
+    except ValueError:
+        state = None
+    if not isinstance(state, dict):
+        state = None
+    now = time.time() if now is None else now
+    fresh = bool(state) and isinstance(state.get("t"), (int, float)) and 0 <= now - state["t"] <= STATE_FRESH_S
+    if state:
+        keep = ("version", "enabled", "procs", "running", "since", "rssMb", "cacheMb", "nextStart", "restarts",
+                "lastExit", "error", "log")
+        state = {k: state.get(k) for k in keep}
+        state["log"] = [str(x) for x in state["log"]] if isinstance(state["log"], list) else []
+    return {"installed": fresh, "control": control, "state": state if fresh else None}
+
+
 def overview(inst: InstanceConfig, config_text: str) -> dict[str, Any]:
     """Tout ce que la page BeamNG.Earth du panel affiche (config_text : ServerConfig.toml ; sa clé n'en sort pas,
     seulement le fait qu'elle soit remplie)."""
@@ -295,4 +344,5 @@ def overview(inst: InstanceConfig, config_text: str) -> dict[str, Any]:
         "state": state,
         "packs": list_packs(inst, state["packs"] if state and state["fresh"] else None),
         "pending": pending_requests(inst),
+        "helper": read_helper(inst),
     }

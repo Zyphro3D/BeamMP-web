@@ -207,3 +207,43 @@ def test_store_and_packs_need_an_admin(client, plugin):
     assert client.post("/api/i/default/earth/packs/upload", files={"file": ("a.bnge", pack_bytes())}).status_code == 401
     assert client.delete("/api/i/default/earth/packs/a.bnge").status_code == 401
     assert not (plugin / "clear-store.request").exists()
+
+
+# ── Assistant de partage (helper.json / helper-state.json) ────────
+
+def helper_state(**over):
+    s = {"v": 1, "t": int(time.time()), "version": "1.10.0-beta.fr.2", "enabled": True, "procs": 1, "running": True,
+         "pid": 4242, "since": int(time.time()) - 60, "rssMb": 512.3, "cacheMb": 1800.0, "nextStart": None,
+         "restarts": 0, "lastExit": None, "error": None, "log": ["helper: 1 planning processes"]}
+    s.update(over)
+    return json.dumps(s)
+
+
+def test_helper_not_installed_then_toggle(admin, plugin):
+    h = admin.get("/api/i/default/earth").json()["helper"]
+    assert h == {"installed": False, "control": {"enabled": False, "procs": 1}, "state": None}
+    r = admin.put("/api/i/default/earth/helper", json={"enabled": True, "procs": 2})
+    assert r.status_code == 200 and json.loads((plugin / "helper.json").read_text()) == {"enabled": True, "procs": 2}
+    (plugin / "helper-state.json").write_text(helper_state())
+    h = admin.get("/api/i/default/earth").json()["helper"]
+    assert h["installed"] and h["control"] == {"enabled": True, "procs": 2}
+    assert h["state"]["running"] and h["state"]["rssMb"] == 512.3 and "pid" not in h["state"]
+    acts = admin.get("/api/i/default/activity").json()
+    assert any(a["type"] == "earth_helper" and "allumé" in a["message"] for a in acts)
+
+
+def test_helper_stale_state_means_not_installed(admin, plugin):
+    (plugin / "helper-state.json").write_text(helper_state(t=int(time.time()) - 120))
+    h = admin.get("/api/i/default/earth").json()["helper"]
+    assert h["installed"] is False and h["state"] is None
+
+
+@pytest.mark.parametrize("body", [{"enabled": "yes"}, {"enabled": True, "procs": 3}, {"enabled": True, "procs": 0},
+                                  {"enabled": True, "procs": True}, {"enabled": True, "x": 1}, [True]])
+def test_helper_refused(admin, plugin, body):
+    assert admin.put("/api/i/default/earth/helper", json=body).status_code == 400
+    assert not (plugin / "helper.json").exists()
+
+
+def test_helper_needs_an_admin(client, plugin):
+    assert client.put("/api/i/default/earth/helper", json={"enabled": True}).status_code == 401

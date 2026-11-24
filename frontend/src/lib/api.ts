@@ -129,6 +129,11 @@ export const api = {
     fd.append('file', file)
     return request<EarthPack>(`${i(instanceId)}/earth/packs/upload`, { method: 'POST', body: fd })
   },
+  setEarthHelper: (instanceId: string, enabled: boolean, procs: number) =>
+    request<EarthHelperControl>(`${i(instanceId)}/earth/helper`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled, procs }),
+    }),
   deleteEarthPack: (instanceId: string, name: string) =>
     request<{ deleted: boolean }>(`${i(instanceId)}/earth/packs/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 
@@ -252,6 +257,25 @@ export interface EarthPack {
   loaded: boolean | null     // servi par le plugin (null : plugin arrêté, inconnu)
 }
 
+export interface EarthHelperControl { enabled: boolean; procs: number }
+
+export interface EarthHelper {
+  installed: boolean              // le superviseur (rôle Ansible bnge-helper) répond
+  control: EarthHelperControl
+  state: {
+    version: string | null
+    running: boolean
+    since: number | null
+    rssMb: number | null
+    cacheMb: number | null
+    nextStart: number | null
+    restarts: number
+    lastExit: { code: number; t: number; oom: boolean } | null
+    error: string | null
+    log: string[]
+  } | null
+}
+
 export interface EarthOverview {
   installed: boolean
   supportsSettings?: boolean
@@ -263,6 +287,7 @@ export interface EarthOverview {
   state?: EarthState | null
   packs?: EarthPack[]
   pending?: ('clear-store' | 'reload-packs')[]
+  helper?: EarthHelper
 }
 
 export interface InstanceInfo {

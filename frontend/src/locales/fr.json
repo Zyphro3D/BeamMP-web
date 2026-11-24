@@ -394,5 +394,18 @@
   "earth_pack_added": "Pack ajouté : le plugin le sert dans les 2 secondes.",
   "earth_pack_big_confirm": "Ce pack dépasse 100 Mo : par une adresse derrière Cloudflare, l'envoi échouera. Dans ce cas, copiez-le dans Resources/Server/BeamNGEarth/bake/ puis cliquez sur « Relire les packs ». Envoyer quand même ?",
   "earth_packs_reload": "Relire les packs",
-  "earth_packs_scp": "Gros pack : copiez-le directement dans Resources/Server/BeamNGEarth/bake/ sur le serveur, puis cliquez sur ↻."
+  "earth_packs_scp": "Gros pack : copiez-le directement dans Resources/Server/BeamNGEarth/bake/ sur le serveur, puis cliquez sur ↻.",
+  "earth_helper": "Assistant de partage",
+  "earth_helper_help": "Calcule sur ce serveur les routes autour des joueurs avant qu'ils y arrivent, et les met dans le stock partagé. Bridé : mémoire limitée (s'il déborde, c'est lui qui s'arrête, jamais BeamMP), processeur et disque seulement quand le serveur de jeu ne s'en sert pas.",
+  "earth_helper_not_installed": "L'assistant n'est pas installé sur cette machine (rôle Ansible bnge-helper), ou son superviseur ne répond pas.",
+  "earth_helper_off": "Éteint",
+  "earth_helper_running": "En marche",
+  "earth_helper_starting": "Démarrage…",
+  "earth_helper_retry": "Arrêté, nouvel essai dans",
+  "earth_helper_procs": "Processus de calcul",
+  "earth_helper_ram": "Mémoire",
+  "earth_helper_cache": "Données de carte",
+  "earth_helper_oom": "Dernier arrêt : limite de mémoire atteinte (essayez avec 1 processus)",
+  "earth_helper_exited": "Dernier arrêt : code",
+  "earth_helper_log": "Dernières lignes du journal"
 }

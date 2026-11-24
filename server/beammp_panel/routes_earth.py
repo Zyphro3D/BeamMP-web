@@ -126,6 +126,20 @@ async def delete_pack(request: Request):
     return ok({"deleted": True})
 
 
+async def put_helper(request: Request):
+    user = require_admin(request)
+    inst = _installed_or_404(request)
+    try:
+        control = earth.validate_helper(await json_body(request))
+    except ValueError as err:
+        raise ApiError(400, str(err))
+    await run_in_threadpool(earth.write_helper, inst, control)
+    log_activity(inst.id, "earth_helper",
+                 "BeamNG.Earth : assistant de partage " + ("allumé" if control["enabled"] else "éteint")
+                 + (f" ({control['procs']} processus)" if control["enabled"] else ""), user.get("username"))
+    return ok(control)
+
+
 routes = [
     Route("/api/i/{instanceId}/earth", get_earth, methods=["GET"]),
     Route("/api/i/{instanceId}/earth/settings", put_earth_settings, methods=["PUT"]),
@@ -133,4 +147,5 @@ routes = [
     Route("/api/i/{instanceId}/earth/packs/reload", reload_packs, methods=["POST"]),
     Route("/api/i/{instanceId}/earth/packs/upload", upload_pack, methods=["POST"]),
     Route("/api/i/{instanceId}/earth/packs/{name}", delete_pack, methods=["DELETE"]),
+    Route("/api/i/{instanceId}/earth/helper", put_helper, methods=["PUT"]),
 ]

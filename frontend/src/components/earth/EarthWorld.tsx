@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Database, Package, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { api, type EarthOverview, type EarthPack } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
+import { EarthHelperCard } from './EarthHelperCard'
 
 // Au-delà de 100 Mo, un envoi par un domaine derrière le proxy Cloudflare échoue : on le dit avant d'envoyer.
 const PROXY_LIMIT = 100 * 1024 * 1024
@@ -143,6 +144,8 @@ export function EarthWorld({ instanceId, data, onChanged }: Props) {
         </div>
         <p className="text-[11px] text-zinc-500">{t('earth_packs_scp')}</p>
       </div>
+
+      {data.helper && <EarthHelperCard instanceId={instanceId} helper={data.helper} onChanged={onChanged} />}
 
       {(error || notice) && (
         <p className={`lg:col-span-2 text-xs ${error ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}

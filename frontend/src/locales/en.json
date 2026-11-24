@@ -394,5 +394,18 @@
   "earth_pack_added": "Pack added: the plugin serves it within 2 seconds.",
   "earth_pack_big_confirm": "This pack is over 100 MB: through an address behind Cloudflare, the upload will fail. Then copy it into Resources/Server/BeamNGEarth/bake/ and click \"Read the packs again\". Upload anyway?",
   "earth_packs_reload": "Read the packs again",
-  "earth_packs_scp": "Big pack: copy it straight into Resources/Server/BeamNGEarth/bake/ on the server, then click ↻."
+  "earth_packs_scp": "Big pack: copy it straight into Resources/Server/BeamNGEarth/bake/ on the server, then click ↻.",
+  "earth_helper": "Share helper",
+  "earth_helper_help": "Works out on this server the roads round the players before they get there, into the shared store. Held back: limited memory (if it runs short it stops, never BeamMP), CPU and disk only when the game server is not using them.",
+  "earth_helper_not_installed": "The helper is not installed on this machine (Ansible role bnge-helper), or its supervisor is not answering.",
+  "earth_helper_off": "Off",
+  "earth_helper_running": "Running",
+  "earth_helper_starting": "Starting…",
+  "earth_helper_retry": "Stopped, trying again in",
+  "earth_helper_procs": "Planning processes",
+  "earth_helper_ram": "Memory",
+  "earth_helper_cache": "Map data",
+  "earth_helper_oom": "Last stop: memory limit reached (try 1 process)",
+  "earth_helper_exited": "Last stop: code",
+  "earth_helper_log": "Last log lines"
 }
