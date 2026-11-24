@@ -120,6 +120,17 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(settings),
     }),
+  clearEarthStore: (instanceId: string) =>
+    request<{ requested: boolean }>(`${i(instanceId)}/earth/store/clear`, { method: 'POST' }),
+  reloadEarthPacks: (instanceId: string) =>
+    request<{ requested: boolean }>(`${i(instanceId)}/earth/packs/reload`, { method: 'POST' }),
+  uploadEarthPack: (instanceId: string, file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request<EarthPack>(`${i(instanceId)}/earth/packs/upload`, { method: 'POST', body: fd })
+  },
+  deleteEarthPack: (instanceId: string, name: string) =>
+    request<{ deleted: boolean }>(`${i(instanceId)}/earth/packs/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 
   alerts: (instanceId: string) =>
     request<CriticalAlert[]>(`${i(instanceId)}/alerts`),
@@ -230,6 +241,17 @@ export interface EarthState {
   stats: Record<string, number>
 }
 
+export interface EarthPack {
+  name: string
+  size: number
+  mtime: number
+  valid: boolean
+  error?: string
+  items?: number
+  meta?: { bbox?: number[] | null; made?: string | null; signature?: string | null }
+  loaded: boolean | null     // servi par le plugin (null : plugin arrêté, inconnu)
+}
+
 export interface EarthOverview {
   installed: boolean
   supportsSettings?: boolean
@@ -239,6 +261,8 @@ export interface EarthOverview {
   effective?: EarthSettings
   listing?: 'earth' | 'beammp' | 'direct'
   state?: EarthState | null
+  packs?: EarthPack[]
+  pending?: ('clear-store' | 'reload-packs')[]
 }
 
 export interface InstanceInfo {

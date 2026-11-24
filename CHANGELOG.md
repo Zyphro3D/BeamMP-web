@@ -21,6 +21,14 @@ dernière entrée de ce fichier.
 - **Où les joueurs trouvent le serveur** : liste BeamNG.Earth, liste publique
   BeamMP ou connexion directe, avec l'explication de « Serveur privé », qui
   change de sens avec BeamNG.Earth.
+- **Stock partagé** : taille, nombre d'éléments, échanges avec les joueurs, et
+  bouton « Vider le stock ». C'est le plugin qui vide le stock, à la demande
+  du panel, pour que son index reste juste.
+- **Packs compilés** (`bake/*.bnge`) : liste avec la zone, la date et le
+  nombre d'éléments, signalement des packs illisibles ou pas encore servis,
+  ajout (en-tête vérifié, pas d'écrasement) et retrait ; le plugin relit ses
+  packs dans les 2 secondes. Un gros pack (plus de 100 Mo, limite du proxy
+  Cloudflare) se copie dans `bake/`, puis le bouton « Relire les packs ».
 - Demande un plugin BeamNG.Earth qui lit `settings.json` (fork Zyphro3D,
   24/11/2026) ; avec un plugin plus ancien, la page le signale et n'écrit rien.
 

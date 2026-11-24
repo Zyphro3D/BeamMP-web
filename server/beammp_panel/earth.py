@@ -12,11 +12,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import struct
 import time
 from typing import Any
 
 from .config import InstanceConfig
-from .files import read_text, write_text
+from .files import delete_file, read_text, resolve_within, safe_basename, write_text
 
 PLUGIN_DIR = os.path.join("Server", "BeamNGEarth")
 SETTINGS_FILE = "settings.json"
@@ -181,6 +182,88 @@ def _toml_value(config_text: str, key: str) -> str:
     return m.group(1).strip().strip("\"'") if m else ""
 
 
+# ── Packs compilés (bake/*.bnge) et demandes au plugin ─────────────────────
+
+PACK_MAGIC = b"BNGEBAKE1\n"     # (server/bakepack.py du fork : MAGIC, longueur de l'index sur 8 octets, index JSON)
+PACK_INDEX_MAX = 256 * 1024 * 1024
+REQUESTS = ("clear-store", "reload-packs")
+_pack_cache: dict[str, tuple[tuple[int, float], dict[str, Any]]] = {}
+
+
+def bake_dir(inst: InstanceConfig) -> str:
+    return os.path.join(plugin_dir(inst), "bake")
+
+
+def valid_pack_name(name: Any) -> str | None:
+    base = safe_basename(name)
+    if not base or not base.endswith(".bnge") or base.startswith(".") or len(base) > 200:
+        return None
+    return base if re.fullmatch(r"[\w.\- ]+", base) else None
+
+
+def read_pack_header(path: str) -> dict[str, Any]:
+    """L'en-tête d'un pack : {valid, meta, items} ; valid False (et error) pour un fichier qui n'en est pas un."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(len(PACK_MAGIC) + 8)
+            if len(head) < len(PACK_MAGIC) + 8 or not head.startswith(PACK_MAGIC):
+                return {"valid": False, "error": "pas un pack BeamNG.Earth (en-tête BNGEBAKE1 absent)"}
+            (n,) = struct.unpack("<Q", head[len(PACK_MAGIC):])
+            if n > PACK_INDEX_MAX:
+                return {"valid": False, "error": "index trop gros"}
+            index = json.loads(f.read(n))
+    except (OSError, ValueError):
+        return {"valid": False, "error": "index illisible"}
+    if not isinstance(index, dict) or not isinstance(index.get("items"), dict):
+        return {"valid": False, "error": "index sans items"}
+    meta = index.get("meta") if isinstance(index.get("meta"), dict) else {}
+    keep = ("bbox", "made", "bake_format", "plans_format", "facts_format", "signature")
+    return {"valid": True, "meta": {k: meta.get(k) for k in keep}, "items": len(index["items"])}
+
+
+def list_packs(inst: InstanceConfig, loaded: list[str] | None = None) -> list[dict[str, Any]]:
+    """Les packs de bake/, triés par nom ; loaded : ceux que le plugin sert (state.json), None si inconnu."""
+    out = []
+    folder = bake_dir(inst)
+    try:
+        entries = sorted(os.scandir(folder), key=lambda e: e.name)
+    except OSError:
+        return []
+    for e in entries:
+        if not e.name.endswith(".bnge") or not e.is_file():
+            continue
+        st = e.stat()
+        key = (st.st_size, st.st_mtime)
+        cached = _pack_cache.get(e.path)
+        if not cached or cached[0] != key:
+            cached = (key, read_pack_header(e.path))
+            _pack_cache[e.path] = cached
+        out.append({"name": e.name, "size": st.st_size, "mtime": int(st.st_mtime), **cached[1],
+                    "loaded": None if loaded is None else e.name in loaded})
+    return out
+
+
+def request(inst: InstanceConfig, name: str) -> None:
+    """Dépose une demande pour le plugin (fait sous 2 s, fichier retiré par lui)."""
+    if name not in REQUESTS:
+        raise ValueError(name)
+    write_text(os.path.join(plugin_dir(inst), f"{name}.request"), "")
+
+
+def pending_requests(inst: InstanceConfig) -> list[str]:
+    return [n for n in REQUESTS if os.path.exists(os.path.join(plugin_dir(inst), f"{n}.request"))]
+
+
+def delete_pack(inst: InstanceConfig, name: str) -> bool:
+    base = valid_pack_name(name)
+    path = base and resolve_within(bake_dir(inst), base)
+    if not path or not os.path.isfile(path):
+        return False
+    delete_file(path)
+    request(inst, "reload-packs")
+    return True
+
+
 def overview(inst: InstanceConfig, config_text: str) -> dict[str, Any]:
     """Tout ce que la page BeamNG.Earth du panel affiche (config_text : ServerConfig.toml ; sa clé n'en sort pas,
     seulement le fait qu'elle soit remplie)."""
@@ -210,4 +293,6 @@ def overview(inst: InstanceConfig, config_text: str) -> dict[str, Any]:
         "effective": effective,
         "listing": listing,
         "state": state,
+        "packs": list_packs(inst, state["packs"] if state and state["fresh"] else None),
+        "pending": pending_requests(inst),
     }

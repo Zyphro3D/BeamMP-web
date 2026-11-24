@@ -136,3 +136,74 @@ def test_listing(env, plugin, toml, listed, expected):
     inst = C.get_instance("default")
     (plugin / "settings.json").write_text(json.dumps({"listed": listed}))
     assert earth.overview(inst, toml)["listing"] == expected
+
+
+# ── Lot 2 : stock partagé et packs ───────────────────────────────
+
+def pack_bytes(meta=None, items=None, magic=b"BNGEBAKE1\n") -> bytes:
+    import struct
+    index = json.dumps({"meta": meta or {"bbox": [43.5, 1.3, 43.7, 1.5], "made": "2026-11-24T02:00:00Z",
+                                         "bake_format": 1, "plans_format": 14, "signature": "w1s1"},
+                        "items": items if items is not None else {"plans/w1s1/14_1_2": [0, 3], "facts/x/y/z": [3, 2]}})
+    return magic + struct.pack("<Q", len(index)) + index.encode() + b"abcde"
+
+
+def test_clear_store_and_reload_packs_are_requests(admin, plugin):
+    r = admin.post("/api/i/default/earth/store/clear")
+    assert r.status_code == 200 and (plugin / "clear-store.request").exists()
+    assert admin.post("/api/i/default/earth/packs/reload").status_code == 200
+    assert admin.get("/api/i/default/earth").json()["pending"] == ["clear-store", "reload-packs"]
+    acts = admin.get("/api/i/default/activity").json()
+    assert any(a["type"] == "earth_store_clear" for a in acts)
+
+
+def test_upload_list_delete_pack(admin, plugin):
+    r = admin.post("/api/i/default/earth/packs/upload", files={"file": ("tarn.bnge", pack_bytes())})
+    assert r.status_code == 200, r.text
+    assert r.json()["items"] == 2 and (plugin / "bake" / "tarn.bnge").exists()
+    assert (plugin / "reload-packs.request").exists()
+    assert not list((plugin / "bake").glob("*.part"))
+    (plugin / "bake" / "notes.txt").write_text("x")                    # (pas un pack : ignoré)
+    (plugin / "bake" / "broken.bnge").write_bytes(b"BNGEBAKE1\n" + b"\xff" * 8)
+    packs = admin.get("/api/i/default/earth").json()["packs"]
+    assert [p["name"] for p in packs] == ["broken.bnge", "tarn.bnge"]
+    assert packs[0]["valid"] is False and packs[1]["valid"] is True and packs[1]["loaded"] is None
+    assert packs[1]["meta"]["bbox"] == [43.5, 1.3, 43.7, 1.5] and packs[1]["items"] == 2
+    # déjà présent : refusé sans écraser
+    assert admin.post("/api/i/default/earth/packs/upload", files={"file": ("tarn.bnge", pack_bytes())}).status_code == 409
+    (plugin / "reload-packs.request").unlink()
+    assert admin.delete("/api/i/default/earth/packs/tarn.bnge").status_code == 200
+    assert not (plugin / "bake" / "tarn.bnge").exists() and (plugin / "reload-packs.request").exists()
+    assert admin.delete("/api/i/default/earth/packs/tarn.bnge").status_code == 404
+
+
+def test_loaded_packs_follow_the_state(admin, plugin):
+    (plugin / "bake").mkdir()
+    (plugin / "bake" / "a.bnge").write_bytes(pack_bytes())
+    (plugin / "bake" / "b.bnge").write_bytes(pack_bytes())
+    (plugin / "state.json").write_text(state(packs=["a.bnge"]))
+    packs = admin.get("/api/i/default/earth").json()["packs"]
+    assert [(p["name"], p["loaded"]) for p in packs] == [("a.bnge", True), ("b.bnge", False)]
+
+
+@pytest.mark.parametrize("name,data", [
+    ("tarn.zip", pack_bytes()), ("tarn.bnge", b"PK\x03\x04 pas un pack"), (".cache.bnge", pack_bytes()),
+    ("tarn.bnge", pack_bytes(items=[])), ("t;rm.bnge", pack_bytes()),
+])
+def test_upload_pack_refused(admin, plugin, name, data):
+    r = admin.post("/api/i/default/earth/packs/upload", files={"file": (name, data)})
+    assert r.status_code == 400, r.text
+    assert not (plugin / "bake").exists() or not any((plugin / "bake").iterdir())
+
+
+@pytest.mark.parametrize("name", ["../main.lua", "..%2Fmain.lua", "main.lua", "x.bnge/../../main.lua"])
+def test_delete_pack_stays_in_bake(admin, plugin, name):
+    assert admin.delete(f"/api/i/default/earth/packs/{name}").status_code in (404, 405)
+    assert (plugin / "main.lua").exists()
+
+
+def test_store_and_packs_need_an_admin(client, plugin):
+    assert client.post("/api/i/default/earth/store/clear").status_code == 401
+    assert client.post("/api/i/default/earth/packs/upload", files={"file": ("a.bnge", pack_bytes())}).status_code == 401
+    assert client.delete("/api/i/default/earth/packs/a.bnge").status_code == 401
+    assert not (plugin / "clear-store.request").exists()

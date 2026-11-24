@@ -4,6 +4,7 @@ import { api, type EarthOverview, type EarthSettings, type EarthWeather } from '
 import { useI18n } from '../../context/I18nContext'
 import { Toggle } from '../../components/ui/Toggle'
 import { formatUptimeMs } from '../../lib/format'
+import { EarthWorld } from '../../components/earth/EarthWorld'
 
 const WEATHERS: EarthWeather[] = ['real', 'clear', 'cloudy', 'rain', 'storm', 'snow', 'fog']
 const SPEEDS = [0, 1, 60]
@@ -181,6 +182,8 @@ export function SectionEarth({ instanceId }: { instanceId: string }) {
           </div>
         </form>
       </div>
+
+      <EarthWorld instanceId={instanceId} data={data} onChanged={load} />
     </div>
   )
 }
