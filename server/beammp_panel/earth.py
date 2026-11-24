@@ -144,7 +144,7 @@ def read_state(inst: InstanceConfig, now: float | None = None) -> dict[str, Any]
         "settings": raw.get("settings") if isinstance(raw.get("settings"), dict) else {},
         "warnings": [str(w) for w in _as_list(raw.get("warnings"))],
         "players": players,
-        "store": {k: store.get(k) for k in ("bytes", "items", "capBytes")},
+        "store": {k: store.get(k) for k in ("mb", "items", "capMb")},     # (en Mo : voir le plugin, G.state)
         "packs": [str(p) for p in _as_list(raw.get("packs"))],
         "stats": raw.get("stats") if isinstance(raw.get("stats"), dict) else {},
     }

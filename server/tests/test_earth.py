@@ -35,7 +35,7 @@ def state(**over):
          "settings": {"listed": True, "time": "real", "timeSpeed": 0, "weather": "fog", "shareStoreMb": 2048,
                       "shareOutKbps": 1024, "meetM": 3000},
          "warnings": {}, "players": [{"pid": 0, "name": "Zoe", "lat": 43.6, "lon": 1.44, "h": 90, "joined": 30}],
-         "store": {"bytes": 1000, "items": 3, "capBytes": 2147483648}, "packs": {}, "stats": {"items_in": 2}}
+         "store": {"mb": 119.7, "items": 3, "capMb": 2048}, "packs": {}, "stats": {"items_in": 2}}
     s.update(over)
     return json.dumps(s)
 
@@ -101,7 +101,7 @@ def test_state_fresh_and_empty_lists(admin, plugin):
     s = o["state"]
     assert s["fresh"] and s["uptime"] == 42 and s["warnings"] == [] and s["packs"] == []
     assert s["players"] == [{"pid": 0, "name": "Zoe", "lat": 43.6, "lon": 1.44, "h": 90, "joined": 30}]
-    assert s["store"] == {"bytes": 1000, "items": 3, "capBytes": 2147483648}
+    assert s["store"] == {"mb": 119.7, "items": 3, "capMb": 2048}
     assert o["effective"]["weather"] == "fog"        # (ce que le plugin applique vraiment)
 
 

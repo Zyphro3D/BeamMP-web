@@ -225,7 +225,7 @@ export interface EarthState {
   settings: Partial<EarthSettings>
   warnings: string[]
   players: EarthPlayer[]
-  store: { bytes: number | null; items: number | null; capBytes: number | null }
+  store: { mb: number | null; items: number | null; capMb: number | null }
   packs: string[]
   stats: Record<string, number>
 }
