@@ -77,6 +77,26 @@ OK "config lue : $cfg"
 $cat = (Api GET '/api/i/default/catalog').Content
 OK "catalogue : $cat"
 
+# BeamNG.Earth (3.4.0) : un faux plugin, la section, les réglages écrits, une tuile de carte relayée
+$earth = Join-Path $srv 'Resources\Server\BeamNGEarth'
+New-Item -ItemType Directory -Force $earth | Out-Null
+Set-Content -Path (Join-Path $earth 'main.lua') -Encoding ascii -Value @(
+  "-- BeamNG.Earth's BeamMP server plugin (test)", "G.SETTINGS_FILE = 'settings.json'", "G.LISTED = true", "G.TIME = 'real'",
+  "G.TIME_SPEED = 0", "G.WEATHER = 'real'", "G.SHARE_STORE_MB = 2048", "G.SHARE_OUT_KBPS = 1024", "G.MEET_M = 3000")
+$e = (Api GET '/api/i/default/earth' $null $s).Content | ConvertFrom-Json
+if ($e.installed -and $e.supportsSettings -and $e.defaults.weather -eq 'real') { OK "section BeamNG.Earth (écoute : $($e.listing))" } else { KO "section BeamNG.Earth : $($e | ConvertTo-Json -Compress)" }
+Api PUT '/api/i/default/earth/settings' @{ weather = 'rain'; time = '21:30'; timeSpeed = 60 } $s | Out-Null
+$written = Get-Content (Join-Path $earth 'settings.json') -Raw | ConvertFrom-Json
+if ($written.weather -eq 'rain' -and $written.time -eq '21:30') { OK 'settings.json écrit à côté du plugin' } else { KO "settings.json : $written" }
+Api PUT '/api/i/default/earth/helper' @{ enabled = $true; procs = 1 } $s | Out-Null
+if (Test-Path (Join-Path $earth 'helper.json')) { OK 'helper.json écrit' } else { KO 'helper.json absent' }
+try {
+  $tile = Api GET '/api/earth/tiles/5/16/11.png' $null $s
+  if ($tile.Headers['Content-Type'] -eq 'image/png' -and $tile.RawContentLength -gt 100) { OK "tuile OSM relayée ($($tile.RawContentLength) octets)" } else { KO 'tuile : réponse inattendue' }
+} catch { KO "tuile : $($_.Exception.Message)" }
+$rel = (Api GET '/api/i/default/earth/release' $null $s).Content | ConvertFrom-Json
+if ($rel.latest) { OK "dernière release BeamNG.Earth vue : $($rel.latest)" } else { KO "releases : $($rel.error)" }
+
 # deuxième lancement : doit seulement rendre la main
 $t0 = Get-Date
 Start-Process -FilePath (Join-Path $pkg 'python\python.exe') -ArgumentList '-X', 'utf8', '-m', 'beammp_panel' -WorkingDirectory $pkg -WindowStyle Hidden -Wait
