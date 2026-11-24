@@ -6,6 +6,7 @@ import { Toggle } from '../../components/ui/Toggle'
 import { formatUptimeMs } from '../../lib/format'
 import { EarthWorld } from '../../components/earth/EarthWorld'
 import { EarthReleaseCard } from '../../components/earth/EarthReleaseCard'
+import { EarthMap } from '../../components/earth/EarthMap'
 
 const WEATHERS: EarthWeather[] = ['real', 'clear', 'cloudy', 'rain', 'storm', 'snow', 'fog']
 const SPEEDS = [0, 1, 60]
@@ -193,6 +194,13 @@ export function SectionEarth({ instanceId, canRestart, restarting, onRestart }: 
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Carte des joueurs (admins : les positions appartiennent aux joueurs) */}
+      <div className="card p-5 space-y-3 lg:col-span-2">
+        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">🗺 {t('earth_map')}</p>
+        {running ? <EarthMap players={state!.players} /> : <p className="text-xs text-zinc-500">{t('earth_needs_running')}</p>}
+        <p className="text-[11px] text-zinc-500">{t('earth_map_privacy')}</p>
       </div>
 
       <EarthWorld instanceId={instanceId} data={data} onChanged={load} />

@@ -417,5 +417,12 @@
   "earth_version_restore_confirm": "Remettre le mod et le plugin de la version",
   "earth_version_help": "Le mod (beamng_earth.zip) et le plugin viennent du zip serveur de la release, empreinte vérifiée. La version remplacée est gardée pour un retour arrière.",
   "earth_version_restart": "Installé. Redémarrez le serveur pour l'appliquer : les joueurs connectés seront déconnectés.",
-  "earth_helper_version_mismatch": "L'assistant n'a pas la version du mod : ce qu'il calcule ne sert à personne. Relancez le rôle Ansible bnge-helper avec la nouvelle version, ou éteignez-le."
+  "earth_helper_version_mismatch": "L'assistant n'a pas la version du mod : ce qu'il calcule ne sert à personne. Relancez le rôle Ansible bnge-helper avec la nouvelle version, ou éteignez-le.",
+  "earth_map": "Carte des joueurs",
+  "earth_map_players": "joueurs",
+  "earth_map_zoom_in": "Zoomer",
+  "earth_map_zoom_out": "Dézoomer",
+  "earth_map_follow": "Suivre les joueurs",
+  "earth_map_empty": "Personne dans le monde pour l'instant.",
+  "earth_map_privacy": "Visible des admins seulement : la position d'un joueur lui appartient. Mise à jour toutes les 5 secondes ; fond de carte © les contributeurs OpenStreetMap, relayé par le panel."
 }

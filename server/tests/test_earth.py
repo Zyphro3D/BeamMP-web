@@ -377,3 +377,50 @@ def test_restore_without_previous(admin, installed):
 def test_release_needs_an_admin(client, installed):
     assert client.post("/api/i/default/earth/release/install").status_code == 401
     assert client.post("/api/i/default/earth/release/restore").status_code == 401
+
+
+# ── Lot 4 : tuiles de la carte des joueurs ──────────────────────
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 100
+
+
+@pytest.fixture()
+def osm(monkeypatch):
+    calls = []
+
+    def handler(request: httpx.Request):
+        calls.append((str(request.url), request.headers.get("user-agent")))
+        if request.url.path == "/5/16/11.png":
+            return httpx.Response(200, content=PNG)
+        if request.url.path == "/5/16/12.png":
+            return httpx.Response(200, content=b"<html>pas une image</html>")
+        return httpx.Response(404)
+    real = httpx.AsyncClient
+
+    def client(*a, **kw):
+        kw["transport"] = httpx.MockTransport(handler)
+        return real(*a, **kw)
+    from beammp_panel import tiles
+    monkeypatch.setattr(tiles.httpx, "AsyncClient", client)
+    return calls
+
+
+def test_tiles_relayed_and_cached(admin, env, osm):
+    r = admin.get("/api/earth/tiles/5/16/11.png")
+    assert r.status_code == 200 and r.content == PNG and r.headers["content-type"] == "image/png"
+    assert osm[0][0] == "https://tile.openstreetmap.org/5/16/11.png" and "BeamMP-Panel" in osm[0][1]
+    assert admin.get("/api/earth/tiles/5/16/11.png").content == PNG
+    assert len(osm) == 1                                    # (la deuxième vient du cache)
+    assert (env / "data" / "tiles" / "5" / "16" / "11.png").read_bytes() == PNG
+
+
+@pytest.mark.parametrize("path,code", [("5/16/12", 502), ("5/40/11", 400), ("18/0/0", 400), ("-1/0/0", 400),
+                                       ("5/16/99", 400), ("x/1/1", 400)])
+def test_tiles_refused(admin, env, osm, path, code):
+    assert admin.get(f"/api/earth/tiles/{path}.png").status_code == code
+    assert not (env / "data" / "tiles" / "5" / "16" / "12.png").exists()
+
+
+def test_tiles_need_an_admin(client, osm):
+    assert client.get("/api/earth/tiles/5/16/11.png").status_code == 401
+    assert osm == []

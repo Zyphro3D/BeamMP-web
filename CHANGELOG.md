@@ -42,6 +42,11 @@ dernière entrée de ce fichier.
   le redémarrage. Dépôt des releases : `EARTH_RELEASES_REPO`
   (`Zyphro3D/BeamNG.Earth` par défaut). L'assistant de partage signale une
   version différente de celle du mod.
+- **Carte des joueurs en direct** (admins seulement : la position d'un joueur
+  lui appartient) : flèches orientées selon le cap, cadrage automatique sur
+  les joueurs, zoom et déplacement, liste avec coordonnées et temps de jeu.
+  Fond OpenStreetMap relayé et gardé 14 jours par le panel (la CSP n'autorise
+  que ses propres images), sans nouvelle dépendance.
 - Demande un plugin BeamNG.Earth qui lit `settings.json` (fork Zyphro3D,
   24/11/2026) ; avec un plugin plus ancien, la page le signale et n'écrit rien.
 

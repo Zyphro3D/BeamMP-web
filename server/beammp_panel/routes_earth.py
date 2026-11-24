@@ -7,9 +7,10 @@ import shutil
 
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
+from starlette.responses import Response
 from starlette.routing import Route
 
-from . import earth, earth_release
+from . import earth, earth_release, tiles
 from .activity import log_activity
 from .files import ensure_dir, read_text
 from .routes_dashboard import _single_file
@@ -177,6 +178,23 @@ async def restore_release(request: Request):
     return ok({"installed": version, "needsRestart": True})
 
 
+# ── Carte des joueurs : tuiles OSM relayées (la CSP n'autorise que les images du panel) ──
+
+async def get_tile(request: Request):
+    require_admin(request)
+    limiter.check(request, "earth-tiles", 600, 60)
+    try:
+        z, x, y = (int(request.path_params[k]) for k in ("z", "x", "y"))
+    except ValueError:
+        raise ApiError(400, "Tuile invalide")
+    if not tiles.valid(z, x, y):
+        raise ApiError(400, "Tuile invalide")
+    data = await tiles.fetch(z, x, y)
+    if data is None:
+        raise ApiError(502, "Tuile indisponible")
+    return Response(data, media_type="image/png", headers={"Cache-Control": "private, max-age=604800"})
+
+
 routes = [
     Route("/api/i/{instanceId}/earth", get_earth, methods=["GET"]),
     Route("/api/i/{instanceId}/earth/settings", put_earth_settings, methods=["PUT"]),
@@ -188,4 +206,5 @@ routes = [
     Route("/api/i/{instanceId}/earth/release", get_release, methods=["GET"]),
     Route("/api/i/{instanceId}/earth/release/install", install_release, methods=["POST"]),
     Route("/api/i/{instanceId}/earth/release/restore", restore_release, methods=["POST"]),
+    Route("/api/earth/tiles/{z}/{x}/{y}.png", get_tile, methods=["GET"]),
 ]
