@@ -45,6 +45,10 @@ async def _single_file(request: Request, max_bytes: int) -> tuple[UploadFile, di
     upload = next((v for v in form.values() if isinstance(v, UploadFile)), None)
     if upload is None:
         raise ApiError(400, "No file")
+    # Content-Length absent (envoi « chunked ») : seule la taille réellement reçue fait foi.
+    if upload.size is not None and upload.size > max_bytes:
+        await upload.close()
+        raise ApiError(413, f"Fichier trop gros (maximum {max_bytes // (1024 * 1024)} Mo)")
     fields = {k: v for k, v in form.items() if isinstance(v, str)}
     return upload, fields
 

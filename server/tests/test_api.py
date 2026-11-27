@@ -158,6 +158,15 @@ def test_upload_vehicle_and_metadata(admin, env):
     assert upload(admin, vehicle_zip(), "Gavril Dynamo.zip", "Dynamo", "vehicle").status_code == 409
 
 
+def test_upload_size_checked_on_received_bytes(admin, env, monkeypatch):
+    """La limite ne repose pas que sur l'en-tête Content-Length : la taille reçue est comparée elle aussi."""
+    import beammp_panel.routes_dashboard as rd
+    monkeypatch.setattr(rd, "MAX_UPLOAD_BYTES", 1000)
+    r = upload(admin, vehicle_zip() + b"\0" * 5000, "Gros.zip", "Gros", "vehicle")
+    assert r.status_code == 413, r.text
+    assert not (env / "res" / "Client" / "Gros.zip").exists()
+
+
 def test_upload_rejects_bad_files(admin):
     assert upload(admin, b"not a zip at all", "x.zip", "X", "mod").status_code == 400
     assert upload(admin, vehicle_zip(), "x.exe", "X", "mod").status_code == 400
@@ -211,7 +220,7 @@ def test_maps_activation_and_inactive_upload(admin, env):
 
 
 def test_scan_import_map_gets_level_and_activates(admin, env):
-    """Carte posée à la main dans Client/ (cas EarthNG sur beammp-201, 08/11/2026)."""
+    """Carte posée à la main dans Client/ (cas EarthNG en production, 08/11/2026)."""
     upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
     (env / "res" / "Client" / "earthng_planet.zip").write_bytes(map_zip("e2r_world"))
     rep = admin.post("/api/admin/i/default/scan-import").json()
@@ -240,7 +249,7 @@ def test_scan_import_backfills_missing_map_id(admin, env):
 
 
 def test_write_text_on_single_file_mount(tmp_path, monkeypatch):
-    """ServerConfig.toml monté seul sous Docker : os.replace lève EBUSY (beammp-201, 08/11/2026)."""
+    """ServerConfig.toml monté seul sous Docker : os.replace lève EBUSY (en production, 08/11/2026)."""
     import errno
     import os as _os
     from beammp_panel import files
@@ -443,7 +452,7 @@ def test_map_config_value(map_id, expected):
 
 
 def test_status_map_follows_server_config(admin, env):
-    """`Map =` changé hors du panel (beammp-201, 20/11/2026) : le statut suit le fichier, pas la base."""
+    """`Map =` changé hors du panel (en production, 20/11/2026) : le statut suit le fichier, pas la base."""
     upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
     cfg = env / "ServerConfig.toml"
     # carte inconnue du panel : son identifiant de niveau s'affiche
