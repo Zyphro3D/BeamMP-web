@@ -211,7 +211,7 @@ def test_maps_activation_and_inactive_upload(admin, env):
 
 
 def test_scan_import_map_gets_level_and_activates(admin, env):
-    """Carte posée à la main dans Client/ (cas EarthNG sur beammp-201, 08/11/2026)."""
+    """Carte posée à la main dans Client/ (cas EarthNG en production, 08/11/2026)."""
     upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
     (env / "res" / "Client" / "earthng_planet.zip").write_bytes(map_zip("e2r_world"))
     rep = admin.post("/api/admin/i/default/scan-import").json()
@@ -240,7 +240,7 @@ def test_scan_import_backfills_missing_map_id(admin, env):
 
 
 def test_write_text_on_single_file_mount(tmp_path, monkeypatch):
-    """ServerConfig.toml monté seul sous Docker : os.replace lève EBUSY (beammp-201, 08/11/2026)."""
+    """ServerConfig.toml monté seul sous Docker : os.replace lève EBUSY (en production, 08/11/2026)."""
     import errno
     import os as _os
     from beammp_panel import files
@@ -443,7 +443,7 @@ def test_map_config_value(map_id, expected):
 
 
 def test_status_map_follows_server_config(admin, env):
-    """`Map =` changé hors du panel (beammp-201, 20/11/2026) : le statut suit le fichier, pas la base."""
+    """`Map =` changé hors du panel (en production, 20/11/2026) : le statut suit le fichier, pas la base."""
     upload(admin, map_zip("black_hills"), "hills.zip", "Hills", "map", map_id="black_hills")
     cfg = env / "ServerConfig.toml"
     # carte inconnue du panel : son identifiant de niveau s'affiche
