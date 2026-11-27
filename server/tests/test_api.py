@@ -158,6 +158,15 @@ def test_upload_vehicle_and_metadata(admin, env):
     assert upload(admin, vehicle_zip(), "Gavril Dynamo.zip", "Dynamo", "vehicle").status_code == 409
 
 
+def test_upload_size_checked_on_received_bytes(admin, env, monkeypatch):
+    """La limite ne repose pas que sur l'en-tête Content-Length : la taille reçue est comparée elle aussi."""
+    import beammp_panel.routes_dashboard as rd
+    monkeypatch.setattr(rd, "MAX_UPLOAD_BYTES", 1000)
+    r = upload(admin, vehicle_zip() + b"\0" * 5000, "Gros.zip", "Gros", "vehicle")
+    assert r.status_code == 413, r.text
+    assert not (env / "res" / "Client" / "Gros.zip").exists()
+
+
 def test_upload_rejects_bad_files(admin):
     assert upload(admin, b"not a zip at all", "x.zip", "X", "mod").status_code == 400
     assert upload(admin, vehicle_zip(), "x.exe", "X", "mod").status_code == 400
