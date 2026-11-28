@@ -6,6 +6,16 @@ dernière entrée de ce fichier.
 
 ## [À venir]
 
+### Cartes
+
+- **Le niveau est lu dans le zip** : à l'ajout d'une carte, le champ « identifiant »
+  peut rester vide, le panel lit `levels/<nom>/` dans le zip. Au démarrage, les
+  cartes déjà enregistrées sans identifiant le reçoivent de la même façon.
+- **« Activer » marche toujours** : la carte est désignée par son id (deux zips
+  du même niveau ne sont plus confondus). Un identifiant absent ou faux est repris
+  du zip ; un pack à plusieurs niveaux propose le choix ; un zip sans niveau dit
+  pourquoi. Avant, le clic ne faisait rien.
+
 ### Performances de la page publique
 
 - **Miniatures des grilles** : les cartes de mods et le catalogue chargent un

@@ -11,6 +11,7 @@ from pathlib import Path
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from . import config as C
@@ -21,7 +22,7 @@ from .db import db, dumps, now_iso
 from .discord import notify_map_change, notify_mod_upload, notify_restart, notify_update
 from .files import delete_file, ensure_dir, read_text, tail_lines, write_text
 from .logwatch import active_alerts
-from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, valid_map_id, read_config_entries,
+from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, level_of, map_levels, valid_map_id, read_config_entries,
                        set_mod_active, set_toml_key)
 from .security import ApiError, limiter, require_admin, require_auth
 from .status import invalidate_cache
@@ -118,6 +119,11 @@ async def upload_mod(request: Request):
 
     image, metadata = await run_in_threadpool(
         analyze_upload, dest, type_, C.config.images_path, Path(safe_filename).stem, inst.id)
+    if type_ == "map" and map_id is None:
+        # Champ laissé vide : le niveau est lu dans le zip (levels/<nom>/). Un pack à plusieurs niveaux reste sans :
+        # le choix est demandé à l'activation.
+        levels = await run_in_threadpool(map_levels, inst, {"filename": safe_filename})
+        map_id = levels[0] if len(levels) == 1 else None
     desc_json = dumps({"fr": desc}) if desc else None
     try:
         cur = db().run(
@@ -232,11 +238,37 @@ async def maps_activate(request: Request):
     require_admin(request)
     inst = instance_or_404(request.path_params["instanceId"])
     body = await json_body(request)
-    map_id = body.get("map_id")
-    if not isinstance(map_id, str) or not map_id:
-        raise ApiError(400, "map_id is required")
+    mod_id, level = body.get("mod_id"), body.get("level")
+    if mod_id is None:
+        # Ancienne forme {map_id} : la carte est cherchée par son niveau.
+        map_id = body.get("map_id")
+        if not isinstance(map_id, str) or not map_id:
+            raise ApiError(400, "map_id is required")
+    else:
+        if not isinstance(mod_id, int) or isinstance(mod_id, bool):
+            raise ApiError(400, "mod_id invalide")
+        if level is not None and (not isinstance(level, str) or not valid_map_id(level)):
+            raise ApiError(400, "Niveau invalide")
+        mod = db().one("SELECT * FROM mods WHERE id = ? AND instance_id = ? AND type = 'map'", [mod_id, inst.id])
+        if not mod:
+            raise ApiError(404, "Map not found")
+        levels = await run_in_threadpool(map_levels, inst, mod)
+        saved = level_of(mod.get("map_id"))
+        if level is not None:
+            if levels and level not in levels:
+                raise ApiError(400, f"Le niveau « {level} » n'est pas dans le zip de cette carte")
+            map_id = level
+        elif saved and (not levels or saved in levels):
+            map_id = saved                     # identifiant connu et toujours présent dans le zip
+        elif len(levels) == 1:
+            map_id = levels[0]                 # absent ou faux en base : repris du zip
+        elif len(levels) > 1:
+            return JSONResponse({"error": "Cette carte contient plusieurs niveaux : choisis celui à charger.",
+                                 "levels": levels}, status_code=409)
+        else:
+            raise ApiError(400, "Aucun niveau (dossier levels/) trouvé dans le zip de cette carte")
     previous = db().one("SELECT name FROM mods WHERE instance_id = ? AND type = 'map' AND active = 1 LIMIT 1", [inst.id])
-    good, result = await run_in_threadpool(activate_map, inst, map_id)
+    good, result = await run_in_threadpool(activate_map, inst, map_id, mod_id)
     if not good:
         raise ApiError(404, result)
     invalidate_cache(inst.id)

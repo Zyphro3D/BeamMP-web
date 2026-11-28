@@ -25,7 +25,8 @@ async function request<T>(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error ?? 'Request failed')
+    // Le corps reste joint à l'erreur : certaines réponses portent un choix à proposer (niveaux d'un pack de cartes).
+    throw Object.assign(new Error(err.error ?? 'Request failed'), { status: res.status, data: err })
   }
   return res.json() as Promise<T>
 }
@@ -79,10 +80,11 @@ export const api = {
     request<Mod>(`${i(instanceId)}/mods/${id}/official`, { method: 'PATCH' }),
 
   // Per-instance — Maps
-  activateMap: (instanceId: string, map_id: string) =>
+  // La carte est désignée par son id ; le niveau est lu dans son zip par le serveur. `level` : choix pour un pack.
+  activateMap: (instanceId: string, mod_id: number, level?: string) =>
     request<{ activated: string }>(`${i(instanceId)}/maps/activate`, {
       method: 'POST',
-      body: JSON.stringify({ map_id }),
+      body: JSON.stringify(level ? { mod_id, level } : { mod_id }),
     }),
 
   // Per-instance — Config presets

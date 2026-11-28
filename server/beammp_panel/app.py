@@ -19,7 +19,7 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import (VERSION, appmode, logwatch, routes_admin, routes_app, routes_auth, routes_dashboard, routes_discord,
+from . import (VERSION, appmode, logwatch, modstate, routes_admin, routes_app, routes_auth, routes_dashboard, routes_discord,
                routes_earth, routes_presets, routes_public, supervisor, updater)
 from . import config as C
 from .db import db, init_db, now_iso
@@ -289,6 +289,10 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
     async def lifespan(app):
         init_db(C.config.db_path)
         create_initial_superadmin()
+        try:
+            await asyncio.to_thread(modstate.repair_map_ids, C.config.instances)
+        except Exception:      # une réparation ratée ne doit jamais empêcher le panel de démarrer
+            log.exception("Réparation des identifiants de carte impossible")
         await start_runtime()
         if appmode.layout():
             updater.mark_healthy_later()

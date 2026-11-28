@@ -399,5 +399,8 @@
   "earth_map_zoom_out": "Herauszoomen",
   "earth_map_follow": "Den Spielern folgen",
   "earth_map_empty": "Gerade ist niemand in der Welt.",
-  "earth_map_privacy": "Nur für Admins sichtbar: Der Standort eines Spielers gehört ihm. Alle 5 Sekunden aktualisiert; Karte © OpenStreetMap-Mitwirkende, vom Panel weitergeleitet."
+  "earth_map_privacy": "Nur für Admins sichtbar: Der Standort eines Spielers gehört ihm. Alle 5 Sekunden aktualisiert; Karte © OpenStreetMap-Mitwirkende, vom Panel weitergeleitet.",
+  "choose_level_title": "Level wählen",
+  "choose_level_text": "Dieses Zip enthält mehrere Levels. Wähle das, das der Server laden soll:",
+  "map_id_auto_hint": "Leer lassen: Das Level wird aus dem Zip gelesen (Ordner levels/<name>/)."
 }

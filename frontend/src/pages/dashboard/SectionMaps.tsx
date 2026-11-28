@@ -28,16 +28,21 @@ export function SectionMaps({ instanceId, maps, onRefresh, loading, onNeedsResta
     !search || m.name.toLowerCase().includes(search.toLowerCase())
   ), sort), [maps, search, sort])
 
-  const activate = async (map: Mod) => {
-    if (!map.map_id) return
+  // Pack à plusieurs niveaux : le serveur répond 409 avec la liste, l'admin choisit, on renvoie avec `level`.
+  const [choice, setChoice] = useState<{ map: Mod; levels: string[] } | null>(null)
+
+  const activate = async (map: Mod, level?: string) => {
     setActivateError('')
+    setChoice(null)
     setActivating(map.id)
     try {
-      await api.activateMap(instanceId, map.map_id)
+      await api.activateMap(instanceId, map.id, level)
       onNeedsRestart()
       onRefresh()
     } catch (err: unknown) {
-      setActivateError(err instanceof Error ? err.message : t('activate_error'))
+      const levels = (err as { data?: { levels?: unknown } })?.data?.levels
+      if (Array.isArray(levels) && levels.length > 1) setChoice({ map, levels: levels.map(String) })
+      else setActivateError(err instanceof Error ? err.message : t('activate_error'))
     } finally {
       setActivating(null)
     }
@@ -108,12 +113,26 @@ export function SectionMaps({ instanceId, maps, onRefresh, loading, onNeedsResta
         </div>
       )}
 
+      {choice && (
+        <Modal title={t('choose_level_title')} onClose={() => setChoice(null)}>
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-500">{t('choose_level_text')} <span className="font-semibold text-zinc-300">{choice.map.name}</span></p>
+            <div className="grid gap-2">
+              {choice.levels.map(level => (
+                <button key={level} onClick={() => activate(choice.map, level)} disabled={activating === choice.map.id}
+                        className="btn-ghost justify-start font-mono text-xs">{level}</button>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {showUpload && (
         <Modal title={t('add_map')} onClose={() => setShowUpload(false)}>
           <form onSubmit={handleUpload} className="space-y-3">
             {upError && <p className="text-xs text-red-400">{upError}</p>}
             <div className="space-y-1"><label htmlFor="map-name" className="inline-block text-xs text-zinc-400">{t('mod_display_name')}</label><input id="map-name" name="name" required className="input" /></div>
-            <div className="space-y-1"><label htmlFor="map-id" className="inline-block text-xs text-zinc-400">{t('map_id_label')}</label><input id="map-id" name="map_id" required className="input font-mono text-xs" placeholder="/levels/mapname/info.json" /></div>
+            <div className="space-y-1"><label htmlFor="map-id" className="inline-block text-xs text-zinc-400">{t('map_id_label')}</label><input id="map-id" name="map_id" aria-describedby="map-id-hint" className="input font-mono text-xs" placeholder="/levels/mapname/info.json" /><p id="map-id-hint" className="text-[11px] text-zinc-500">{t('map_id_auto_hint')}</p></div>
             <div className="space-y-1"><label htmlFor="map-description" className="inline-block text-xs text-zinc-400">{t('description')}</label><input id="map-description" name="description" className="input" /></div>
             <div className="space-y-1"><label htmlFor="map-file" className="inline-block text-xs text-zinc-400">{t('mod_file')}</label><input id="map-file" name="file" type="file" accept=".zip" required className="input py-1.5 text-xs" /></div>
             <button type="submit" disabled={uploading} className="btn-accent w-full justify-center">{uploading ? t('uploading_progress') : t('add')}</button>

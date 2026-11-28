@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
+import zipfile
 from typing import Any
 
 from .config import InstanceConfig
 from .db import db
+from .analyzer import level_candidates
 from .files import ensure_dir, move_file, read_text, write_text
+
+log = logging.getLogger("beammp_panel")
 
 
 def _has_file(mod: dict[str, Any]) -> bool:
@@ -60,17 +65,70 @@ def valid_map_id(map_id: str) -> bool:
         return False
 
 
-def activate_map(inst: InstanceConfig, map_id: str) -> tuple[bool, Any]:
+def map_zip_path(inst: InstanceConfig, mod: dict[str, Any]) -> str | None:
+    """Le zip d'une carte sur le disque (Client/ si active, inactive_map/ sinon) ; None pour une carte officielle."""
+    if not _has_file(mod):
+        return None
+    for sub in ("Client", "inactive_map"):
+        path = os.path.join(inst.beammp.resources_path, sub, mod["filename"])
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def map_levels(inst: InstanceConfig, mod: dict[str, Any]) -> list[str]:
+    """Niveaux lus dans le zip de la carte (seulement la table des fichiers : rapide même pour un gros zip)."""
+    path = map_zip_path(inst, mod)
+    if not path:
+        return []
+    try:
+        with zipfile.ZipFile(path) as zf:
+            names = [i.filename for i in zf.infolist() if not i.is_dir()]
+    except (zipfile.BadZipFile, OSError):
+        return []
+    return [lvl for lvl in level_candidates(names) if valid_map_id(lvl)]
+
+
+def level_of(map_id: str | None) -> str | None:
+    """Nom de niveau d'un map_id enregistré (accepte « /levels/x/info.json »), None s'il est vide ou invalide."""
+    return map_config_value(map_id) if map_id and valid_map_id(map_id) else None
+
+
+def repair_map_ids(instances: list[InstanceConfig]) -> int:
+    """Au démarrage : les cartes sans identifiant de niveau (envoyées sans, ou importées d'un zip ambigu) le reçoivent
+    quand leur zip n'en contient qu'un. Sans lui, « Activer » ne pouvait rien faire. Un pack à plusieurs niveaux reste
+    sans : le choix est demandé à l'activation."""
+    fixed = 0
+    for inst in instances:
+        for mod in db().all("SELECT * FROM mods WHERE instance_id = ? AND type = 'map' AND (map_id IS NULL OR map_id = '')",
+                            [inst.id]):
+            levels = map_levels(inst, mod)
+            if len(levels) == 1:
+                db().run("UPDATE mods SET map_id = ? WHERE id = ?", [levels[0], mod["id"]])
+                fixed += 1
+    if fixed:
+        log.info("Cartes : %d identifiant(s) de niveau retrouvé(s) dans les zips", fixed)
+    return fixed
+
+
+def activate_map(inst: InstanceConfig, map_id: str, mod_id: int | None = None) -> tuple[bool, Any]:
     """Active une carte : range l'ancienne, sort la nouvelle, met à jour `Map =`.
 
+    `mod_id` désigne la carte elle-même (deux zips peuvent porter le même niveau) ; `map_id` est alors le niveau
+    choisi, enregistré sur la carte. Sans `mod_id`, la carte est cherchée par son niveau (presets, ancienne API).
     Renvoie (True, carte) ou (False, message d'erreur).
     """
     if not valid_map_id(map_id):
         return False, "Identifiant de carte invalide"
-    new_map = db().one("SELECT * FROM mods WHERE map_id = ? AND type = 'map' AND instance_id = ?",
-                       [map_id, inst.id])
+    if mod_id is not None:
+        new_map = db().one("SELECT * FROM mods WHERE id = ? AND type = 'map' AND instance_id = ?", [mod_id, inst.id])
+    else:
+        new_map = db().one("SELECT * FROM mods WHERE map_id = ? AND type = 'map' AND instance_id = ?",
+                           [map_id, inst.id])
     if not new_map:
         return False, "Map not found"
+    if mod_id is not None and new_map.get("map_id") != map_id:
+        db().run("UPDATE mods SET map_id = ? WHERE id = ?", [map_id, new_map["id"]])
     # La config d'abord : si elle ne peut pas être écrite, ni la base ni les fichiers
     # ne bougent (avant, un échec laissait la nouvelle carte active en base et
     # l'ancienne rangée, avec un `Map =` toujours sur l'ancienne).

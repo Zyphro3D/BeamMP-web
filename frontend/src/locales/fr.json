@@ -424,5 +424,8 @@
   "earth_map_zoom_out": "Dézoomer",
   "earth_map_follow": "Suivre les joueurs",
   "earth_map_empty": "Personne dans le monde pour l'instant.",
-  "earth_map_privacy": "Visible des admins seulement : la position d'un joueur lui appartient. Mise à jour toutes les 5 secondes ; fond de carte © les contributeurs OpenStreetMap, relayé par le panel."
+  "earth_map_privacy": "Visible des admins seulement : la position d'un joueur lui appartient. Mise à jour toutes les 5 secondes ; fond de carte © les contributeurs OpenStreetMap, relayé par le panel.",
+  "choose_level_title": "Choisir le niveau",
+  "choose_level_text": "Ce zip contient plusieurs niveaux. Choisis celui que le serveur doit charger :",
+  "map_id_auto_hint": "Laisse vide : le niveau est lu dans le zip (dossier levels/<nom>/)."
 }

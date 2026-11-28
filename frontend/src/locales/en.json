@@ -424,5 +424,8 @@
   "earth_map_zoom_out": "Zoom out",
   "earth_map_follow": "Follow the players",
   "earth_map_empty": "No one in the world right now.",
-  "earth_map_privacy": "Seen by admins only: a player's place is theirs. Updated every 5 seconds; map © OpenStreetMap contributors, relayed by the panel."
+  "earth_map_privacy": "Seen by admins only: a player's place is theirs. Updated every 5 seconds; map © OpenStreetMap contributors, relayed by the panel.",
+  "choose_level_title": "Choose the level",
+  "choose_level_text": "This zip contains several levels. Pick the one the server should load:",
+  "map_id_auto_hint": "Leave empty: the level is read from the zip (levels/<name>/ folder)."
 }

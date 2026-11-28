@@ -466,10 +466,19 @@ def level_id(names: list[str]) -> str | None:
     Sans lui, une carte importée depuis le disque ne pouvait pas être activée
     (« Map not found ») et restait marquée active à côté de l'ancienne.
     """
-    with_info = [m.group(1) for n in names if (m := re.match(r"^levels/([^/]+)/info\.json$", n, re.I))]
-    levels = level_names(names)
-    candidates = with_info or levels
-    return candidates[0] if len(set(candidates)) == 1 else None
+    candidates = level_candidates(names)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def level_candidates(names: list[str]) -> list[str]:
+    """Les niveaux qu'une carte peut charger : ceux qui ont un info.json, sinon tous les dossiers sous levels/.
+    Plusieurs = un pack de cartes : le choix revient à l'admin à l'activation."""
+    with_info: list[str] = []
+    for n in names:
+        m = re.match(r"^levels/([^/]+)/info\.json$", n, re.I)
+        if m and m.group(1) not in with_info and m.group(1).lower() != "mod_info":
+            with_info.append(m.group(1))
+    return with_info or level_names(names)
 
 
 def analyze_upload(path: str, type_: str, images_dir: str, base_name: str, instance_id: str) -> tuple[str | None, dict[str, Any] | None]:
