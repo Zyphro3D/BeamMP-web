@@ -140,6 +140,17 @@ def test_migration_et_homonymes(panel):
     assert library.migrate(C.config.instances) == 0                                # rien à refaire
 
 
+def test_liens_durs_windows(panel, monkeypatch):
+    """Sous Windows, Client/ reçoit un lien dur : au redémarrage, ce n'est pas un zip de plus à ranger."""
+    client, env = panel
+    monkeypatch.setattr(library.os, "symlink", os.link)          # ce que fait _link sous Windows
+    upload(client, "default", vehicle_zip(), "dynamo.zip")
+    link, lib = client_path("default", "dynamo.zip"), env / "bibliotheque" / "dynamo.zip"
+    assert not os.path.islink(link) and os.path.samefile(link, lib)
+    assert library.migrate(C.config.instances) == 0
+    assert os.path.samefile(link, lib)
+
+
 def test_lien_casse_signale_et_retire(panel):
     client, env = panel
     upload(client, "default", vehicle_zip(), "dynamo.zip")

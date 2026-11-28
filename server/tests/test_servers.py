@@ -45,7 +45,9 @@ def test_add_requires_supervision(admin):
 def test_add_start_list_remove(local):
     client, env = local
     listing = client.get("/api/admin/servers").json()
-    assert listing["canAdd"] and listing["nextPort"] == 30814 or listing["nextPort"] >= 30814
+    # Le premier serveur écoute 30814 (son ServerConfig.toml), sans BEAMMP_SERVER_PORT : 30815 est proposé
+    assert listing["canAdd"] and listing["nextPort"] == 30815, listing
+    assert listing["servers"][0]["port"] == 30814
 
     for bad in ({"name": "", "port": 30900, "authKey": KEY},
                 {"name": "X", "port": 80, "authKey": KEY},
@@ -96,6 +98,24 @@ def test_add_start_list_remove(local):
     # Un identifiant archivé n'est jamais réutilisé.
     r3 = client.post("/api/admin/servers", json={"name": "Soirée drift", "port": 30902, "authKey": KEY})
     assert r3.json()["server"]["id"] == "soiree-drift-3"
+
+
+def test_instance_port_reads_server_config(env, monkeypatch):
+    """Le port vient du ServerConfig.toml ; BEAMMP_SERVER_PORT puis 30814 seulement en secours."""
+    cfg = env / "ServerConfig.toml"
+    monkeypatch.setenv("BEAMMP_SERVER_PORT", "30814")
+    cfg.write_text(cfg.read_text().replace("Port = 30814", "Port = 30900   # choisi à la main"))
+    C.set_config(C.load_config())
+    base = C.config.instances[0]
+    assert servers.instance_port(base) == 30900
+    assert servers.next_port([base]) == 30814
+    with pytest.raises(ValueError, match="déjà utilisé"):
+        servers.validate("X", 30900, KEY, [base])
+    cfg.unlink()                       # fichier illisible : la variable, puis le défaut de BeamMP
+    assert servers.instance_port(base) == 30814
+    monkeypatch.delenv("BEAMMP_SERVER_PORT")
+    C.set_config(C.load_config())
+    assert servers.next_port(C.config.instances) == 30815
 
 
 def test_admin_cannot_add(local):

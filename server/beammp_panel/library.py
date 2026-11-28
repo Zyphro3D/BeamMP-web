@@ -224,6 +224,14 @@ def forget(inst, mod: dict[str, Any]) -> bool:
     return True
 
 
+def _is_lib_copy(path: str, filename: str) -> bool:
+    """Ce fichier est déjà l'exemplaire de la bibliothèque (lien dur sous Windows) : rien à ranger."""
+    try:
+        return os.path.samefile(path, lib_file(filename))
+    except OSError:
+        return False
+
+
 def migrate(instances) -> int:
     """Au démarrage : les zips encore rangés serveur par serveur passent dans la bibliothèque, et chaque mod actif
     reçoit son lien. Rien n'est effacé sinon un doublon exact. -> nombre de mods rangés."""
@@ -235,7 +243,7 @@ def migrate(instances) -> int:
             if not shared(mod):
                 continue
             fn = mod["filename"]
-            had_local = any(os.path.isfile(p) and not os.path.islink(p)
+            had_local = any(os.path.isfile(p) and not os.path.islink(p) and not _is_lib_copy(p, fn)
                             for p in (client_file(inst, fn), inactive_file(inst, mod["type"], fn)))
             try:
                 place(inst, mod, bool(mod["active"]))

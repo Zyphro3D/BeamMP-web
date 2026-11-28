@@ -123,8 +123,26 @@ def new_id(name: str, instances: list[InstanceConfig]) -> str:
     return f"{base}-{n}"
 
 
+_PORT_RE = re.compile(r"^\s*Port\s*=\s*[\"']?(\d+)[\"']?\s*(?:#.*)?$", re.M)
+
+
+def instance_port(inst: InstanceConfig) -> int:
+    """Le port de jeu d'un serveur : `Port` de son ServerConfig.toml (ce que BeamMP-Server écoute vraiment), sinon
+    BEAMMP_SERVER_PORT, sinon 30814, le défaut de BeamMP. L'appli Windows et une installation au .env sans
+    BEAMMP_SERVER_PORT ne renseignent pas le port du premier serveur : sans la lecture du fichier, le bouton
+    « Ajouter un serveur » proposait 30814, déjà pris (banc Windows du 28/11/2026)."""
+    beammp = getattr(inst, "beammp", None)
+    try:
+        m = _PORT_RE.search(Path(beammp.config_path).read_text(encoding="utf-8", errors="replace")) if beammp else None
+    except OSError:
+        m = None
+    if m:
+        return int(m.group(1))
+    return int(inst.server_port) if str(inst.server_port).isdigit() else FIRST_PORT
+
+
 def used_ports(instances: list[InstanceConfig]) -> set[int]:
-    return {int(i.server_port) for i in instances if str(i.server_port).isdigit()}
+    return {instance_port(i) for i in instances}
 
 
 def next_port(instances: list[InstanceConfig]) -> int:

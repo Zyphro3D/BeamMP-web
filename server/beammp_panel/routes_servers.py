@@ -36,7 +36,7 @@ def _base() -> InstanceConfig:
 async def _describe(inst: InstanceConfig) -> dict:
     sp = supervisor.get(inst)
     state = await sp.fetch_state() if sp else {}
-    return {"id": inst.id, "name": inst.name, "port": int(inst.server_port) if str(inst.server_port).isdigit() else None,
+    return {"id": inst.id, "name": inst.name, "port": servers.instance_port(inst),
             "origin": inst.origin, "removable": inst.origin == "panel", "managed": bool(sp),
             "running": bool(state.get("running")), "wanted": bool(state.get("wanted")),
             "error": state.get("error") or "", "unreachable": bool(state.get("unreachable"))}
