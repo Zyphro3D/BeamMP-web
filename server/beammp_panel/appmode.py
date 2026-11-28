@@ -95,6 +95,9 @@ def apply_to_environ() -> dict[str, Any]:
     os.environ.setdefault("HOST", settings.get("host", "127.0.0.1"))
     os.environ["PORT"] = str(settings.get("port") or os.environ.get("PORT") or 3000)
     os.environ.setdefault("BEAMMP_INFO_HOST", "127.0.0.1")
+    # Serveurs ajoutés par le bouton « Ajouter un serveur » : un dossier chacun, à côté des réglages
+    # (une mise à jour de l'appli n'y touche pas), tous lancés avec le BeamMP-Server.exe de server_dir.
+    os.environ.setdefault("BEAMMP_SERVERS_PATH", str(data_dir() / "servers"))
     if settings.get("server_name"):
         os.environ.setdefault("INSTANCE_NAME", settings["server_name"])
     if settings.get("server_dir"):

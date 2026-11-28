@@ -58,6 +58,8 @@ def fake_server(directory: Path) -> Path:
 def test_settings_generate_secret_and_paths(app_env):
     s = appmode.load_settings()
     assert len(s["jwt_secret"]) == 64
+    # Serveurs ajoutés depuis le panel : rangés avec les réglages, hors du dossier de l'appli
+    assert os.environ["BEAMMP_SERVERS_PATH"] == str(app_env / "data" / "servers")
     assert os.environ["HOST"] == "127.0.0.1"
     paths = appmode.server_paths("/srv/beammp")
     assert paths["BEAMMP_LOG_PATH"] == "/srv/beammp/Server.log"
