@@ -421,8 +421,8 @@ async def start_all(instances: list[InstanceConfig]) -> None:
 
 
 async def stop_all() -> None:
-    for sp in list(_servers.values()):
-        await sp.shutdown()
+    # En parallèle : l'arrêt du conteneur « jeu » laisse un temps borné pour tous les serveurs
+    await asyncio.gather(*(sp.shutdown() for sp in list(_servers.values())))
     _servers.clear()
 
 

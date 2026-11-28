@@ -109,7 +109,7 @@ def test_install_sh_refuses_older_version_from_panel():
 
 def _sh_function(name: str) -> str:
     text = (ROOT / "install.sh").read_text()
-    return re.search(rf"^{name}\(\) \{{\n.*?^\}}\n", text, re.M | re.S).group(0)
+    return re.search(rf"^{name}\(\) \{{[^\n]*\n.*?^\}}\n", text, re.M | re.S).group(0)
 
 
 def _strict_bash(script: str, stdin: str = "") -> subprocess.CompletedProcess:
@@ -160,3 +160,62 @@ def test_install_sh_reads_owner_before_copying():
     assert text.index('owner="$(stat -c %u:%g "$DIR")"') < copy
     assert text.index('mode="$(stat -c %a "$DIR")"') < copy
     assert text.index('chmod "$mode" "$DIR"') > copy
+
+
+# ── conteneur « jeu » (plusieurs serveurs) ────────────────────
+
+def test_install_sh_env_set_replaces_or_appends(tmp_path):
+    (tmp_path / ".env").write_text("A=1\nB=ancien\n")
+    script = f'DIR="{tmp_path}"\n' + _sh_function("env_get") + _sh_function("env_set") + (
+        'env_set B nouveau\nenv_set C "x=y"\necho "$(env_get B)|$(env_get C)|$(env_get ABSENT)"')
+    res = _strict_bash(script)
+    assert res.returncode == 0, res.stderr
+    assert res.stdout.strip() == "nouveau|x=y|"
+    assert (tmp_path / ".env").read_text() == "A=1\nB=nouveau\nC=x=y\n"
+
+
+def _migratable(tmp_path, *, exec_start: str, uid: str = "1000", cfg: str | None = None):
+    wd = tmp_path / "srv"
+    wd.mkdir(exist_ok=True)
+    (wd / "ServerConfig.toml").write_text("[General]\n")
+    (tmp_path / ".env").write_text(f"BEAMMP_CONFIG_PATH={cfg or wd / 'ServerConfig.toml'}\n")
+    fake = f'''
+systemctl() {{
+  case "$3" in
+    LoadState) echo loaded ;; WorkingDirectory) echo "{wd}" ;; User) echo beammp ;;
+    ExecStart) echo "{{ path={exec_start.split()[0]} ; argv[]={exec_start} ; ignore_errors=no ; start_time=[n/a] }}" ;;
+  esac
+}}
+id() {{ echo {uid}; }}
+'''
+    script = f'DIR="{tmp_path}"\n' + fake + _sh_function("env_get") + _sh_function("migratable") + (
+        'if out="$(migratable beammp.service)"; then echo "OUI:$out"; else echo "NON:$out"; fi')
+    res = _strict_bash(script)
+    assert res.returncode == 0, res.stderr
+    return res.stdout.strip(), wd
+
+
+def test_install_sh_migrates_only_a_plain_server_unit(tmp_path):
+    """Migration vers le conteneur « jeu » : seulement un service simple, sous l'uid 1000, lu par le panel."""
+    wd = tmp_path / "srv"
+    out, _ = _migratable(tmp_path, exec_start=f"{wd}/BeamMP-Server")
+    assert out == f"OUI:{wd}"
+    out, _ = _migratable(tmp_path, exec_start=f"{wd}/BeamMP-Server --config autre.toml")
+    assert out.startswith("NON:") and "sans option" in out
+    out, _ = _migratable(tmp_path, exec_start="/ailleurs/BeamMP-Server")
+    assert out.startswith("NON:")
+    out, _ = _migratable(tmp_path, exec_start=f"{wd}/BeamMP-Server", uid="0")
+    assert out.startswith("NON:") and "uid 1000" in out
+    out, _ = _migratable(tmp_path, exec_start=f"{wd}/BeamMP-Server", cfg="/autre/ServerConfig.toml")
+    assert out.startswith("NON:") and "le panel lit" in out
+
+
+def test_compose_jeu_service_is_unprivileged():
+    """Le conteneur « jeu » : sans privilège, uid 1000, sans docker.sock, activé par profil seulement."""
+    text = (ROOT / "docker-compose.yml").read_text()
+    block = re.search(r"^  jeu:\n(.*?)(?=^  \S|\Z)", text, re.M | re.S).group(1)
+    for needed in ('profiles: ["jeu"]', 'user: "1000:1000"', "cap_drop: [ALL]",
+                   "no-new-privileges:true", "network_mode: host", "beammp_panel.runner"):
+        assert needed in block, needed
+    code = re.sub(r"(?m)#.*$", "", text)
+    assert "docker.sock" not in code and "env_file" not in block and "privileged" not in block

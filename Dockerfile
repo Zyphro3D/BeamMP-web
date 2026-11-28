@@ -12,8 +12,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     DATA_DIR=/app/data IMAGES_PATH=/app/images
 WORKDIR /app
 
+# liblua5.3-0 : demandée par BeamMP-Server, que le conteneur « jeu » (même image) fait tourner
 RUN useradd --create-home --uid 1000 panel \
- && apt-get update && apt-get install -y --no-install-recommends gosu tzdata \
+ && apt-get update && apt-get install -y --no-install-recommends gosu tzdata liblua5.3-0 \
  && rm -rf /var/lib/apt/lists/*
 
 COPY server/requirements.txt ./

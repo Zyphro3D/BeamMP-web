@@ -24,6 +24,7 @@ services:
       # Mise à jour depuis le panel (installation par install.sh) : le panel
       # dépose une demande ici, l'hôte fait la mise à jour.
       BEAMMP_PANEL_UPDATE_DIR: /app/update
+      BEAMMP_SERVERS_PATH: /beammp/servers
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -41,6 +42,9 @@ services:
       # Sauvegardes de la v2, lues une seule fois par l'import (scripts/upgrade-to-v3.sh).
       - ./backups:/app/backups:ro
       - ./update:/app/update
+      # Serveurs ajoutés par le bouton « Ajouter un serveur » (un dossier chacun), partagés
+      # avec le conteneur « jeu » qui les fait tourner.
+      - ./servers:/beammp/servers
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/api/info', timeout=5)"]
@@ -56,6 +60,40 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
+
+  # Conteneur « jeu » : fait tourner les BeamMP-Server (celui de l'installation et ceux ajoutés
+  # depuis le panel), avec un seul exécutable pour tous. Même image que le panel. Réseau de l'hôte
+  # (les joueurs arrivent sur les ports de jeu de la machine), uid 1000 (propriétaire des mods et
+  # de ServerConfig.toml), sans privilège, sans docker.sock ni sudo. Le panel le pilote en HTTP
+  # avec un jeton (BEAMMP_RUNNER_URL/TOKEN, écrits dans .env par install.sh) et ne lui envoie que
+  # des identifiants de serveur. Activé par COMPOSE_PROFILES=jeu dans .env (install.sh) : une
+  # installation qui ne l'a pas garde son ancien fonctionnement.
+  jeu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["jeu"]
+    entrypoint: []
+    init: true
+    command: ["python", "-m", "beammp_panel.runner"]
+    network_mode: host
+    user: "1000:1000"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      BEAMMP_RUNNER_TOKEN: ${BEAMMP_RUNNER_TOKEN:-}
+      # Passerelle du réseau Docker du panel : joignable par le panel, pas depuis le réseau local
+      BEAMMP_RUNNER_BIND: ${BEAMMP_RUNNER_BIND:-127.0.0.1}
+      BEAMMP_RUNNER_PORT: ${BEAMMP_RUNNER_PORT:-3010}
+      BEAMMP_MAIN_DIR: /beammp/main
+      BEAMMP_SERVERS_PATH: /beammp/servers
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - ${BEAMMP_SERVER_DIR:-./beammp-server}:/beammp/main
+      - ./servers:/beammp/servers
+    restart: unless-stopped
+    # Laisse aux serveurs le temps de s'arrêter proprement (le superviseur les arrête un par un)
+    stop_grace_period: 40s
 
   # PostgreSQL de la v2 : plus utilisé par le panel. Gardé (profil « legacy »,
   # jamais démarré par défaut) seulement pour pouvoir refaire un pg_dump ou

@@ -46,6 +46,7 @@ SERVER_UNIT="beammp.service"
 AGENT_UNIT="beammp-agent.service"
 AGENT_DIR="/opt/beammp-agent"
 AGENT_PORT=4445
+RUNNER_PORT=3010
 GAME_PORT=30814
 # Clé publique des releases (build/update_public.b64, au format PEM) : la clé privée ne quitte
 # jamais la machine qui publie. server/tests/test_docker_update.py vérifie que les deux concordent.
@@ -314,6 +315,23 @@ open(path, "w", encoding="utf-8").write(text)
 EOF
 }
 
+env_get() {   # env_get CLÉ : valeur dans .env (vide si absente)
+    { grep -m1 "^$1=" "$DIR/.env" 2>/dev/null || true; } | cut -d= -f2- | tr -d '\r'
+}
+env_set() {   # env_set CLÉ VALEUR : remplace la ligne ou l'ajoute à la fin de .env
+    python3 -I - "$DIR/.env" "$1" "$2" <<'EOF'
+import re, sys
+path, key, value = sys.argv[1:]
+text = open(path, encoding="utf-8").read()
+line = f"{key}={value}"
+if re.search(rf"(?m)^{re.escape(key)}=.*$", text):
+    text = re.sub(rf"(?m)^{re.escape(key)}=.*$", lambda _m: line, text, count=1)
+else:
+    text = text.rstrip("\n") + "\n" + line + "\n"
+open(path, "w", encoding="utf-8").write(text)
+EOF
+}
+
 install_server() {
     local user="$1" arch id ver
     arch="$(uname -m)"; [ "$arch" = aarch64 ] && arch=arm64
@@ -370,27 +388,6 @@ EOF
     fi
     : > "$SERVER_DIR/Server.log"
     chown -R "$user:" "$SERVER_DIR"
-    if [ ! -f "/etc/systemd/system/$SERVER_UNIT" ]; then
-        cat > "/etc/systemd/system/$SERVER_UNIT" <<EOF
-[Unit]
-Description=BeamMP-Server (géré par BeamMP Panel)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=$user
-WorkingDirectory=$SERVER_DIR
-ExecStart=$SERVER_DIR/BeamMP-Server
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-        systemctl daemon-reload
-        systemctl enable "$SERVER_UNIT" >/dev/null 2>&1
-        ok "Service $SERVER_UNIT créé"
-    fi
 }
 
 RUN_USER=""
@@ -467,6 +464,7 @@ rollback() {
     warn "$1 : retour à la version précédente"
     status rollback "$1"
     tar -C "$DIR" -xzf "$DIR/.rollback/code.tgz"
+    [ -f "$TMP/env.avant-jeu" ] && cp -p "$TMP/env.avant-jeu" "$DIR/.env"
     docker tag beammp-panel-rollback:app "$APP_IMAGE"
     # --force-recreate : seul le contenu de l'image a changé, compose garderait le conteneur cassé
     docker compose up -d --no-build --force-recreate app
@@ -485,52 +483,80 @@ rollback() {
     exit 1
 }
 
+# Conteneur « jeu » (BeamMP-Server, plusieurs serveurs) : posé à la première installation, et à la
+# mise à jour d'une installation dont le serveur tournait par un service systemd (migration :
+# même dossier, même port ; le service est arrêté une fois le panel à jour, rétabli en cas d'échec).
+JEU=0; MIGRATE=0; OLD_UNIT=""; WAS_ACTIVE=0
+# Serveur tenu par un service systemd simple : <dossier>/BeamMP-Server lancé dans son dossier,
+# sous l'uid 1000, et c'est bien le serveur que le panel lit (.env). Sinon, rien ne change.
+migratable() {
+    local unit="$1" wd exe user cfg
+    [ "$(systemctl show -P LoadState "$unit" 2>/dev/null)" = loaded ] || { echo "service $unit introuvable"; return 1; }
+    wd="$(systemctl show -P WorkingDirectory "$unit")"
+    exe="$(systemctl show -P ExecStart "$unit" | sed -nE 's/.*argv\[\]=([^;]*[^; ]) *;.*/\1/p')"
+    user="$(systemctl show -P User "$unit")"
+    [ -n "$wd" ] && [ "$exe" = "$wd/BeamMP-Server" ] || { echo "$unit ne lance pas <dossier>/BeamMP-Server sans option (ExecStart : $exe)"; return 1; }
+    [ "$(id -u "${user:-root}" 2>/dev/null)" = 1000 ] || { echo "$unit tourne sous ${user:-root}, pas sous l'uid 1000"; return 1; }
+    cfg="$(env_get BEAMMP_CONFIG_PATH)"
+    [ -f "$wd/ServerConfig.toml" ] && [ "$(realpath -m "$cfg")" = "$(realpath -m "$wd/ServerConfig.toml")" ] \
+        || { echo "le panel lit $cfg, pas $wd/ServerConfig.toml"; return 1; }
+    printf '%s' "$wd"
+}
+if [ -n "$(env_get BEAMMP_RUNNER_TOKEN)" ]; then
+    JEU=1
+    d="$(env_get BEAMMP_SERVER_DIR)"; SERVER_DIR="${d:-$SERVER_DIR}"
+elif [ "$FIRST_INSTALL" -eq 1 ]; then
+    JEU=1
+elif [ -n "$(env_get INSTANCES)" ]; then
+    warn "Plusieurs serveurs déclarés dans .env (INSTANCES) : fonctionnement inchangé, pas de bouton « Ajouter un serveur »"
+else
+    OLD_UNIT="$(env_get BEAMMP_AGENT_SERVICE)"
+    OLD_UNIT="${OLD_UNIT:-$SERVER_UNIT}"
+    if WHY="$(migratable "$OLD_UNIT")"; then
+        JEU=1; MIGRATE=1; SERVER_DIR="$WHY"
+    else
+        warn "Serveur laissé tel quel ($WHY) : pas de bouton « Ajouter un serveur »"
+    fi
+fi
+
 status build "Construction de $VERSION"
 say "Construction (premier lancement : quelques minutes)"
-# Construction seule : l'ancien conteneur continue de répondre jusqu'au redémarrage
-if ! docker compose build app; then
+BUILD=(app); [ "$JEU" -eq 1 ] && BUILD+=(jeu)
+# Construction seule : les conteneurs en place continuent de tourner jusqu'au redémarrage
+if ! docker compose build "${BUILD[@]}"; then
     [ "$ROLLBACK" -eq 1 ] && rollback "construction impossible"
     die "La construction a échoué (voir ci-dessus)"
 fi
 # Première installation : crée le réseau Docker du panel, dont la passerelle sert à l'agent
 [ "$FIRST_INSTALL" -eq 0 ] || docker compose up --no-start app
 
-# ── 6. beammp-agent : redémarrage et mise à jour du serveur depuis le panel ──
-if [ -f "/etc/systemd/system/$AGENT_UNIT" ]; then
-    install_agent_code
-elif [ "$FIRST_INSTALL" -eq 1 ]; then
-    PROJECT="$(docker compose config --format json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["name"])')"
-    GW="$(docker network inspect -f '{{(index .IPAM.Config 0).Gateway}}' "${PROJECT}_default" 2>/dev/null || true)"
-    printf '%s' "$GW" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || die "Passerelle du réseau Docker introuvable (${PROJECT}_default)"
-    mkdir -p "$AGENT_DIR"
-    install -m 755 agent/beammp-agent.py "$AGENT_DIR/beammp-agent.py"
-    if [ ! -f /etc/beammp-agent.env ]; then
-        ( umask 077; printf 'RESTART_TOKEN=%s\n' "$(rand 64)" > /etc/beammp-agent.env )
+# ── 6. Réglages du conteneur « jeu » ─────────────────────────────────────────
+docker_gw() {   # passerelle du réseau Docker du panel : joignable par lui, pas depuis le réseau local
+    local project gw
+    project="$(docker compose config --format json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["name"])')"
+    gw="$(docker network inspect -f '{{(index .IPAM.Config 0).Gateway}}' "${project}_default" 2>/dev/null || true)"
+    printf '%s' "$gw" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || die "Passerelle du réseau Docker introuvable (${project}_default)"
+    printf '%s' "$gw"
+}
+if [ "$JEU" -eq 1 ]; then
+    if [ -z "$(env_get BEAMMP_RUNNER_TOKEN)" ]; then
+        cp -p .env "$TMP/env.avant-jeu"     # rétabli si la bascule échoue
+        GW="$(docker_gw)"
+        profiles="$(env_get COMPOSE_PROFILES)"
+        case ",$profiles," in *,jeu,*) ;; *) profiles="${profiles:+$profiles,}jeu" ;; esac
+        printf '\n# Conteneur « jeu » (posé par install.sh)\n' >> .env
+        env_set COMPOSE_PROFILES "$profiles"
+        env_set BEAMMP_SERVER_DIR "$SERVER_DIR"
+        env_set BEAMMP_RUNNER_BIND "$GW"
+        env_set BEAMMP_RUNNER_PORT "$RUNNER_PORT"
+        env_set BEAMMP_RUNNER_URL "http://$GW:$RUNNER_PORT"
+        env_set BEAMMP_RUNNER_TOKEN "$(rand 64)"
+        chmod 600 .env
     fi
-    TOKEN="$(sed -n 's/^RESTART_TOKEN=//p' /etc/beammp-agent.env)"
-    SYSTEMCTL="$(command -v systemctl)"
-    printf '%s ALL=(root) NOPASSWD: %s restart %s\n' "$RUN_USER" "$SYSTEMCTL" "$SERVER_UNIT" > "$TMP/sudoers"
-    visudo -cf "$TMP/sudoers" >/dev/null || die "Règle sudoers refusée par visudo"
-    install -m 440 "$TMP/sudoers" /etc/sudoers.d/beammp-agent
-    sed -e "s|^User=.*|User=$RUN_USER|" \
-        -e "s|^ExecStart=.*|ExecStart=/usr/bin/python3 $AGENT_DIR/beammp-agent.py|" \
-        -e "s|^Environment=ALLOWED_SERVICES=.*|Environment=ALLOWED_SERVICES=$SERVER_UNIT|" \
-        -e "s|^Environment=AGENT_HOST=.*|Environment=AGENT_HOST=$GW|" \
-        -e "s|^Environment=AGENT_PORT=.*|Environment=AGENT_PORT=$AGENT_PORT|" \
-        -e "s|^#Environment=BEAMMP_BINARY_PATH=.*|Environment=BEAMMP_BINARY_PATH=$SERVER_DIR/BeamMP-Server|" \
-        -e "s|^#ReadWritePaths=.*|ReadWritePaths=$SERVER_DIR|" \
-        agent/beammp-agent.service > "/etc/systemd/system/$AGENT_UNIT"
-    chmod 600 "/etc/systemd/system/$AGENT_UNIT"
-    systemctl daemon-reload
-    {
-        echo
-        echo "# beammp-agent (posé par install.sh)"
-        echo "BEAMMP_AGENT_URL=http://$GW:$AGENT_PORT"
-        echo "BEAMMP_AGENT_TOKEN=$TOKEN"
-        echo "BEAMMP_AGENT_SERVICE=$SERVER_UNIT"
-        echo "BEAMMP_AGENT_ASSET=$ASSET"
-    } >> .env
-    ok "beammp-agent installé (écoute sur $GW:$AGENT_PORT, réseau Docker du panel seulement)"
+    # Dossier des serveurs ajoutés depuis le panel, à l'uid des deux conteneurs
+    install -d -o 1000 -g 1000 "$DIR/servers"
+elif [ -f "/etc/systemd/system/$AGENT_UNIT" ]; then
+    install_agent_code
 else
     warn "beammp-agent absent : boutons Redémarrer / Mettre à jour le serveur indisponibles (voir README)"
 fi
@@ -538,7 +564,7 @@ fi
 # ── 7. Démarrage ─────────────────────────────────────────────────────────────
 status restart "Redémarrage du panel"
 docker compose up -d --force-recreate app
-[ -f "/etc/systemd/system/$AGENT_UNIT" ] && systemctl enable --now "$AGENT_UNIT" >/dev/null 2>&1 || true
+[ "$JEU" -eq 0 ] && [ -f "/etc/systemd/system/$AGENT_UNIT" ] && systemctl enable --now "$AGENT_UNIT" >/dev/null 2>&1 || true
 
 say "Attente du panel"
 if ! panel_up "$VERSION"; then
@@ -546,13 +572,70 @@ if ! panel_up "$VERSION"; then
     die "Le panel ne répond pas : docker compose -f $DIR/docker-compose.yml logs app"
 fi
 
-# Serveur BeamMP géré par ce script : démarré dès qu'il a sa clé (relancé si la clé vient de changer)
-if [ -f "$SERVER_DIR/ServerConfig.toml" ] && grep -q "Description=BeamMP-Server (géré par BeamMP Panel)" "/etc/systemd/system/$SERVER_UNIT" 2>/dev/null; then
-    if grep -qE '^AuthKey *= *"[^"]+"' "$SERVER_DIR/ServerConfig.toml"; then
-        if [ -n "$AUTH_KEY" ]; then systemctl restart "$SERVER_UNIT"; else systemctl start "$SERVER_UNIT"; fi
-        ok "BeamMP-Server démarré (port $GAME_PORT)"
+# Conteneur « jeu » : recréé seulement si son code a changé (le recréer arrête les serveurs)
+runner_call() {   # runner_call MÉTHODE CHEMIN : appel au conteneur « jeu », jeton hors de la ligne de commande
+    ( umask 077; printf 'Authorization: Bearer %s\n' "$(env_get BEAMMP_RUNNER_TOKEN)" > "$TMP/runner.h" )
+    curl -fsS -m 60 -X "$1" -H "@$TMP/runner.h" "$(env_get BEAMMP_RUNNER_URL)$2" 2>/dev/null
+}
+jeu_up() {
+    local deadline=$(( $(date +%s) + 60 ))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        curl -fsS -m 5 "$(env_get BEAMMP_RUNNER_URL)/health" >/dev/null 2>&1 && return 0
+        sleep 2
+    done
+    return 1
+}
+# Service systemd remis en place si la bascule vers le conteneur « jeu » échoue
+undo_migration() {
+    warn "$1 : le serveur reste sur le service $OLD_UNIT"
+    docker compose stop jeu >/dev/null 2>&1 || true
+    cp -p "$TMP/env.avant-jeu" .env
+    systemctl enable "$OLD_UNIT" >/dev/null 2>&1 || true
+    [ "$WAS_ACTIVE" -eq 1 ] && systemctl start "$OLD_UNIT"
+    docker compose up -d --force-recreate app
+    panel_up "$VERSION" 180 || warn "Le panel ne répond pas : docker compose -f $DIR/docker-compose.yml logs app"
+    JEU=0
+}
+if [ "$JEU" -eq 1 ]; then
+    RUNNER_SHA="$(cat Dockerfile server/requirements.txt server/beammp_panel/runner.py server/beammp_panel/supervisor.py \
+        server/beammp_panel/config.py server/beammp_panel/servers.py | sha256sum | cut -d' ' -f1)"
+    if [ "$MIGRATE" -eq 1 ]; then
+        status restart "Passage du serveur BeamMP dans le conteneur « jeu »"
+        systemctl is-active --quiet "$OLD_UNIT" && WAS_ACTIVE=1
+        # Arrêté et désactivé : jamais deux serveurs sur le même port
+        systemctl disable --now "$OLD_UNIT" >/dev/null 2>&1
+    fi
+    if [ "$MIGRATE" -eq 1 ] || [ "$(cat update/runner.sha 2>/dev/null)" != "$RUNNER_SHA" ] \
+       || [ -z "$(docker compose ps -q --status running jeu 2>/dev/null)" ]; then
+        docker compose up -d --force-recreate jeu
+    fi
+    if ! jeu_up; then
+        if [ "$MIGRATE" -eq 1 ]; then undo_migration "Le conteneur « jeu » ne répond pas"
+        else warn "Le conteneur « jeu » ne répond pas : docker compose -f $DIR/docker-compose.yml logs jeu"; fi
     else
-        warn "BeamMP-Server attend sa clé AuthKey : relancez ce script avec --auth-key VOTRE_CLÉ"
+        printf '%s\n' "$RUNNER_SHA" > update/runner.sha
+        if [ "$WAS_ACTIVE" -eq 1 ] || { [ -n "$AUTH_KEY" ] && grep -qE '^AuthKey *= *"[^"]+"' "$SERVER_DIR/ServerConfig.toml"; }; then
+            # Démarré (ou relancé pour une nouvelle clé), puis gardé en marche à chaque démarrage du conteneur
+            if runner_call POST /servers/default/restart | grep -q '"running": *true'; then
+                ok "BeamMP-Server démarré dans le conteneur « jeu » (port $GAME_PORT)"
+            elif [ "$MIGRATE" -eq 1 ]; then
+                undo_migration "BeamMP-Server ne démarre pas dans le conteneur « jeu »"
+            else
+                warn "BeamMP-Server ne démarre pas : docker compose -f $DIR/docker-compose.yml logs jeu"
+            fi
+        elif [ "$FIRST_INSTALL" -eq 1 ]; then
+            warn "BeamMP-Server attend sa clé AuthKey : relancez ce script avec --auth-key VOTRE_CLÉ"
+        fi
+    fi
+    if [ "$MIGRATE" -eq 1 ] && [ "$JEU" -eq 1 ]; then
+        # beammp-agent et sa règle sudo ne servent plus. Gardés à côté pour un retour en arrière à la main.
+        if [ -f "/etc/systemd/system/$AGENT_UNIT" ]; then
+            systemctl disable --now "$AGENT_UNIT" >/dev/null 2>&1 || true
+        fi
+        if [ -f /etc/sudoers.d/beammp-agent ]; then
+            mv /etc/sudoers.d/beammp-agent /etc/beammp-agent.sudoers.retire
+        fi
+        ok "Serveur BeamMP passé dans le conteneur « jeu » ($SERVER_DIR) ; $OLD_UNIT et beammp-agent désactivés"
     fi
 fi
 
@@ -593,10 +676,10 @@ if [ "$FIRST_INSTALL" -eq 1 ]; then
    Identifiants (à changer dans le panel) / Credentials (change them in the panel):
      $(grep -m1 '^SUPERADMIN_USERNAME=' .env | cut -d= -f2) / $SUPERADMIN_PW
 
-   Serveur BeamMP : $SERVER_DIR (service $SERVER_UNIT). Port à ouvrir vers cette machine pour
+   Serveur BeamMP : $SERVER_DIR (conteneur « jeu »). Port à ouvrir vers cette machine pour
    les joueurs : $GAME_PORT TCP+UDP. Sans clé AuthKey, relancez ce script avec --auth-key CLÉ.
 
-   BeamMP server: $SERVER_DIR ($SERVER_UNIT service). Port to open to this machine for
+   BeamMP server: $SERVER_DIR ("jeu" container). Port to open to this machine for
    players: $GAME_PORT TCP+UDP. No AuthKey yet? Run this script again with --auth-key KEY.
 EOF
 fi
