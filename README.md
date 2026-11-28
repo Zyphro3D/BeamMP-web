@@ -30,9 +30,12 @@ Gestion des mods, cartes, configuration, logs et joueurs.
   sur chaque carte.
 - **Configs pré-établies** — un jeu de mods + une carte appliqués en un clic
   (voir [Configs pré-établies](#configs-pré-établies)).
-- **Configuration serveur** — édition de `ServerConfig.toml`, redémarrage et
-  mise à jour du binaire BeamMP-Server via
-  [beammp-agent](#redémarrage-du-serveur).
+- **Plusieurs serveurs** — bouton « Ajouter un serveur » : nom, port, clé
+  AuthKey, et le serveur démarre aussitôt, sans rien écrire dans `.env`.
+  Un serveur retiré est archivé, jamais effacé (voir
+  [Plusieurs serveurs](#plusieurs-serveurs)).
+- **Configuration serveur** — édition de `ServerConfig.toml`, démarrage,
+  arrêt, redémarrage et mise à jour du binaire BeamMP-Server.
 - **Logs et alertes** — consultation de `Server.log`, bannière d'alerte sur les
   erreurs critiques (ex. AuthKey refusée par le backend BeamMP).
 - **Joueurs** — historique des connexions, temps de jeu, badge de rang
@@ -62,7 +65,7 @@ Gestion des mods, cartes, configuration, logs et joueurs.
 5. [Démarrage](#démarrage)
 6. [Premier démarrage](#premier-démarrage)
 7. [Reverse proxy HTTPS](#reverse-proxy-https)
-8. [Multi-instance](#multi-instance)
+8. [Plusieurs serveurs](#plusieurs-serveurs)
 9. [Redémarrage du serveur](#redémarrage-du-serveur)
 10. [Configs pré-établies](#configs-pré-établies)
 11. [Mise à jour](#mise-à-jour)
@@ -98,6 +101,8 @@ Ensuite :
   quelques centaines de Ko, et si la nouvelle version ne démarre pas, la
   précédente revient au lancement suivant (et la version fautive n'est plus
   proposée) ;
+- **plusieurs serveurs** : bouton « Ajouter un serveur » dans *Serveurs*,
+  chaque serveur ajouté a son dossier dans `%APPDATA%\BeamMP Panel\servers` ;
 - si le port 3000 est déjà pris sur le PC, le panel prend le suivant libre et
   s'en souvient ;
 - données dans `%APPDATA%\BeamMP Panel` (base, images, `settings.json`,
@@ -140,10 +145,10 @@ Le script fait tout ce qui est décrit plus bas à la main :
   publique écrite dans le script) et l'empreinte SHA-256 de l'archive ;
 - crée `.env` (droits 600) avec une clé de session et un mot de passe
   SuperAdmin aléatoires, affichés à la fin ;
-- installe BeamMP-Server (binaire officiel, empreinte confirmée par GitHub)
-  et son service `beammp.service` ;
-- installe **beammp-agent** (boutons Redémarrer / Mettre à jour le serveur),
-  qui n'écoute que sur le réseau Docker du panel ;
+- installe BeamMP-Server (binaire officiel, empreinte confirmée par GitHub) ;
+- le fait tourner dans le conteneur **« jeu »** (voir
+  [Plusieurs serveurs](#plusieurs-serveurs)) : ni service systemd, ni agent,
+  ni règle sudo ;
 - construit et démarre le panel, puis attend qu'il réponde ;
 - pose l'unité `beammp-panel-update` : le bouton **Mettre à jour** du panel
   relance ce script sur l'hôte (voir [Mise à jour](#mise-à-jour)).
@@ -167,7 +172,9 @@ sudo bash beammp-install.sh --dir /opt/app-docker/beammp-panel --server-dir /che
 ```
 
 Le `.env`, la base (volume `app_data`), les mods, les services BeamMP et
-l'unité de beammp-agent sont gardés tels quels ; seul le code du panel et de
+l'unité de beammp-agent sont gardés tels quels (le passage au conteneur
+« jeu » se fait ensuite par un bouton, voir
+[Plusieurs serveurs](#plusieurs-serveurs)) ; seul le code du panel et de
 l'agent est remplacé par celui de la release. Les fichiers du dossier sont
 alors ceux de la release, plus ceux de git : n'utilisez plus `git pull` dans
 ce dossier (les mises à jour passent par le bouton du panel ou la même
@@ -312,11 +319,79 @@ Puis redémarrer : `docker compose up -d`
 
 ---
 
-## Multi-instance
+## Plusieurs serveurs
 
-Le panel peut gérer plusieurs serveurs BeamMP depuis une seule interface.
+Onglet *Serveurs* du tableau de bord, réservé au SuperAdmin : **Ajouter un
+serveur** demande un nom, un port (le suivant libre est proposé) et une clé
+AuthKey ([keymaster.beammp.com](https://keymaster.beammp.com), une clé par
+serveur). Le serveur démarre aussitôt et apparaît partout dans le panel
+(mods, cartes, joueurs, journal) et sur la page publique, qui liste tous les
+serveurs. Rien n'est à écrire dans `.env` ni dans `docker-compose.yml`.
 
-### Configuration `.env`
+Port à ouvrir vers la machine pour chaque serveur ajouté : son port, en
+**TCP+UDP**.
+
+Le serveur de l'installation ne se retire pas. Un serveur ajouté, une fois
+retiré, est arrêté puis son dossier est déplacé dans `servers/_archives/`
+(nom du serveur + date) : mods et réglages restent récupérables, rien n'est
+effacé, et son identifiant n'est jamais réutilisé.
+
+### Sous Linux : le conteneur « jeu »
+
+L'installation en une commande fait tourner tous les BeamMP-Server dans un
+second conteneur, **« jeu »**, construit depuis la même image que le panel :
+
+- réseau de l'hôte (les joueurs arrivent directement sur les ports de jeu) ;
+- uid 1000, propriétaire des mods et de `ServerConfig.toml` ; aucun
+  privilège, ni `docker.sock` ni sudo ;
+- un seul exécutable BeamMP-Server (`DOSSIER/beammp-server/BeamMP-Server`),
+  partagé par tous les serveurs ; sa mise à jour les relance tous ;
+- serveurs ajoutés dans `DOSSIER/servers/<identifiant>/` ;
+- piloté par le panel en HTTP avec un jeton (`BEAMMP_RUNNER_URL`,
+  `BEAMMP_RUNNER_TOKEN`), en écoute sur la passerelle du réseau Docker
+  du panel seulement ; il ne reçoit que des identifiants de serveur.
+
+`install.sh` écrit lui-même `COMPOSE_PROFILES=jeu` et les variables
+`BEAMMP_RUNNER_*` dans `.env`.
+
+### Installation existante : bouton « Activer l'ajout de serveurs »
+
+Une installation faite avant la 3.5.0 garde son service `beammp.service` et
+beammp-agent après la mise à jour. Le bouton **Activer l'ajout de serveurs**
+(onglet *Serveurs*, SuperAdmin) demande à `install.sh` de passer le serveur
+dans le conteneur « jeu », sans changer de version :
+
+1. le serveur est arrêté le temps du passage (moins d'une minute) ;
+2. `beammp.service` et beammp-agent sont désactivés (rien n'est effacé ; le
+   service reçoit un fichier `beammp-panel-jeu.conf` qui refuse un démarrage
+   à la main, pour ne pas lancer deux fois le même serveur) ;
+3. le serveur repart dans le conteneur, avec le même dossier, les mêmes mods
+   et le même port.
+
+Si le serveur ne repart pas, `install.sh` remet l'ancien service en marche
+et la raison s'affiche à la place du bouton. Le passage est refusé, raison
+affichée, quand le service ne lance pas `<dossier>/BeamMP-Server` sans option,
+ne tourne pas sous l'uid 1000, ou quand le panel ne lit pas le
+`ServerConfig.toml` de ce dossier ; les installations à plusieurs serveurs
+déclarés dans `.env` (`INSTANCES`) restent elles aussi sur leur
+fonctionnement actuel.
+
+> Les outils de l'hôte qui visaient `beammp.service` (redémarrage, journal
+> `StandardOutput=append:…`, scripts de mise à jour du binaire) sont à
+> adapter avant le passage : le serveur se pilote ensuite depuis le panel, et
+> son journal est `DOSSIER_DU_SERVEUR/Server.log`.
+
+Pour revenir en arrière : `docker compose stop jeu`, retirer
+`COMPOSE_PROFILES=jeu` de `.env`, supprimer
+`/etc/systemd/system/beammp.service.d/beammp-panel-jeu.conf`, puis
+`systemctl daemon-reload` et `systemctl enable --now beammp beammp-agent`.
+
+### Installation à la main : instances déclarées dans `.env`
+
+Sans le conteneur « jeu », le panel peut gérer plusieurs serveurs déclarés
+dans `.env` (le bouton « Ajouter un serveur » est alors indisponible).
+
+#### Configuration `.env`
 
 ```env
 INSTANCES=main,event
@@ -342,7 +417,7 @@ INSTANCE_EVENT_AGENT_SERVICE=beammp-event.service
 hôte) — seul `AGENT_SERVICE` varie par instance, pour cibler le bon service
 systemd au redémarrage.
 
-### Volumes `docker-compose.yml`
+#### Volumes `docker-compose.yml`
 
 Ajouter un volume par instance sous `services.app.volumes` :
 
@@ -365,6 +440,11 @@ volumes:
 ---
 
 ## Redémarrage du serveur
+
+Avec le conteneur « jeu » (installation en une commande, voir
+[Plusieurs serveurs](#plusieurs-serveurs)), il n'y a rien à installer : le
+panel démarre, arrête, redémarre et met à jour les serveurs lui-même. Cette
+section concerne les installations faites à la main.
 
 Le panel tourne en conteneur Docker et n'a pas accès à `systemctl` de l'hôte —
 le bouton "Redémarrer le serveur" passe donc par **beammp-agent**, un petit
@@ -662,6 +742,16 @@ SQLite, un seul fichier (`DB_PATH`) : rien à configurer. Les variables
 | `BEAMMP_INFO_HOST` | `host.docker.internal` | Hôte interrogé en direct sur le port de jeu (`BEAMMP_SERVER_PORT`, défaut 30814) pour le statut : joueurs, carte, mods, même en serveur privé. Vide = désactivé |
 | `BEAMMP_API_HOST` | `localhost` | Host de l'API HTTP BeamMP (optionnel) |
 | `BEAMMP_API_PORT` | `4444` | Port de l'API HTTP BeamMP |
+
+### Conteneur « jeu » (écrites par `install.sh`)
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `COMPOSE_PROFILES` | — | `jeu` démarre le conteneur « jeu » avec le panel |
+| `BEAMMP_RUNNER_URL` | — | Adresse du conteneur « jeu » vue du panel (passerelle du réseau Docker) |
+| `BEAMMP_RUNNER_TOKEN` | — | Jeton partagé entre le panel et le conteneur « jeu » |
+| `BEAMMP_RUNNER_BIND` | `127.0.0.1` | Adresse d'écoute du conteneur « jeu » (passerelle Docker, jamais l'IP LAN) |
+| `BEAMMP_RUNNER_PORT` | `3010` | Port d'écoute du conteneur « jeu » |
 
 ### Agent de redémarrage (optionnel — voir [Redémarrage du serveur](#redémarrage-du-serveur))
 
