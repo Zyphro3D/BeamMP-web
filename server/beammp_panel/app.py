@@ -308,11 +308,12 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
                 await asyncio.to_thread(modstate.ensure_earth_map, inst)
         except Exception:      # une réparation ratée ne doit jamais empêcher le panel de démarrer
             log.exception("Réparation des identifiants de carte impossible")
-        try:
-            # Zips encore rangés serveur par serveur : dans la bibliothèque commune, liés là où ils sont actifs
-            await asyncio.to_thread(library.migrate, C.config.instances)
-        except Exception:
-            log.exception("Rangement dans la bibliothèque de mods impossible")
+        # Zips encore rangés serveur par serveur : dans la bibliothèque commune, liés là où ils sont actifs. En tâche de
+        # fond : entre deux montages, chaque zip est copié (des Go de cartes), le panel répond pendant ce temps.
+        migration = asyncio.get_running_loop().create_task(asyncio.to_thread(library.migrate, C.config.instances))
+        migration.add_done_callback(lambda task: task.cancelled() or not task.exception() or log.error(
+            "Rangement dans la bibliothèque de mods impossible", exc_info=task.exception()))
+        app.state.library_migration = migration
         await start_runtime()
         if appmode.layout():
             updater.mark_healthy_later()

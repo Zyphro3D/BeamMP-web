@@ -119,6 +119,20 @@ def _link(src: str, dest: str) -> None:
     os.replace(tmp, dest)
 
 
+def _move_in(src: str, dest: str) -> None:
+    """Déplace un zip dans la bibliothèque. Entre deux montages c'est une copie : faite sous un nom provisoire, pour
+    qu'un arrêt en cours de route ne laisse jamais un zip tronqué sous le vrai nom (l'original reste alors en place)."""
+    try:
+        os.rename(src, dest)            # même montage : immédiat
+        return
+    except OSError:
+        pass
+    tmp = dest + ".part-panel"
+    shutil.copy2(src, tmp)
+    os.replace(tmp, dest)
+    os.unlink(src)                      # seulement une fois la copie complète en place
+
+
 def _free_name(filename: str) -> str:
     stem, ext = os.path.splitext(filename)
     n = 2
@@ -143,13 +157,13 @@ def adopt(inst, mod: dict[str, Any]) -> dict[str, Any]:
         lib = lib_file(mod["filename"])
         ensure_dir(os.path.dirname(lib))
         if not os.path.exists(lib):
-            shutil.move(path, lib)
+            _move_in(path, lib)
         elif _same_content(path, lib):
             if not os.path.samefile(path, lib):
                 os.unlink(path)
         else:
             new = _free_name(mod["filename"])
-            shutil.move(path, lib_file(new))
+            _move_in(path, lib_file(new))
             db().run("UPDATE mods SET filename = ? WHERE id = ?", [new, mod["id"]])
             log.info("Bibliothèque : %s de %s rangé sous le nom %s (un autre zip porte déjà ce nom)",
                      mod["filename"], inst.id, new)
