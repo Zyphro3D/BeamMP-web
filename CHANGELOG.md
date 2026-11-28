@@ -6,6 +6,25 @@ dernière entrée de ce fichier.
 
 ## [À venir]
 
+### Plusieurs serveurs
+
+- **Bouton « Ajouter un serveur »** (onglet *Serveurs*, SuperAdmin) : un nom,
+  un port (le suivant libre est proposé) et une clé AuthKey, et le serveur
+  démarre aussitôt, sans rien écrire dans `.env`. Il apparaît partout dans le
+  panel et sur la page publique, qui liste tous les serveurs. Linux et Windows.
+- **Retrait sans perte** : un serveur ajouté puis retiré est arrêté, et son
+  dossier (mods, réglages) est rangé dans `servers/_archives/`, jamais effacé.
+- **Linux : conteneur « jeu »** : les BeamMP-Server tournent dans un second
+  conteneur (réseau de l'hôte, uid 1000, sans privilège, ni `docker.sock` ni
+  sudo), avec un seul exécutable pour tous. Une installation neuve n'a plus de
+  service systemd, d'agent ni de règle sudo.
+- **Installation existante** : après la mise à jour, le bouton « Activer
+  l'ajout de serveurs » passe le serveur dans le conteneur, avec le même
+  dossier, les mêmes mods et le même port. L'ancien service est désactivé
+  (rien n'est effacé) et revient tout seul si le serveur ne repart pas ; la
+  raison d'un refus s'affiche à la place du bouton. Voir le README,
+  section *Plusieurs serveurs*.
+
 ### Corrections
 
 - **Accueil public** : la carte « Active map » montre la carte que le serveur
