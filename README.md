@@ -369,10 +369,11 @@ dans le conteneur « jeu », sans changer de version :
    et le même port.
 
 Si le serveur ne repart pas, `install.sh` remet l'ancien service en marche
-et la raison s'affiche à la place du bouton. Le passage est refusé, raison
+et la raison s'affiche au-dessus du bouton. Le passage est refusé, raison
 affichée, quand le service ne lance pas `<dossier>/BeamMP-Server` sans option,
 ne tourne pas sous l'uid 1000, ou quand le panel ne lit pas le
-`ServerConfig.toml` de ce dossier ; les installations à plusieurs serveurs
+`ServerConfig.toml` de ce dossier. Une fois la cause corrigée, le bouton
+relance le passage. Les installations à plusieurs serveurs
 déclarés dans `.env` (`INSTANCES`) restent elles aussi sur leur
 fonctionnement actuel.
 

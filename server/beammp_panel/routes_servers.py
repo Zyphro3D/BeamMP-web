@@ -46,13 +46,13 @@ async def list_servers(request: Request):
     require_admin(request)
     base = _base()
     can, why = servers.can_add(base)
-    # Installation Docker encore sur le service systemd (agent) : bascule proposée, sauf si install.sh
-    # l'a déjà refusée (raison affichée) ou si une demande est en attente.
+    # Installation Docker encore sur le service systemd (agent) : bascule proposée, sauf si une demande est en
+    # attente. Un refus d'install.sh s'affiche au-dessus du bouton : une fois la cause corrigée, on réessaie.
     refusal = "" if can else updater.runner_refusal()
     can_switch = (not can and bool(base.agent) and len(C.config.instances) == 1 and updater.docker_mode()
-                  and not refusal and not updater.host_status()["pending"])
+                  and not updater.host_status()["pending"])
     items = await asyncio.gather(*(_describe(i) for i in C.config.instances))
-    return ok({"canAdd": can, "reason": refusal or why, "canSwitch": can_switch,
+    return ok({"canAdd": can, "reason": refusal or why, "refusal": refusal, "canSwitch": can_switch,
                "switchPending": not can and updater.host_status()["pending"],
                "nextPort": servers.next_port(C.config.instances), "servers": list(items)})
 

@@ -141,11 +141,11 @@ def test_switch_to_runner_request(env, monkeypatch):
         assert listing["switchPending"] and not listing["canSwitch"]
         assert admin.post("/api/admin/servers/switch").status_code == 400       # une seule demande à la fois
 
-        # install.sh a refusé (service non conforme) : la raison remplace le bouton.
+        # install.sh a refusé (service non conforme) : la raison s'affiche, le bouton reste pour réessayer.
         (upd / "request.json").rename(upd / "consommee.json")
         (upd / "jeu-refus.txt").write_text("beammp.service tourne sous root, pas sous l'uid 1000\n")
         listing = admin.get("/api/admin/servers").json()
-        assert not listing["canSwitch"] and "uid 1000" in listing["reason"]
+        assert listing["canSwitch"] and "uid 1000" in listing["refusal"]
 
         db().run("UPDATE users SET role = 'admin' WHERE username = 'boss'")
         assert admin.post("/api/admin/servers/switch").status_code == 403

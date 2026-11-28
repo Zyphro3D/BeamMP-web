@@ -356,6 +356,7 @@ export interface ManagedServer {
 export interface ServerList {
   canAdd: boolean
   reason: string
+  refusal: string
   canSwitch: boolean
   switchPending: boolean
   nextPort: number
