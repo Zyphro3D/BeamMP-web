@@ -11,6 +11,9 @@ dernière entrée de ce fichier.
 - **Accueil public** : la carte « Active map » montre la carte que le serveur
   charge vraiment (`Map =`). Quand il tourne sur un niveau qui n'est pas une
   carte du panel (BeamNG.Earth), l'ancienne carte n'est plus affichée à tort.
+- **Cohérence** : `mods.json` (écrit par BeamMP-Server) et la copie de retour
+  arrière de BeamNG.Earth ne sont plus signalés comme orphelins dans `Client/`
+  (« Corriger » les aurait supprimés, et Earth aurait perdu son retour arrière).
 - **Barre latérale** : la vraie version du panel (`/api/info` la donne) au lieu
   de « BeamMP-Web v2 » écrit en dur.
 - **Activité récente** : les messages suivent la langue choisie (8 langues) ;

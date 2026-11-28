@@ -191,6 +191,10 @@ def _scan_consistency(inst) -> dict:
     for location, label, files in (("client", "Client", client), ("inactive_mod", "inactive_mod", inactive_mod),
                                    ("inactive_map", "inactive_map", inactive_map)):
         for filename in sorted(files):
+            # Seuls les zips et paks sont des mods. mods.json (écrit par BeamMP-Server) et beamng_earth.zip.previous
+            # (copie de retour arrière de BeamNG.Earth) ne sont pas des orphelins : « Corriger » les aurait supprimés.
+            if not filename.lower().endswith((".zip", ".pak")):
+                continue
             if filename not in referenced_files:
                 issues.append({"id": f"orphan_{'client' if location == 'client' else location}_{filename}",
                                "type": "orphan_file", "severity": "warning",

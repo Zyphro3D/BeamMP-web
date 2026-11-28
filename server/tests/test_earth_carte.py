@@ -114,3 +114,16 @@ def test_sans_earth_rien_ne_change(env):
         login(c)
         assert db().one("SELECT COUNT(*) AS n FROM mods WHERE filename = 'beamng_earth.zip'")["n"] == 0
         assert c.get(f"{URL}/earth").json() == {"installed": False, "active": False}
+
+
+def test_coherence_ignore_les_fichiers_qui_ne_sont_pas_des_mods(serveur):
+    """Recette du 28/11 : mods.json (BeamMP-Server) et beamng_earth.zip.previous (retour arrière d'Earth) étaient
+    signalés orphelins, et « Corriger » les supprimait."""
+    (serveur / "Client" / "mods.json").write_text("{}")
+    (serveur / "Client" / "beamng_earth.zip.previous").write_bytes(b"PK")
+    (serveur / "Client" / "vrai_orphelin.zip").write_bytes(b"PK")
+    with demarrer() as c:
+        login(c)
+        issues = c.get("/api/admin/i/default/consistency").json()["issues"]
+        noms = {i["meta"].get("filename") for i in issues if i["type"] == "orphan_file"}
+        assert noms == {"vrai_orphelin.zip"}
