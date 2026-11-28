@@ -25,6 +25,9 @@ RELEASES = [rel("v3.9.4", pre=True), rel("v3.9.3"), rel("v3.9.2"), rel("v3.9.1",
 @pytest.fixture()
 def serveur(env, monkeypatch):
     """Instance avec agent, faux agent (version 3.9.3) et faux GitHub ; g['installe'] = ce que l'agent a reçu."""
+    # test_appmode laisse BEAMMP_SERVER_EXE dans l'environnement (appmode.apply_to_environ écrit os.environ) : sans ce
+    # retrait, l'instance passerait en serveur géré par le panel au lieu de l'agent.
+    monkeypatch.delenv("BEAMMP_SERVER_EXE", raising=False)
     monkeypatch.setenv("BEAMMP_AGENT_URL", "http://agent.test:8787")
     monkeypatch.setenv("BEAMMP_AGENT_TOKEN", "jeton")
     monkeypatch.setenv("BEAMMP_AGENT_SERVICE", "beammp")
