@@ -16,6 +16,17 @@ function activityColor(type: ActivityEvent['type']): string {
     : 'bg-blue-400'
 }
 
+// Phrase dans la langue de l'utilisateur : clé activity_<type> (+ _on/_off pour un interrupteur), valeurs dans
+// e.params ; sans traduction (ancien serveur, type inconnu), le texte français du serveur.
+function activityText(e: ActivityEvent, t: (k: string) => string): string {
+  const p = e.params ?? {}
+  const key = `activity_${e.type}${p.state ? `_${p.state}` : ''}`
+  const tpl = t(key)
+  if (tpl === key) return e.message
+  const vals: Record<string, string> = { ...p, ...(p.channel ? { channel: t(`channel_${p.channel}`) } : {}) }
+  return tpl.replace(/\{(\w+)\}/g, (_, k: string) => vals[k] ?? '').replace(/\s+$/, '')
+}
+
 function activityTime(ts: string): string {
   return new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
@@ -166,7 +177,7 @@ export function SectionDashboard({ instanceId, mods, maps, vehicles, loading }: 
               <div key={e.id} className="flex items-center gap-3 px-4 py-2.5">
                 <span className="text-[11px] text-zinc-600 font-mono w-10 shrink-0">{activityTime(e.timestamp)}</span>
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activityColor(e.type)}`} />
-                <span className="text-xs text-zinc-700 dark:text-zinc-300">{e.message}</span>
+                <span className="text-xs text-zinc-700 dark:text-zinc-300">{activityText(e, t)}</span>
               </div>
             ))
           )}

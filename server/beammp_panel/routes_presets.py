@@ -107,7 +107,7 @@ async def apply_preset(request: Request):
             map_error = result
 
     invalidate_cache(inst.id)
-    log_activity(inst.id, "preset_applied", f"Config appliquée : {preset['name']}")
+    log_activity(inst.id, "preset_applied", f"Config appliquée : {preset['name']}", params={"name": preset["name"]})
 
     restarted, restart_error = False, None
     if can_restart(inst):

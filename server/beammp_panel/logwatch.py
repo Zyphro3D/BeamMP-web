@@ -117,7 +117,7 @@ async def handle_join(inst: InstanceConfig, username: str) -> None:
                    [inst.id, username])
     count = row["connection_count"] if row else 1
     label = "🥚 première connexion !" if count == 1 else (rank_label(count) or f"{count}e connexion")
-    log_activity(inst.id, "player_join", f"{username} s'est connecté", username)
+    log_activity(inst.id, "player_join", f"{username} s'est connecté", username, {"user": username})
     await notify_player_join(inst, username, label, len(online_players(inst.id)))
 
 
@@ -136,7 +136,8 @@ async def handle_leave(inst: InstanceConfig, username: str) -> None:
                  [seconds, inst.id, username])
     mins, secs = divmod(seconds, 60)
     duration = f"{mins}m {secs}s" if mins else f"{secs}s"
-    log_activity(inst.id, "player_leave", f"{username} s'est déconnecté · {duration} de session", username)
+    log_activity(inst.id, "player_leave", f"{username} s'est déconnecté · {duration} de session", username,
+                 {"user": username, "duration": duration})
     await notify_player_leave(inst, username, seconds, len(online_players(inst.id)))
 
 

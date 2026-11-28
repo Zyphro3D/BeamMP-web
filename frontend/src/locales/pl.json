@@ -409,5 +409,21 @@
   "channel_pinned": "Konkretna wersja",
   "prerelease_tag": "przedpremierowa",
   "installed_tag": "zainstalowana",
-  "install_downgrade": "Wróć do"
+  "install_downgrade": "Wróć do",
+  "activity_player_join": "{user} dołączył",
+  "activity_player_leave": "{user} wyszedł · sesja {duration}",
+  "activity_mod_upload": "Dodano mod · {name}",
+  "activity_map_change": "Zmieniono mapę → {map}",
+  "activity_server_restart": "Serwer uruchomiony ponownie",
+  "activity_server_update": "Serwer zaktualizowany do {version}",
+  "activity_server_update_channel": "Kanał aktualizacji serwera: {channel} {version}",
+  "activity_preset_applied": "Zastosowano konfigurację: {name}",
+  "activity_earth_settings": "BeamNG.Earth: zmieniono ustawienia ({fields})",
+  "activity_earth_store_clear": "BeamNG.Earth: wyczyszczono wspólny magazyn",
+  "activity_earth_pack_upload": "BeamNG.Earth: dodano pakiet {name} ({items} elementów)",
+  "activity_earth_pack_delete": "BeamNG.Earth: usunięto pakiet {name}",
+  "activity_earth_helper_on": "BeamNG.Earth: pomocnik udostępniania włączony ({procs} procesów)",
+  "activity_earth_helper_off": "BeamNG.Earth: pomocnik udostępniania wyłączony",
+  "activity_earth_update": "BeamNG.Earth zaktualizowany: {from} → {to} (wymagany restart)",
+  "activity_earth_rollback": "BeamNG.Earth: powrót do wersji {version} (wymagany restart)"
 }

@@ -15,10 +15,15 @@ _store: dict[str, deque[dict[str, Any]]] = defaultdict(lambda: deque(maxlen=MAX)
 _lock = threading.Lock()
 
 
-def log_activity(instance_id: str, type_: str, message: str, user: str | None = None) -> None:
+def log_activity(instance_id: str, type_: str, message: str, user: str | None = None,
+                 params: dict[str, Any] | None = None) -> None:
+    """`message` : texte français, gardé pour les anciens clients et en secours. `params` : les valeurs de la phrase,
+    que l'interface compose dans la langue de l'utilisateur (clé `activity_<type>`)."""
     event: dict[str, Any] = {"id": next(_counter), "type": type_, "message": message, "timestamp": now_iso()}
     if user is not None:
         event["user"] = user
+    if params:
+        event["params"] = {k: str(v) for k, v in params.items()}
     with _lock:
         _store[instance_id].appendleft(event)
 

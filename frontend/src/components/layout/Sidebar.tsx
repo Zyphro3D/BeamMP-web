@@ -62,7 +62,7 @@ export function Sidebar({ section, onSection, modCount, instanceId = 'default', 
             <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
               {status.serverName || 'BeamMP Panel'}
             </p>
-            <p className="text-[10px] text-zinc-400 dark:text-zinc-500">BeamMP-Web v2</p>
+            <p className="text-[10px] text-zinc-400 dark:text-zinc-500">BeamMP Panel{info?.version ? ` v${info.version}` : ''}</p>
           </div>
         </div>
       </div>

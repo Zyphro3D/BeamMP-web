@@ -10,6 +10,7 @@ from starlette.requests import Request
 from starlette.responses import StreamingResponse
 from starlette.routing import Route
 
+from . import VERSION
 from . import config as C
 from .activity import get_activity
 from .agent import can_restart
@@ -92,8 +93,9 @@ async def instance_activity(request: Request):
 
 
 async def info(request: Request):
+    # version : déjà dans l'en-tête X-BeamMP-Panel-Version de chaque réponse ; ici pour l'afficher dans la barre latérale.
     return ok({"discordUrl": C.config.discord.server_url, "kofiUrl": C.config.kofi_url,
-               "serverDescription": C.config.server_description})
+               "serverDescription": C.config.server_description, "version": VERSION})
 
 
 # Anciennes routes sans instance → première instance (compatibilité).

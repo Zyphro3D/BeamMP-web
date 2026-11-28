@@ -47,7 +47,8 @@ async def put_earth_settings(request: Request):
     changed = sorted(k for k in earth.SETTINGS if before.get(k) != settings.get(k))
     if changed:
         log_activity(inst.id, "earth_settings",
-                     "BeamNG.Earth : " + ", ".join(LABELS[k] for k in changed) + " modifié(s)", user.get("username"))
+                     "BeamNG.Earth : " + ", ".join(LABELS[k] for k in changed) + " modifié(s)", user.get("username"),
+                     {"fields": ", ".join(changed)})
     return ok({"file": settings, "changed": changed})
 
 
@@ -68,7 +69,7 @@ async def clear_store(request: Request):
     user = require_admin(request)
     inst = _installed_or_404(request)
     await run_in_threadpool(earth.request, inst, "clear-store")
-    log_activity(inst.id, "earth_store_clear", "BeamNG.Earth : stock partagé vidé", user.get("username"))
+    log_activity(inst.id, "earth_store_clear", "BeamNG.Earth : stock partagé vidé", user.get("username"), {"done": 1})
     return ok({"requested": True})
 
 
@@ -116,7 +117,7 @@ async def upload_pack(request: Request):
         await upload.close()
     await run_in_threadpool(earth.request, inst, "reload-packs")
     log_activity(inst.id, "earth_pack_upload", f"BeamNG.Earth : pack {name} ajouté ({head['items']} éléments)",
-                 user.get("username"))
+                 user.get("username"), {"name": name, "items": head["items"]})
     return ok({"name": name, **head})
 
 
@@ -126,7 +127,7 @@ async def delete_pack(request: Request):
     name = request.path_params["name"]
     if not await run_in_threadpool(earth.delete_pack, inst, name):
         raise ApiError(404, "Pack introuvable")
-    log_activity(inst.id, "earth_pack_delete", f"BeamNG.Earth : pack {name} retiré", user.get("username"))
+    log_activity(inst.id, "earth_pack_delete", f"BeamNG.Earth : pack {name} retiré", user.get("username"), {"name": name})
     return ok({"deleted": True})
 
 
@@ -140,7 +141,8 @@ async def put_helper(request: Request):
     await run_in_threadpool(earth.write_helper, inst, control)
     log_activity(inst.id, "earth_helper",
                  "BeamNG.Earth : assistant de partage " + ("allumé" if control["enabled"] else "éteint")
-                 + (f" ({control['procs']} processus)" if control["enabled"] else ""), user.get("username"))
+                 + (f" ({control['procs']} processus)" if control["enabled"] else ""), user.get("username"),
+                 {"state": "on" if control["enabled"] else "off", "procs": control.get("procs") or 0})
     return ok(control)
 
 
@@ -162,7 +164,7 @@ async def install_release(request: Request):
         raise ApiError(502, str(err))
     log_activity(inst.id, "earth_update",
                  f"BeamNG.Earth mis à jour : {result['previous'] or '?'} → {result['installed']} (redémarrage nécessaire)",
-                 user.get("username"))
+                 user.get("username"), {"from": result["previous"] or "?", "to": result["installed"]})
     return ok({**result, "needsRestart": True})
 
 
@@ -173,8 +175,8 @@ async def restore_release(request: Request):
         version = await run_in_threadpool(earth_release.restore_previous, inst)
     except RuntimeError as err:
         raise ApiError(409, str(err))
-    log_activity(inst.id, "earth_update", f"BeamNG.Earth : retour à la version {version} (redémarrage nécessaire)",
-                 user.get("username"))
+    log_activity(inst.id, "earth_rollback", f"BeamNG.Earth : retour à la version {version} (redémarrage nécessaire)",
+                 user.get("username"), {"version": version})
     return ok({"installed": version, "needsRestart": True})
 
 

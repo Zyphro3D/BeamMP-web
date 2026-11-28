@@ -34,7 +34,10 @@ export function Home() {
   }, [])
 
   // activeMods endpoint already filters active=true, so all returned items are active
-  const activeMap = mods.find((m) => m.type === 'map')
+  // La carte que le serveur charge vraiment (`Map =`, dans status.map) : la base peut en garder une autre marquée
+  // active quand le serveur tourne sur un niveau qui n'est pas une carte du panel (BeamNG.Earth, #4745).
+  const levelOf = (id?: string | null) => (id ?? '').replace(/^\/?levels\//, '').replace(/\/(info\.json)?$/, '')
+  const activeMap = mods.find((m) => m.type === 'map' && !!status.map && levelOf(m.map_id) === levelOf(status.map))
   const vehicles  = mods.filter((m) => m.type === 'vehicle')
   const otherMods = mods.filter((m) => m.type === 'mod')
 

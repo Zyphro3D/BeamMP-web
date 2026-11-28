@@ -132,7 +132,7 @@ async def upload_mod(request: Request):
             [inst.id, name, type_, safe_filename, desc_json, int(start_active), map_id, image, dumps(metadata), now_iso()])
     except sqlite3.IntegrityError:
         raise ApiError(409, f'Un mod avec le fichier "{safe_filename}" existe déjà')
-    log_activity(inst.id, "mod_upload", f"Mod uploadé · {name}")
+    log_activity(inst.id, "mod_upload", f"Mod uploadé · {name}", params={"name": name})
     await notify_mod_upload(inst, name, type_, os.path.getsize(dest) if os.path.exists(dest) else 0, bool(start_active))
     return ok(db().one("SELECT * FROM mods WHERE id = ?", [cur.lastrowid]))
 
@@ -272,7 +272,7 @@ async def maps_activate(request: Request):
     if not good:
         raise ApiError(404, result)
     invalidate_cache(inst.id)
-    log_activity(inst.id, "map_change", f"Carte changée → {result['name']}")
+    log_activity(inst.id, "map_change", f"Carte changée → {result['name']}", params={"map": result["name"]})
     await notify_map_change(inst, result, previous["name"] if previous else None)
     return ok({"activated": map_id, "needsRestart": True})
 
@@ -368,7 +368,8 @@ async def server_update_channel(request: Request):
         version = None
     set_channel(inst, channel, version)
     log_activity(inst.id, "server_update_channel",
-                 f"Canal de mise à jour du serveur : {channel}{' ' + version if version else ''}")
+                 f"Canal de mise à jour du serveur : {channel}{' ' + version if version else ''}",
+                 params={"channel": channel, "version": version or ""})
     return ok(await check_for_update(inst))
 
 
@@ -382,7 +383,7 @@ async def server_update(request: Request):
     good, result = await update_via_agent(inst)
     if not good:
         raise ApiError(502, result)
-    log_activity(inst.id, "server_update", f"Serveur mis à jour vers {result}")
+    log_activity(inst.id, "server_update", f"Serveur mis à jour vers {result}", params={"version": result})
     await notify_update(inst, before.get("currentVersion"), str(result))
     return ok({"updated": True, "version": result})
 

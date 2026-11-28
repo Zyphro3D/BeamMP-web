@@ -326,6 +326,7 @@ export interface ServerInfo {
   discordUrl: string
   kofiUrl: string
   serverDescription: string
+  version?: string
 }
 
 export interface CriticalAlert {
@@ -355,10 +356,11 @@ export interface UpdateCheck {
 
 export interface ActivityEvent {
   id: number
-  type: 'player_join' | 'player_leave' | 'mod_upload' | 'server_restart' | 'server_update' | 'map_change'
-  message: string
+  type: string                      // player_join, map_change, earth_update… (activity_<type> dans les langues)
+  message: string                   // texte français du serveur, en secours
   timestamp: string
   user?: string
+  params?: Record<string, string>   // valeurs de la phrase, composée dans la langue de l'utilisateur
 }
 
 export interface ServerStatus {

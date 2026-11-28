@@ -409,5 +409,21 @@
   "channel_pinned": "Конкретная версия",
   "prerelease_tag": "предварительная",
   "installed_tag": "установлена",
-  "install_downgrade": "Вернуться к"
+  "install_downgrade": "Вернуться к",
+  "activity_player_join": "{user} подключился",
+  "activity_player_leave": "{user} отключился · сессия {duration}",
+  "activity_mod_upload": "Мод добавлен · {name}",
+  "activity_map_change": "Карта изменена → {map}",
+  "activity_server_restart": "Сервер перезапущен",
+  "activity_server_update": "Сервер обновлён до {version}",
+  "activity_server_update_channel": "Канал обновлений сервера: {channel} {version}",
+  "activity_preset_applied": "Конфигурация применена: {name}",
+  "activity_earth_settings": "BeamNG.Earth: настройки изменены ({fields})",
+  "activity_earth_store_clear": "BeamNG.Earth: общее хранилище очищено",
+  "activity_earth_pack_upload": "BeamNG.Earth: пакет {name} добавлен ({items} элементов)",
+  "activity_earth_pack_delete": "BeamNG.Earth: пакет {name} удалён",
+  "activity_earth_helper_on": "BeamNG.Earth: помощник обмена включён ({procs} процессов)",
+  "activity_earth_helper_off": "BeamNG.Earth: помощник обмена выключен",
+  "activity_earth_update": "BeamNG.Earth обновлён: {from} → {to} (нужен перезапуск)",
+  "activity_earth_rollback": "BeamNG.Earth: возврат к версии {version} (нужен перезапуск)"
 }

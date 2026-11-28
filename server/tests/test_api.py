@@ -32,7 +32,8 @@ def test_public_routes(client):
     assert set(st) >= {"online", "playerCount", "maxPlayers", "players", "map", "mapName", "serverName", "uptimeMs"}
     assert st["maxPlayers"] == 8 and st["serverName"] == "Serveur test"
     assert client.get("/api/i/nope/status").json()["online"] is False
-    assert client.get("/api/info").json() == {"discordUrl": "", "kofiUrl": "", "serverDescription": ""}
+    from beammp_panel import VERSION
+    assert client.get("/api/info").json() == {"discordUrl": "", "kofiUrl": "", "serverDescription": "", "version": VERSION}
     assert client.get("/api/i/default/mods/active").json() == []
     assert client.get("/api/activity").json() == []
 

@@ -434,5 +434,21 @@
   "channel_pinned": "Specific version",
   "prerelease_tag": "pre-release",
   "installed_tag": "installed",
-  "install_downgrade": "Roll back to"
+  "install_downgrade": "Roll back to",
+  "activity_player_join": "{user} joined",
+  "activity_player_leave": "{user} left · {duration} session",
+  "activity_mod_upload": "Mod added · {name}",
+  "activity_map_change": "Map changed → {map}",
+  "activity_server_restart": "Server restarted",
+  "activity_server_update": "Server updated to {version}",
+  "activity_server_update_channel": "Server update channel: {channel} {version}",
+  "activity_preset_applied": "Config applied: {name}",
+  "activity_earth_settings": "BeamNG.Earth: settings changed ({fields})",
+  "activity_earth_store_clear": "BeamNG.Earth: shared store cleared",
+  "activity_earth_pack_upload": "BeamNG.Earth: pack {name} added ({items} items)",
+  "activity_earth_pack_delete": "BeamNG.Earth: pack {name} removed",
+  "activity_earth_helper_on": "BeamNG.Earth: sharing helper on ({procs} processes)",
+  "activity_earth_helper_off": "BeamNG.Earth: sharing helper off",
+  "activity_earth_update": "BeamNG.Earth updated: {from} → {to} (restart needed)",
+  "activity_earth_rollback": "BeamNG.Earth: rolled back to version {version} (restart needed)"
 }
