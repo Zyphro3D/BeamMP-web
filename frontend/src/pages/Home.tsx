@@ -225,8 +225,10 @@ function ModGrid({ title, mods, lang }: { title: string; mods: Mod[]; lang: stri
           <div key={mod.id} className="card overflow-hidden">
             {mod.image ? (
               <img
-                src={`/images/${mod.image}`}
+                src={`/images/thumb/${mod.image}`}
                 alt={mod.name}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-28 object-cover"
               />
             ) : (

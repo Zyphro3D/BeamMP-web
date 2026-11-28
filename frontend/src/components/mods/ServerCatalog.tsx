@@ -89,7 +89,7 @@ export function ServerCatalog({ items }: { items: CatalogItem[] }) {
             <div key={item.id} className="card overflow-hidden flex flex-col">
               <div className="relative">
                 {item.image ? (
-                  <img src={`/images/${item.image}`} alt={item.name} loading="lazy"
+                  <img src={`/images/thumb/${item.image}`} alt={item.name} loading="lazy" decoding="async"
                        className="w-full h-28 object-cover" />
                 ) : (
                   <div className="w-full h-28 bg-surface-card flex items-center justify-center">

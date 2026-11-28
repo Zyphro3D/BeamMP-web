@@ -4,6 +4,22 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
+## [À venir]
+
+### Performances de la page publique
+
+- **Miniatures des grilles** : les cartes de mods et le catalogue chargent un
+  aperçu réduit à 400 px de large (`/images/thumb/<nom>`, fabriqué une fois et
+  gardé dans `images/.thumbs`), au lieu de l'image entière (jusqu'à 70 Ko pour
+  une vignette). Les images hors de l'écran se chargent à l'approche.
+- **Cache du navigateur** : les fichiers du build (`/assets/`, nom à empreinte)
+  sont gardés un an, les aperçus une semaine ; la page d'entrée est toujours
+  relue, si bien qu'une nouvelle version s'affiche tout de suite.
+- **CSP derrière Cloudflare** : un jeton aléatoire (`nonce`) différent à chaque
+  réponse est ajouté à `script-src`. Le script de détection des robots que
+  Cloudflare injecte n'est plus bloqué en console ; aucun script inline n'est
+  autorisé pour autant.
+
 ## [3.4.0] — 2026-11-24
 
 ### BeamNG.Earth

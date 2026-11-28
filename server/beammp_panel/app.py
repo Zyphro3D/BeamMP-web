@@ -6,6 +6,8 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
+import secrets
 from pathlib import Path
 
 from starlette.applications import Starlette
@@ -42,7 +44,6 @@ CSP = "; ".join([
     "script-src-attr 'none'",
 ])
 SECURITY_HEADERS = [
-    (b"content-security-policy", CSP.encode()),
     (b"cross-origin-opener-policy", b"same-origin"),
     (b"cross-origin-resource-policy", b"same-origin"),
     (b"origin-agent-cluster", b"?1"),
@@ -58,8 +59,34 @@ SECURITY_HEADERS = [
 ]
 
 
+def csp_header() -> bytes:
+    """CSP avec un jeton aléatoire neuf à chaque réponse. Aucun script du panel ne le porte : il sert au script de
+    détection des robots que Cloudflare injecte derrière son proxy (il recopie le jeton lu dans l'en-tête), qui était
+    bloqué en console. Sans Cloudflare devant, il ne change rien."""
+    return CSP.replace("script-src 'self'", f"script-src 'self' 'nonce-{secrets.token_urlsafe(16)}'", 1).encode()
+
+
+# Durées de cache des fichiers servis : les fichiers du build ont une empreinte dans leur nom (jamais réécrits),
+# les aperçus peuvent être remplacés sous le même nom, la page d'entrée doit toujours être relue.
+CACHE_IMMUABLE = b"public, max-age=31536000, immutable"
+CACHE_IMAGES = b"public, max-age=604800"
+CACHE_PAGE = b"no-cache"
+
+
+def cache_header(path: str, content_type: bytes) -> bytes | None:
+    if path.startswith("/api/") or path == "/api":
+        return None
+    if path.startswith("/assets/") and not content_type.startswith(b"text/html"):   # fichier absent : la page d'entrée revient
+        return CACHE_IMMUABLE
+    if path.startswith("/images/"):
+        return CACHE_IMAGES
+    if content_type.startswith(b"text/html"):
+        return CACHE_PAGE
+    return None
+
+
 class HeadersMiddleware:
-    """Ajoute les en-têtes de sécurité à chaque réponse (ASGI pur : compatible SSE)."""
+    """Ajoute les en-têtes de sécurité et de cache à chaque réponse (ASGI pur : compatible SSE)."""
 
     def __init__(self, app):
         self.app = app
@@ -70,12 +97,39 @@ class HeadersMiddleware:
 
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
-                existing = {k.lower() for k, _ in message.get("headers", [])}
-                message.setdefault("headers", [])
-                message["headers"] = list(message["headers"]) + [h for h in SECURITY_HEADERS if h[0] not in existing]
+                headers = list(message.get("headers", []))
+                existing = {k.lower() for k, _ in headers}
+                ajout = [h for h in SECURITY_HEADERS if h[0] not in existing]
+                if b"content-security-policy" not in existing:
+                    ajout.append((b"content-security-policy", csp_header()))
+                if b"cache-control" not in existing and message.get("status", 200) == 200:
+                    ctype = next((v for k, v in headers if k.lower() == b"content-type"), b"")
+                    cache = cache_header(scope.get("path", ""), ctype)
+                    if cache:
+                        ajout.append((b"cache-control", cache))
+                message["headers"] = headers + ajout
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+THUMB_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(?:webp|png|jpe?g)", re.I)
+THUMB_WIDTH = 400
+
+
+def make_thumb(src: Path, out: Path) -> None:
+    """Réduit `src` à THUMB_WIDTH px de large au plus (WebP qualité 78), écriture atomique."""
+    from PIL import Image, ImageOps
+    with Image.open(src) as img:
+        img = ImageOps.exif_transpose(img)
+        if img.width > THUMB_WIDTH:
+            img = img.resize((THUMB_WIDTH, round(img.height * THUMB_WIDTH / img.width)), Image.Resampling.LANCZOS)
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        tmp = out.with_suffix(".tmp")
+        img.save(tmp, "WEBP", quality=78)
+    os.replace(tmp, out)
 
 
 def default_frontend_dir() -> str:
@@ -156,6 +210,25 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
     images = C.config.images_path
     Path(images).mkdir(parents=True, exist_ok=True)
 
+    async def thumb(request: Request):
+        """Aperçu réduit à 400 px de large pour les grilles (cartes de mods, catalogue) : les anciens aperçus font jusqu'à
+        640 px et 70 Ko pour une vignette de 112 px de haut. Fabriqué une fois, gardé dans images/.thumbs, refait si
+        l'original change. Un nom hors du dossier ou illisible renvoie 404."""
+        name = request.path_params["name"]
+        if not THUMB_NAME.fullmatch(name):
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        src = Path(images, name)
+        if not src.is_file():
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        out = Path(images, ".thumbs", Path(name).stem + ".webp")
+        try:
+            if not out.is_file() or out.stat().st_mtime < src.stat().st_mtime:
+                await asyncio.to_thread(make_thumb, src, out)
+        except Exception:      # image illisible : l'original reste servi tel quel
+            log.warning("Miniature impossible pour %s", name)
+            return FileResponse(src)
+        return FileResponse(out, media_type="image/webp")
+
     async def spa(request: Request):
         path = request.path_params.get("path", "")
         if path.startswith("api/") or path == "api":
@@ -177,6 +250,7 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
         *routes_presets.routes,
         *routes_discord.routes,
         *routes_earth.routes,
+        Route("/images/thumb/{name}", thumb),
         Mount("/images", app=StaticFiles(directory=images, check_dir=False), name="images"),
         Route("/{path:path}", spa),
     ]
