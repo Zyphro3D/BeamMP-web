@@ -4,7 +4,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 `X-BeamMP-Panel-Version` (header HTTP sur chaque réponse API) reflète la
 dernière entrée de ce fichier.
 
-## [À venir]
+## [3.5.0] — 2026-11-28
 
 ### Plusieurs serveurs
 
@@ -22,13 +22,18 @@ dernière entrée de ce fichier.
   l'ajout de serveurs » passe le serveur dans le conteneur, avec le même
   dossier, les mêmes mods et le même port. L'ancien service est désactivé
   (rien n'est effacé) et revient tout seul si le serveur ne repart pas ; la
-  raison d'un refus s'affiche à la place du bouton. Voir le README,
-  section *Plusieurs serveurs*.
+  raison d'un refus s'affiche au-dessus du bouton, qui reste là pour réessayer
+  une fois la cause corrigée. Voir le README, section *Plusieurs serveurs*.
 - **Bibliothèque de mods commune** : chaque zip (mod, véhicule, carte) est
   rangé une seule fois pour tous les serveurs, et ajouté à un autre serveur en
   un clic, sans le renvoyer. Un mod désactivé reste dans la bibliothèque ; un
   zip n'est effacé que lorsque plus aucun serveur ne l'utilise. Les mods
   existants y sont rangés au premier démarrage (doublons exacts fusionnés).
+  Active quand le panel fait tourner les serveurs lui-même (conteneur « jeu »
+  ou Windows) ; BeamNG.Earth reste propre à chaque serveur.
+- **Chaque serveur garde ses réglages** : configuration, mods actifs, carte,
+  préréglages, joueurs connus, Discord et BeamNG.Earth se choisissent par la
+  liste déroulante en haut du tableau de bord.
 
 ### Corrections
 
