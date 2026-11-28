@@ -20,7 +20,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from . import (VERSION, appmode, logwatch, modstate, routes_admin, routes_app, routes_auth, routes_dashboard, routes_discord,
-               routes_earth, routes_presets, routes_public, supervisor, updater)
+               routes_earth, routes_presets, routes_public, routes_servers, supervisor, updater)
 from . import config as C
 from .db import db, init_db, now_iso
 from .security import ApiError, hash_password
@@ -250,6 +250,7 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
         *routes_presets.routes,
         *routes_discord.routes,
         *routes_earth.routes,
+        *routes_servers.routes,
         Route("/images/thumb/{name}", thumb),
         Mount("/images", app=StaticFiles(directory=images, check_dir=False), name="images"),
         Route("/{path:path}", spa),
@@ -261,19 +262,31 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
                                      allow_credentials=True, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
                                      allow_headers=["Content-Type", "Authorization"]))
 
-    tasks: list[asyncio.Task] = []
+    watchers: dict[str, asyncio.Task] = {}   # suivi du journal, un par serveur
+
+    def watch(inst) -> None:
+        if start_watchers and inst.id not in watchers:
+            watchers[inst.id] = logwatch.start_watcher(inst)
+
+    async def unwatch(instance_id: str) -> None:
+        task = watchers.pop(instance_id, None)
+        if task:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    routes_servers.watch_instance = watch
+    routes_servers.unwatch_instance = unwatch
 
     async def start_runtime() -> None:
         if start_watchers:
-            tasks.extend(logwatch.start_log_watchers())
+            for inst in C.config.instances:
+                watch(inst)
             # Appli Windows : le panel lance et surveille BeamMP-Server lui-même.
             await supervisor.start_all(C.config.instances)
 
     async def stop_runtime() -> None:
-        for t in tasks:
-            t.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        tasks.clear()
+        for iid in list(watchers):
+            await unwatch(iid)
         await supervisor.stop_all()
 
     async def reload_runtime() -> None:

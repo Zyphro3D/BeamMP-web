@@ -68,6 +68,15 @@ class BeamMPPaths:
 
 
 @dataclass
+class RunnerConfig:
+    """Conteneur « jeu » (Linux) : fait tourner les BeamMP-Server, piloté en HTTP par le panel."""
+    url: str
+    token: str
+    # Suffixe d'asset BeamMP-Server ; vide = celui du système du panel (même image que le conteneur).
+    asset: str = ""
+
+
+@dataclass
 class InstanceConfig:
     id: str
     name: str
@@ -78,6 +87,13 @@ class InstanceConfig:
     # Exécutable BeamMP-Server lancé et surveillé par le panel lui-même
     # (appli Windows). Vide = le serveur est géré ailleurs (systemd + agent).
     server_exe: str = ""
+    # Dossier de travail de BeamMP-Server (ServerConfig.toml, Resources, Server.log).
+    # Vide = le dossier de l'exécutable (serveur unique historique).
+    workdir: str = ""
+    # Conteneur « jeu » qui fait tourner ce serveur (Linux) ; prioritaire sur l'agent.
+    runner: RunnerConfig | None = None
+    # "env" = déclaré par l'installation (.env / settings.json), "panel" = ajouté par le bouton du panel.
+    origin: str = "env"
 
 
 @dataclass
@@ -119,7 +135,25 @@ def _build_agent(service: str, asset: str) -> AgentConfig | None:
     return None
 
 
+def _build_runner() -> RunnerConfig | None:
+    url, token = env("BEAMMP_RUNNER_URL"), env("BEAMMP_RUNNER_TOKEN")
+    return RunnerConfig(url=url.rstrip("/"), token=token, asset=env("BEAMMP_RUNNER_ASSET")) if url and token else None
+
+
 def _parse_instances() -> list[InstanceConfig]:
+    instances = _env_instances()
+    runner = _build_runner()
+    if runner and not env("INSTANCES"):
+        instances[0].runner = runner       # le serveur historique tourne lui aussi dans le conteneur « jeu »
+    from . import servers                  # import tardif : servers lit cette configuration
+    known = {i.id for i in instances}
+    for entry in servers.load_registry():
+        if entry["id"] not in known:
+            instances.append(servers.instance_for(entry, instances[0], runner))
+    return instances
+
+
+def _env_instances() -> list[InstanceConfig]:
     raw = env("INSTANCES")
     if not raw:
         return [InstanceConfig(

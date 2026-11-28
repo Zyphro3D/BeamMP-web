@@ -1,0 +1,117 @@
+"""Bouton « Ajouter un serveur » : création, démarrage à chaud, retrait avec archivage."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+import time
+
+import pytest
+from starlette.testclient import TestClient
+
+from beammp_panel import config as C
+from beammp_panel import servers, supervisor
+from beammp_panel.app import create_app
+from beammp_panel.db import db
+
+from .conftest import login
+from .test_runner import make_exe
+
+KEY = "abcd1234-ef56-7890-abcd-1234567890ab"
+
+
+@pytest.fixture()
+def local(env, monkeypatch):
+    """Panel en supervision locale (comme l'appli Windows) avec un BeamMP-Server factice."""
+    exe = make_exe(env / "srv" / "BeamMP-Server")
+    monkeypatch.setenv("BEAMMP_SERVER_EXE", str(exe))
+    monkeypatch.setenv("BEAMMP_SERVERS_PATH", str(env / "servers"))
+    C.set_config(C.load_config())
+    supervisor._servers.clear()
+    with TestClient(create_app()) as client:
+        yield login(client), env
+    asyncio.run(supervisor.stop_all())
+
+
+def test_add_requires_supervision(admin):
+    r = admin.get("/api/admin/servers")
+    assert r.status_code == 200 and r.json()["canAdd"] is False
+    r = admin.post("/api/admin/servers", json={"name": "Event", "port": 30900, "authKey": KEY})
+    assert r.status_code == 409
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="exécutable factice en script shebang")
+def test_add_start_list_remove(local):
+    client, env = local
+    listing = client.get("/api/admin/servers").json()
+    assert listing["canAdd"] and listing["nextPort"] == 30814 or listing["nextPort"] >= 30814
+
+    for bad in ({"name": "", "port": 30900, "authKey": KEY},
+                {"name": "X", "port": 80, "authKey": KEY},
+                {"name": "X", "port": 30900, "authKey": "court"},
+                {"name": "X", "port": 30900, "authKey": 'a"b\nInjecte = 1'}):
+        assert client.post("/api/admin/servers", json=bad).status_code == 400
+
+    r = client.post("/api/admin/servers", json={"name": "Soirée drift", "port": 30900, "authKey": KEY})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["server"]["id"] == "soiree-drift" and data["started"], data
+    d = env / "servers" / "soiree-drift"
+    toml = (d / "ServerConfig.toml").read_text()
+    assert 'Name = "Soirée drift"' in toml and "Port = 30900" in toml and KEY in toml
+    assert (d / "Resources" / "Client").is_dir() and (d / "Resources" / "Server").is_dir()
+
+    # Le serveur tourne dans son dossier, et le reste du panel le connaît aussitôt.
+    end = time.time() + 10
+    while time.time() < end and "ALL SYSTEMS" not in (d / "Server.log").read_text():
+        time.sleep(0.2)
+    assert str(d) in (d / "Server.log").read_text()
+    ids = [i["id"] for i in client.get("/api/instances").json()]
+    assert ids == ["default", "soiree-drift"]
+    assert client.get("/api/i/soiree-drift/server/state").json()["running"]
+    assert KEY not in client.get("/api/admin/servers").text          # la clé ne ressort jamais
+
+    # Même port refusé ; même nom = nouvel identifiant.
+    assert client.post("/api/admin/servers", json={"name": "Autre", "port": 30900, "authKey": KEY}).status_code == 400
+    r2 = client.post("/api/admin/servers", json={"name": "Soirée drift", "port": 30901, "authKey": KEY})
+    assert r2.json()["server"]["id"] == "soiree-drift-2"
+
+    # La configuration rechargée (redémarrage du panel) retrouve les serveurs ajoutés.
+    assert [i.id for i in C.load_config().instances] == ["default", "soiree-drift", "soiree-drift-2"]
+
+    # Le serveur de l'installation ne se retire pas.
+    assert client.delete("/api/admin/servers/default").status_code == 400
+
+    sp = supervisor._servers["soiree-drift"]
+    r = client.delete("/api/admin/servers/soiree-drift")
+    assert r.status_code == 200, r.text
+    assert not sp.running() and "soiree-drift" not in supervisor._servers
+    assert not d.exists()
+    archived = list((env / "servers" / "_archives").iterdir())
+    assert len(archived) == 1 and (archived[0] / "ServerConfig.toml").is_file()
+    assert [e["id"] for e in json.loads((env / "data" / "servers.json").read_text())["servers"]] == ["soiree-drift-2"]
+    assert client.get("/api/i/soiree-drift/server/state").status_code == 404
+
+    # Un identifiant archivé n'est jamais réutilisé.
+    r3 = client.post("/api/admin/servers", json={"name": "Soirée drift", "port": 30902, "authKey": KEY})
+    assert r3.json()["server"]["id"] == "soiree-drift-3"
+
+
+def test_admin_cannot_add(local):
+    client, _ = local
+    db().run("UPDATE users SET role = 'admin' WHERE username = 'boss'")   # admin, pas superadmin
+    assert client.get("/api/admin/servers").status_code == 200
+    assert client.post("/api/admin/servers", json={"name": "X", "port": 30950, "authKey": KEY}).status_code == 403
+    assert client.delete("/api/admin/servers/x").status_code == 403
+
+
+def test_registry_ignores_bad_entries(env, monkeypatch):
+    (env / "data").mkdir(exist_ok=True)
+    (env / "data" / "servers.json").write_text(json.dumps({"servers": [
+        {"id": "../etc", "name": "x", "port": 30900},
+        {"id": "ok", "name": "Bon", "port": 30901},
+        {"id": "port", "name": "x", "port": "30902"}]}))
+    assert [e["id"] for e in servers.load_registry()] == ["ok"]
+    (env / "data" / "servers.json").write_text("{pas du json")
+    assert servers.load_registry() == []

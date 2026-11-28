@@ -240,12 +240,13 @@ async def watch_instance(inst: InstanceConfig, poll_s: float = POLL_S) -> None:
         await asyncio.sleep(poll_s)
 
 
+def start_watcher(inst) -> asyncio.Task:
+    log.info('Suivi du journal démarré pour l\'instance "%s"', inst.id)
+    return asyncio.create_task(watch_instance(inst), name=f"logwatch-{inst.id}")
+
+
 def start_log_watchers() -> list[asyncio.Task]:
-    tasks = []
-    for inst in C.config.instances:
-        tasks.append(asyncio.create_task(watch_instance(inst), name=f"logwatch-{inst.id}"))
-        log.info('Suivi du journal démarré pour l\'instance "%s"', inst.id)
-    return tasks
+    return [start_watcher(inst) for inst in C.config.instances]
 
 
 def reset() -> None:
