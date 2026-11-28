@@ -19,7 +19,7 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import (VERSION, appmode, logwatch, modstate, routes_admin, routes_app, routes_auth, routes_dashboard, routes_discord,
+from . import (VERSION, appmode, library, logwatch, modstate, routes_admin, routes_app, routes_auth, routes_dashboard, routes_discord,
                routes_earth, routes_presets, routes_public, routes_servers, supervisor, updater)
 from . import config as C
 from .db import db, init_db, now_iso
@@ -308,6 +308,11 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
                 await asyncio.to_thread(modstate.ensure_earth_map, inst)
         except Exception:      # une réparation ratée ne doit jamais empêcher le panel de démarrer
             log.exception("Réparation des identifiants de carte impossible")
+        try:
+            # Zips encore rangés serveur par serveur : dans la bibliothèque commune, liés là où ils sont actifs
+            await asyncio.to_thread(library.migrate, C.config.instances)
+        except Exception:
+            log.exception("Rangement dans la bibliothèque de mods impossible")
         await start_runtime()
         if appmode.layout():
             updater.mark_healthy_later()

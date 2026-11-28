@@ -385,6 +385,45 @@ Pour revenir en arrière : `docker compose stop jeu`, retirer
 `COMPOSE_PROFILES=jeu` de `.env`, supprimer
 `/etc/systemd/system/beammp.service.d/beammp-panel-jeu.conf`, puis
 `systemctl daemon-reload` et `systemctl enable --now beammp beammp-agent`.
+Les mods actifs sont alors des liens vers `/beammp/bibliotheque`, un chemin
+du conteneur que le service de l'hôte ne voit pas (voir ci-dessous) :
+remplacez-les d'abord par le zip lui-même, dans le dossier `Resources/Client`
+du serveur :
+
+```bash
+for f in *.zip *.pak; do [ -L "$f" ] && cp --remove-destination "DOSSIER/bibliotheque/$f" "$f"; done
+```
+
+Les mods inactifs restent dans `DOSSIER/bibliotheque/`.
+
+### Bibliothèque de mods
+
+Avec le conteneur « jeu » (et dans l'appli Windows), les zips des mods,
+véhicules et cartes sont rangés **une seule fois** dans
+`DOSSIER/bibliotheque/`, pour tous les serveurs. Le dossier `Client/` d'un
+serveur ne contient qu'un lien par mod actif sur ce serveur :
+
+- désactiver un mod retire son lien, le zip reste dans la bibliothèque ;
+- **Ajouter** → section *Bibliothèque de mods* : un zip déjà envoyé s'ajoute
+  à un autre serveur sans être renvoyé ni recopié (une carte arrive rangée si
+  le serveur en a déjà une active) ; renvoyer le même fichier sur un second
+  serveur est refusé ;
+- retirer un mod d'un serveur garde le zip tant qu'un autre serveur
+  l'utilise ; un serveur archivé garde aussi les siens, jusqu'à leur
+  suppression depuis la bibliothèque ;
+- BeamNG.Earth reste propre à chaque serveur.
+
+Au premier démarrage, le panel range dans la bibliothèque les zips encore
+dans `Client/`, `inactive_mod/` et `inactive_map/` de chaque serveur. Deux
+zips identiques n'en font plus qu'un ; deux zips différents portant le même
+nom sont gardés tous les deux, le second renommé (`nom-2.zip`).
+
+Sous Linux, les liens visent `/beammp/bibliotheque/…`, monté au même endroit
+dans le panel et dans « jeu » : vus depuis l'hôte, ils semblent cassés, c'est
+normal. **Sauvegardez `DOSSIER/bibliotheque/`** avec les dossiers des
+serveurs : sans elle, les liens ne mènent plus à rien. Sous Windows, le lien
+est un lien dur, ou une copie quand la bibliothèque et le dossier du serveur
+sont sur deux disques différents.
 
 ### Installation à la main : instances déclarées dans `.env`
 
@@ -602,6 +641,8 @@ Voir [CHANGELOG.md](./CHANGELOG.md) pour le détail des versions.
 
 Le volume `app_data` (base SQLite `panel.db`) est la seule copie des comptes,
 joueurs connus, mods et configs — sans sauvegarde, sa perte est irréversible.
+Les zips des mods sont, eux, dans `bibliotheque/` (conteneur « jeu ») ou dans
+le dossier `Resources/` de chaque serveur : à sauvegarder aussi.
 
 ```bash
 ./scripts/backup-db.sh            # copie à chaud vers ./backups/, gardée 14 jours

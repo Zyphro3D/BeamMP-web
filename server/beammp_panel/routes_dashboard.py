@@ -15,12 +15,13 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from . import config as C
+from . import library
 from .activity import log_activity
 from .agent import CHANNELS, can_restart, check_for_update, restart_via_agent, set_channel, update_via_agent
-from .analyzer import analyze_upload, to_webp
+from .analyzer import analyze_upload, analyze_zip, to_webp
 from .db import db, dumps, now_iso
 from .discord import notify_map_change, notify_mod_upload, notify_restart, notify_update
-from .files import delete_file, ensure_dir, read_text, tail_lines, write_text
+from .files import delete_file, ensure_dir, read_text, safe_basename, tail_lines, write_text
 from .logwatch import active_alerts
 from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, is_earth_map, level_of, map_levels, valid_map_id, read_config_entries,
                        set_mod_active, set_toml_key)
@@ -90,6 +91,11 @@ async def upload_mod(request: Request):
         # fichier d'un mod existant en cas de collision de nom.
         if db().one("SELECT id FROM mods WHERE instance_id = ? AND filename = ?", [inst.id, safe_filename]):
             raise ApiError(409, f'Un mod avec le fichier "{safe_filename}" existe déjà')
+        # Bibliothèque commune : un zip déjà utilisé par un autre serveur ne s'écrase pas, il s'ajoute depuis la
+        # bibliothèque. Un zip qui n'y sert plus à personne peut être remplacé.
+        in_library = library.shared({"filename": safe_filename})
+        if in_library and library.users(safe_filename):
+            raise ApiError(409, f'"{safe_filename}" est déjà dans la bibliothèque : ajoute-le depuis la bibliothèque')
 
         # Une seule carte active : une nouvelle carte arrive inactive s'il y
         # en a déjà une — et son zip va alors dans inactive_map/, pas dans
@@ -98,10 +104,12 @@ async def upload_mod(request: Request):
         if type_ == "map" and db().one(
                 "SELECT id FROM mods WHERE instance_id = ? AND type = 'map' AND active = 1 LIMIT 1", [inst.id]):
             start_active = False
-        sub = "Client" if start_active or type_ != "map" else "inactive_map"
-        dest_dir = os.path.join(inst.beammp.resources_path, sub)
-        ensure_dir(dest_dir)
-        dest = os.path.join(dest_dir, safe_filename)
+        if in_library:
+            dest = library.lib_file(safe_filename)      # puis lié dans Client/ s'il est actif
+        else:
+            sub = "Client" if start_active or type_ != "map" else "inactive_map"
+            dest = os.path.join(inst.beammp.resources_path, sub, safe_filename)
+        ensure_dir(os.path.dirname(dest))
         tmp = dest + ".part"
         await upload.seek(0)
 
@@ -122,7 +130,7 @@ async def upload_mod(request: Request):
     if type_ == "map" and map_id is None:
         # Champ laissé vide : le niveau est lu dans le zip (levels/<nom>/). Un pack à plusieurs niveaux reste sans :
         # le choix est demandé à l'activation.
-        levels = await run_in_threadpool(map_levels, inst, {"filename": safe_filename})
+        levels = await run_in_threadpool(map_levels, inst, {"filename": safe_filename, "type": "map"})
         map_id = levels[0] if len(levels) == 1 else None
     desc_json = dumps({"fr": desc}) if desc else None
     try:
@@ -132,6 +140,9 @@ async def upload_mod(request: Request):
             [inst.id, name, type_, safe_filename, desc_json, int(start_active), map_id, image, dumps(metadata), now_iso()])
     except sqlite3.IntegrityError:
         raise ApiError(409, f'Un mod avec le fichier "{safe_filename}" existe déjà')
+    if in_library:
+        await run_in_threadpool(library.place, inst, db().one("SELECT * FROM mods WHERE id = ?", [cur.lastrowid]),
+                                start_active)
     log_activity(inst.id, "mod_upload", f"Mod uploadé · {name}", params={"name": name})
     await notify_mod_upload(inst, name, type_, os.path.getsize(dest) if os.path.exists(dest) else 0, bool(start_active))
     return ok(db().one("SELECT * FROM mods WHERE id = ?", [cur.lastrowid]))
@@ -165,11 +176,16 @@ async def delete_mod(request: Request):
     if is_earth_map(mod):
         raise ApiError(403, "BeamNG.Earth ne se supprime pas d'ici : active une autre carte pour le ranger")
     db().run("DELETE FROM mods WHERE id = ? AND instance_id = ?", [mod_id, inst.id])
-    for sub in ("Client", "inactive_mod", "inactive_map"):
-        delete_file(os.path.join(inst.beammp.resources_path, sub, mod["filename"]))
-    if mod["image"]:
-        delete_file(os.path.join(C.config.images_path, mod["image"]))
+    # Le zip reste dans la bibliothèque tant qu'un autre serveur l'utilise ; seul le lien de ce serveur part.
+    await run_in_threadpool(library.forget, inst, mod)
+    _drop_image_if_unused(mod["image"])
     return ok({"deleted": True})
+
+
+def _drop_image_if_unused(image: str | None) -> None:
+    """Une image peut servir à plusieurs serveurs (mod ajouté depuis la bibliothèque) : supprimée au dernier."""
+    if image and not db().one("SELECT id FROM mods WHERE image = ? LIMIT 1", [image]):
+        delete_file(os.path.join(C.config.images_path, image))
 
 
 async def toggle_official(request: Request):
@@ -228,10 +244,92 @@ async def upload_image(request: Request):
     Path(C.config.images_path, img_name).write_bytes(webp)
     # L'ancienne image extraite du zip devenait orpheline dans la v2.
     old = mod["image"]
-    if old and old != img_name:
-        delete_file(os.path.join(C.config.images_path, old))
     db().run("UPDATE mods SET image = ? WHERE id = ?", [img_name, mod_id])
+    if old and old != img_name:
+        _drop_image_if_unused(old)
     return ok({"image": img_name})
+
+
+# ── Bibliothèque commune ───────────────────────────────────────
+
+def _library_or_400() -> None:
+    if not library.enabled():
+        raise ApiError(400, "Bibliothèque de mods indisponible : les serveurs ne tournent pas dans le conteneur « jeu »")
+
+
+async def library_list(request: Request):
+    require_admin(request)
+    if not library.enabled():
+        return ok({"enabled": False, "items": []})
+    return ok({"enabled": True, "items": await run_in_threadpool(library.listing)})
+
+
+def _add_from_library(inst, filename: str) -> dict:
+    path = library.lib_file(filename)
+    if not library.shared({"filename": filename}) or not os.path.isfile(path):
+        raise ApiError(404, "Absent de la bibliothèque")
+    if db().one("SELECT id FROM mods WHERE instance_id = ? AND filename = ?", [inst.id, filename]):
+        raise ApiError(409, f'"{filename}" est déjà sur ce serveur')
+    known = {i.id for i in C.config.instances}
+    source = next((r for r in db().all("SELECT * FROM mods WHERE filename = ? ORDER BY id", [filename])
+                   if r["instance_id"] in known), None)
+    if source:
+        name, type_, map_id, metadata = source["name"], source["type"], source["map_id"], source["metadata"]
+        desc = source["description"]
+        image = None
+        if source["image"] and os.path.isfile(os.path.join(C.config.images_path, source["image"])):
+            # Une image à soi : changer celle d'un serveur ne change pas celle des autres
+            image = f"{re.sub(r'[^A-Za-z0-9_-]', '_', inst.id)}_lib_{Path(filename).stem}.webp"
+            shutil.copyfile(os.path.join(C.config.images_path, source["image"]),
+                            os.path.join(C.config.images_path, image))
+    else:   # zip que plus aucun serveur n'utilise : relu comme à l'import
+        a = analyze_zip(path, "client", C.config.images_path, Path(filename).stem, inst.id)
+        name, type_, image, metadata, desc = a["name"], a["type"], a["imageFilename"], a["metadata"], None
+        map_id = a["mapId"] if a["mapId"] and valid_map_id(a["mapId"]) else None
+    # Comme à l'envoi : une carte arrive rangée si ce serveur en a déjà une active
+    start_active = not (type_ == "map" and db().one(
+        "SELECT id FROM mods WHERE instance_id = ? AND type = 'map' AND active = 1 LIMIT 1", [inst.id]))
+    try:
+        cur = db().run(
+            "INSERT INTO mods (instance_id, name, type, filename, description, active, map_id, image, metadata, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [inst.id, name, type_, filename, dumps(desc) if desc else None, int(start_active), map_id, image,
+             dumps(metadata), now_iso()])
+    except sqlite3.IntegrityError:
+        raise ApiError(409, f'"{filename}" est déjà sur ce serveur')
+    mod = library.place(inst, db().one("SELECT * FROM mods WHERE id = ?", [cur.lastrowid]), start_active)
+    return db().one("SELECT * FROM mods WHERE id = ?", [mod["id"]])
+
+
+async def mods_from_library(request: Request):
+    require_admin(request)
+    inst = instance_or_404(request.path_params["instanceId"])
+    _library_or_400()
+    body = await json_body(request)
+    filename = safe_basename(body.get("filename"))
+    if not filename:
+        raise ApiError(400, "filename requis")
+    mod = await run_in_threadpool(_add_from_library, inst, filename)
+    log_activity(inst.id, "mod_upload", f"Mod ajouté depuis la bibliothèque · {mod['name']}", params={"name": mod["name"]})
+    return ok({**mod, "needsRestart": True})
+
+
+async def library_delete(request: Request):
+    require_admin(request)
+    _library_or_400()
+    filename = safe_basename(request.path_params["filename"])
+    if not filename or not library.shared({"filename": filename}):
+        raise ApiError(400, "Nom de fichier invalide")
+    if library.users(filename, archived=False):
+        raise ApiError(409, "Encore utilisé par un serveur : retire-le d'abord de chaque serveur")
+    if not os.path.isfile(library.lib_file(filename)):
+        raise ApiError(404, "Absent de la bibliothèque")
+    # Seuls des serveurs archivés l'avaient encore : leurs lignes partent avec lui (leur archive garde un lien mort,
+    # sans effet : un serveur archivé ne tourne plus)
+    db().run("DELETE FROM mods WHERE filename = ?", [filename])
+    await run_in_threadpool(library.unlink_everywhere, filename)
+    delete_file(library.lib_file(filename))
+    return ok({"deleted": True})
 
 
 # ── Cartes ─────────────────────────────────────────────────────
@@ -393,6 +491,9 @@ async def server_update(request: Request):
 routes = [
     Route("/api/i/{instanceId}/mods", list_mods),
     Route("/api/i/{instanceId}/mods/upload", upload_mod, methods=["POST"]),
+    Route("/api/i/{instanceId}/mods/from-library", mods_from_library, methods=["POST"]),
+    Route("/api/library", library_list),
+    Route("/api/library/{filename}", library_delete, methods=["DELETE"]),
     Route("/api/i/{instanceId}/mods/{id}/toggle", toggle_mod, methods=["POST"]),
     Route("/api/i/{instanceId}/mods/{id}", delete_mod, methods=["DELETE"]),
     Route("/api/i/{instanceId}/mods/{id}/official", toggle_official, methods=["PATCH"]),

@@ -567,6 +567,8 @@ if [ "$JEU" -eq 1 ]; then
     fi
     # Dossier des serveurs ajoutés depuis le panel, à l'uid des deux conteneurs
     install -d -o 1000 -g 1000 "$DIR/servers"
+    # Bibliothèque de mods commune aux serveurs (zips liés dans Client/ de chacun)
+    install -d -o 1000 -g 1000 "$DIR/bibliotheque"
 elif [ -f "/etc/systemd/system/$AGENT_UNIT" ]; then
     install_agent_code
 else

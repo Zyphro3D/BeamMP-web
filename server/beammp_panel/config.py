@@ -125,6 +125,8 @@ class Config:
     kofi_url: str
     discord: DiscordConfig
     instances: list[InstanceConfig] = field(default_factory=list)
+    # Bibliothèque de mods commune aux serveurs (library.py) ; vide = chaque serveur range ses mods chez lui
+    library_path: str = ""
 
 
 def _build_agent(service: str, asset: str) -> AgentConfig | None:
@@ -212,6 +214,7 @@ def load_config() -> Config:
         trust_proxy=env("TRUST_PROXY"),
         server_description=env("SERVER_DESCRIPTION"),
         kofi_url=env("KOFI_URL"),
+        library_path=env("BEAMMP_LIBRARY_PATH"),
         discord=DiscordConfig(
             webhook_url=env("DISCORD_WEBHOOK_URL"),
             webhook_restart=env("DISCORD_WEBHOOK_RESTART"),

@@ -49,7 +49,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     }.items():
         monkeypatch.setenv(key, value)
     for key in ("INSTANCES", "BEAMMP_SERVER_IP", "BEAMMP_SERVER_PORT", "BEAMMP_AGENT_URL", "DISCORD_WEBHOOK_URL",
-                "BEAMMP_SERVER_EXE", "BEAMMP_RUNNER_URL", "BEAMMP_RUNNER_TOKEN", "BEAMMP_SERVERS_PATH"):
+                "BEAMMP_SERVER_EXE", "BEAMMP_RUNNER_URL", "BEAMMP_RUNNER_TOKEN", "BEAMMP_SERVERS_PATH",
+                "BEAMMP_LIBRARY_PATH"):
         monkeypatch.delenv(key, raising=False)
     C.set_config(C.load_config())
     status.reset()

@@ -24,6 +24,11 @@ dernière entrée de ce fichier.
   (rien n'est effacé) et revient tout seul si le serveur ne repart pas ; la
   raison d'un refus s'affiche à la place du bouton. Voir le README,
   section *Plusieurs serveurs*.
+- **Bibliothèque de mods commune** : chaque zip (mod, véhicule, carte) est
+  rangé une seule fois pour tous les serveurs, et ajouté à un autre serveur en
+  un clic, sans le renvoyer. Un mod désactivé reste dans la bibliothèque ; un
+  zip n'est effacé que lorsque plus aucun serveur ne l'utilise. Les mods
+  existants y sont rangés au premier démarrage (doublons exacts fusionnés).
 
 ### Corrections
 

@@ -10,6 +10,7 @@ import { SectionMods } from './SectionMods'
 import { SectionMaps } from './SectionMaps'
 import { SectionPlayers } from './SectionPlayers'
 import { SectionUpload } from './SectionUpload'
+import { SectionLibrary } from './SectionLibrary'
 import { SectionConfig } from './SectionConfig'
 import { SectionPresets } from './SectionPresets'
 import { SectionConsistency } from './SectionConsistency'
@@ -178,7 +179,7 @@ export function Dashboard() {
           {section === 'mods'      && <SectionMods instanceId={instanceId} mods={modList} vehicles={vehicles} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'maps'      && <SectionMaps instanceId={instanceId} maps={maps} onRefresh={refresh} loading={loading} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'players'   && <SectionPlayers instanceId={instanceId} />}
-          {section === 'upload'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionUpload instanceId={instanceId} onRefresh={refresh} />}
+          {section === 'upload'       && (user?.role === 'superadmin' || user?.role === 'admin') && <><SectionUpload instanceId={instanceId} onRefresh={refresh} /><SectionLibrary instanceId={instanceId} onRefresh={refresh} /></>}
           {section === 'config'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConfig instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={handleRestart} />}
           {section === 'presets'      && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionPresets instanceId={instanceId} mods={modList} vehicles={vehicles} maps={maps} onApplied={refresh} onNeedsRestart={() => setNeedsRestart(true)} />}
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}

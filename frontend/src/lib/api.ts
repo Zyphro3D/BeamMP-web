@@ -73,6 +73,12 @@ export const api = {
   mods:    (instanceId: string) => request<Mod[]>(`${i(instanceId)}/mods`),
   uploadMod: (instanceId: string, formData: FormData) =>
     request<Mod>(`${i(instanceId)}/mods/upload`, { method: 'POST', body: formData }),
+  // Bibliothèque commune aux serveurs : un zip, lié dans Client/ des serveurs où il est actif
+  library: () => request<{ enabled: boolean; items: LibraryItem[] }>('/api/library'),
+  addFromLibrary: (instanceId: string, filename: string) =>
+    request<Mod>(`${i(instanceId)}/mods/from-library`, { method: 'POST', body: JSON.stringify({ filename }) }),
+  deleteFromLibrary: (filename: string) =>
+    request<{ deleted: boolean }>(`/api/library/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
   toggleMod: (instanceId: string, id: number) =>
     request<Mod>(`${i(instanceId)}/mods/${id}/toggle`, { method: 'POST' }),
   deleteMod: (instanceId: string, id: number) =>
@@ -475,6 +481,15 @@ export interface Mod {
   is_official: boolean
   metadata: ModMetadata | null
   created_at: string
+}
+
+export interface LibraryItem {
+  filename: string
+  size: number
+  name: string
+  type: 'mod' | 'vehicle' | 'map' | null
+  servers: { id: string; name: string; active: boolean }[]
+  archived: string[]
 }
 
 export interface SetupStatus {

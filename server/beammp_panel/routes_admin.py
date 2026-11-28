@@ -13,7 +13,8 @@ from . import config as C
 from .analyzer import analyze_metadata, analyze_zip, level_id
 from .db import db, dumps, now_iso
 from .modstate import valid_map_id
-from .files import (delete_file, ensure_dir, list_files, move_file, resolve_within, safe_basename)
+from . import library
+from .files import (delete_file, list_files, resolve_within, safe_basename)
 from .security import ApiError, hash_password, require_admin, require_auth, require_superadmin, revoke_tokens
 from .web import instance_or_404, int_param, json_body, ok
 
@@ -141,6 +142,12 @@ def _scan_consistency(inst) -> dict:
     inactive_mod = set(list_files(os.path.join(rp, "inactive_mod")))
     inactive_map = set(list_files(os.path.join(rp, "inactive_map")))
     images = list_files(images_dir)
+    client_dir = os.path.join(rp, "Client")
+    # Un lien cassé dans Client/ (zip retiré de la bibliothèque à la main) empêche BeamMP-Server de démarrer.
+    try:
+        broken = sorted(e.name for e in os.scandir(client_dir) if e.is_symlink() and not os.path.exists(e.path))
+    except OSError:
+        broken = []
 
     referenced_files: set[str] = set()
     # Le dossier d'images est partagé par toutes les instances : une image
@@ -159,6 +166,12 @@ def _scan_consistency(inst) -> dict:
         in_client = mod["filename"] in client
         in_inactive = mod["filename"] in (inactive_map if mod["type"] == "map" else inactive_mod)
         inactive_name = INACTIVE_DIRS[mod["type"]]
+        if library.shared(mod):
+            # Rangé = dans la bibliothèque (un zip resté dans inactive_*/ y entre à la correction)
+            in_inactive = in_inactive or os.path.isfile(library.lib_file(mod["filename"]))
+            if in_client and os.path.islink(os.path.join(client_dir, mod["filename"])):
+                in_inactive = False     # le lien de Client/ n'est pas un second exemplaire
+            inactive_name = "bibliothèque"
         if mod["type"] == "map" and mod["active"]:
             active_maps.append(mod)
 
@@ -187,6 +200,12 @@ def _scan_consistency(inst) -> dict:
                        "description": f"{len(active_maps)} cartes marquées actives simultanément ({names}) — une seule devrait l'être",
                        "fix": "fix_multiple_active_maps",
                        "meta": {"keepId": active_maps[0]["id"], "ids": ",".join(str(m["id"]) for m in active_maps)}})
+
+    for name in broken:
+        issues.append({"id": f"broken_link_{name}", "type": "orphan_file", "severity": "error",
+                       "description": f"Lien cassé dans Client/ : {name} (le zip n'existe plus ; BeamMP-Server ne "
+                                      "démarre pas tant qu'il reste)",
+                       "fix": "delete_orphan_file", "meta": {"filename": name, "location": "client"}})
 
     for location, label, files in (("client", "Client", client), ("inactive_mod", "inactive_mod", inactive_mod),
                                    ("inactive_map", "inactive_map", inactive_map)):
@@ -238,20 +257,17 @@ async def consistency_fix(request: Request):
     fix = body.get("fix")
     meta = body.get("meta") if isinstance(body.get("meta"), dict) else {}
     rp = inst.beammp.resources_path
-    client_dir = os.path.join(rp, "Client")
     # `meta` vient du client : les chemins sont toujours recalculés côté
     # serveur depuis l'id du mod, ou réduits à un nom de base vérifié.
 
     if fix == "move_to_client":
         mod = _mod_for_fix(inst, meta)
-        move_file(os.path.join(rp, INACTIVE_DIRS[mod["type"]], mod["filename"]), os.path.join(client_dir, mod["filename"]))
+        mod = await run_in_threadpool(library.place, inst, mod, True)
         db().run("UPDATE mods SET active = 1 WHERE id = ?", [mod["id"]])
         return ok({"fixed": True, "action": fix, "filename": mod["filename"]})
     if fix == "move_to_inactive":
         mod = _mod_for_fix(inst, meta)
-        dest_dir = os.path.join(rp, INACTIVE_DIRS[mod["type"]])
-        ensure_dir(dest_dir)
-        move_file(os.path.join(client_dir, mod["filename"]), os.path.join(dest_dir, mod["filename"]))
+        mod = await run_in_threadpool(library.place, inst, mod, False)
         db().run("UPDATE mods SET active = 0 WHERE id = ?", [mod["id"]])
         return ok({"fixed": True, "action": fix, "filename": mod["filename"]})
     if fix == "delete_db_record":
@@ -276,6 +292,11 @@ async def consistency_fix(request: Request):
         name = safe_basename(meta.get("filename"))
         if not name:
             raise ApiError(400, "Invalid filename")
+        link = os.path.join(rp, sub, name)
+        if os.path.islink(link):
+            # Un lien vers la bibliothèque (ou cassé) : seul le lien part, jamais le zip qu'il vise
+            os.unlink(link)
+            return ok({"fixed": True, "action": fix, "filename": name})
         path = resolve_within(os.path.join(rp, sub), name)
         if not path:
             raise ApiError(400, "Invalid path")
@@ -339,6 +360,9 @@ def _scan_import(inst) -> dict:
                     [inst.id, a["name"], a["type"], filename, a["imageFilename"], int(active), map_id,
                      dumps(a["metadata"]), now_iso()])
                 existing.add(filename)
+                row = db().one("SELECT * FROM mods WHERE instance_id = ? AND filename = ?", [inst.id, filename])
+                if row:
+                    library.place(inst, row, active)    # dans la bibliothèque, lié dans Client/ s'il est actif
                 results.append({"filename": filename, "name": a["name"], "type": a["type"], "active": active,
                                 "hasImage": bool(a["imageFilename"]), "status": "imported"})
             except Exception as err:
@@ -360,15 +384,14 @@ async def scan_import(request: Request):
 
 
 def _analyze_existing(inst) -> dict:
-    rows = db().all("SELECT id, type, filename, active FROM mods WHERE instance_id = ? AND metadata IS NULL "
+    rows = db().all("SELECT id, type, filename, active, is_official FROM mods WHERE instance_id = ? AND metadata IS NULL "
                     "ORDER BY id LIMIT ?", [inst.id, ANALYZE_EXISTING_BATCH + 1])
     remaining = len(rows) > ANALYZE_EXISTING_BATCH
     rows = rows[:ANALYZE_EXISTING_BATCH]
     analyzed = not_found = errors = 0
     for mod in rows:
-        sub = "Client" if mod["active"] else INACTIVE_DIRS[mod["type"]]
-        path = os.path.join(inst.beammp.resources_path, sub, mod["filename"])
-        if not os.path.exists(path):
+        path = library.stored_path(inst, mod)
+        if not path:
             not_found += 1
             continue
         try:

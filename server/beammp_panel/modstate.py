@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import zipfile
 from typing import Any
@@ -11,14 +10,13 @@ from typing import Any
 from .config import InstanceConfig
 from .db import db
 from .analyzer import level_candidates
-from .files import ensure_dir, move_file, read_text, write_text
+from . import library
+from .files import read_text, write_text
 
 log = logging.getLogger("beammp_panel")
 
 
-def _has_file(mod: dict[str, Any]) -> bool:
-    filename = mod.get("filename") or ""
-    return not mod.get("is_official") and bool(filename) and not filename.startswith("__official__:")
+_has_file = library.has_file
 
 
 def set_mod_active(inst: InstanceConfig, mod_id: int, active: bool) -> dict[str, Any] | None:
@@ -30,12 +28,9 @@ def set_mod_active(inst: InstanceConfig, mod_id: int, active: bool) -> dict[str,
         return mod
     db().run("UPDATE mods SET active = ? WHERE id = ? AND instance_id = ?", [int(active), mod_id, inst.id])
     updated = db().one("SELECT * FROM mods WHERE id = ? AND instance_id = ?", [mod_id, inst.id])
-    if updated and _has_file(updated):
-        active_dir = os.path.join(inst.beammp.resources_path, "Client")
-        inactive_dir = os.path.join(inst.beammp.resources_path, "inactive_mod")
-        ensure_dir(inactive_dir)
-        src_dir, dest_dir = (inactive_dir, active_dir) if active else (active_dir, inactive_dir)
-        move_file(os.path.join(src_dir, updated["filename"]), os.path.join(dest_dir, updated["filename"]))
+    if updated:
+        # Dans Client/ (lien vers la bibliothèque, ou le zip lui-même sans bibliothèque) ou rangé
+        updated = library.place(inst, updated, active)
     return updated
 
 
@@ -66,14 +61,8 @@ def valid_map_id(map_id: str) -> bool:
 
 
 def map_zip_path(inst: InstanceConfig, mod: dict[str, Any]) -> str | None:
-    """Le zip d'une carte sur le disque (Client/ si active, inactive_map/ sinon) ; None pour une carte officielle."""
-    if not _has_file(mod):
-        return None
-    for sub in ("Client", "inactive_map"):
-        path = os.path.join(inst.beammp.resources_path, sub, mod["filename"])
-        if os.path.isfile(path):
-            return path
-    return None
+    """Le zip d'une carte sur le disque (bibliothèque, Client/ ou inactive_map/) ; None pour une carte officielle."""
+    return library.stored_path(inst, mod)
 
 
 def map_levels(inst: InstanceConfig, mod: dict[str, Any]) -> list[str]:
@@ -164,9 +153,6 @@ def activate_map(inst: InstanceConfig, map_id: str, mod_id: int | None = None) -
     content = read_text(inst.beammp.config_path)
     if content:
         write_text(inst.beammp.config_path, set_toml_key(content, "Map", format_toml_value("Map", map_config_value(map_id))))
-    client_dir = os.path.join(inst.beammp.resources_path, "Client")
-    inactive_dir = os.path.join(inst.beammp.resources_path, "inactive_map")
-
     # Toutes les autres cartes actives, pas seulement la première : après un import
     # depuis le disque, deux cartes pouvaient l'être et l'ancienne restait dans Client/.
     # Toutes les autres cartes dont le zip est dans Client/, actives en base ou non : une base réalignée sur `Map =`
@@ -174,20 +160,13 @@ def activate_map(inst: InstanceConfig, map_id: str, mod_id: int | None = None) -
     for current in db().all("SELECT * FROM mods WHERE type = 'map' AND instance_id = ?", [inst.id]):
         if current["id"] == new_map["id"] or not _has_file(current):
             continue
-        src = os.path.join(client_dir, current["filename"])
-        if os.path.exists(src):
-            ensure_dir(inactive_dir)
-            move_file(src, os.path.join(inactive_dir, current["filename"]))
+        library.place(inst, current, False)
 
     with db().transaction() as t:
         t.run("UPDATE mods SET active = 0 WHERE type = 'map' AND instance_id = ?", [inst.id])
         t.run("UPDATE mods SET active = 1 WHERE id = ? AND instance_id = ?", [new_map["id"], inst.id])
 
-    if _has_file(new_map):
-        src = os.path.join(inactive_dir, new_map["filename"])
-        if os.path.exists(src):
-            ensure_dir(client_dir)
-            move_file(src, os.path.join(client_dir, new_map["filename"]))
+    new_map = library.place(inst, new_map, True)
 
     # Le plugin de BeamNG.Earth suit sa carte : sous Server/ seulement quand Earth est la carte active.
     from . import earth

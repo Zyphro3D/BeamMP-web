@@ -98,6 +98,8 @@ def apply_to_environ() -> dict[str, Any]:
     # Serveurs ajoutés par le bouton « Ajouter un serveur » : un dossier chacun, à côté des réglages
     # (une mise à jour de l'appli n'y touche pas), tous lancés avec le BeamMP-Server.exe de server_dir.
     os.environ.setdefault("BEAMMP_SERVERS_PATH", str(data_dir() / "servers"))
+    # Bibliothèque de mods commune : chaque zip une fois, lié dans Client/ des serveurs où il est actif.
+    os.environ.setdefault("BEAMMP_LIBRARY_PATH", str(data_dir() / "bibliotheque"))
     if settings.get("server_name"):
         os.environ.setdefault("INSTANCE_NAME", settings["server_name"])
     if settings.get("server_dir"):

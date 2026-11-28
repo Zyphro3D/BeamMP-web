@@ -25,6 +25,8 @@ services:
       # dépose une demande ici, l'hôte fait la mise à jour.
       BEAMMP_PANEL_UPDATE_DIR: /app/update
       BEAMMP_SERVERS_PATH: /beammp/servers
+      # Bibliothèque de mods commune aux serveurs (même chemin dans « jeu » : les liens de Client/ y pointent)
+      BEAMMP_LIBRARY_PATH: /beammp/bibliotheque
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -45,6 +47,8 @@ services:
       # Serveurs ajoutés par le bouton « Ajouter un serveur » (un dossier chacun), partagés
       # avec le conteneur « jeu » qui les fait tourner.
       - ./servers:/beammp/servers
+      # Bibliothèque de mods : un exemplaire de chaque zip, lié dans Client/ des serveurs où il est actif.
+      - ./bibliotheque:/beammp/bibliotheque
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/api/info', timeout=5)"]
@@ -91,6 +95,8 @@ services:
     volumes:
       - ${BEAMMP_SERVER_DIR:-./beammp-server}:/beammp/main
       - ./servers:/beammp/servers
+      # Au même chemin que dans le panel : BeamMP-Server suit les liens de Client/ vers ce dossier.
+      - ./bibliotheque:/beammp/bibliotheque:ro
     restart: unless-stopped
     # Laisse aux serveurs le temps de s'arrêter proprement (le superviseur les arrête un par un)
     stop_grace_period: 40s
