@@ -136,7 +136,7 @@ async def setup(request: Request):
 
 # ── Serveur local (supervision) ─────────────────────────────────
 
-def _local(request: Request) -> supervisor.ServerProcess:
+def _local(request: Request) -> supervisor.ServerProcess | supervisor.RemoteServer:
     inst = instance_or_404(request.path_params["instanceId"])
     sp = supervisor.get(inst)
     if not sp:
@@ -148,7 +148,7 @@ async def server_state(request: Request):
     require_admin(request)
     inst = instance_or_404(request.path_params["instanceId"])
     sp = supervisor.get(inst)
-    return ok({"managed": bool(sp), **(sp.state() if sp else {})})
+    return ok({"managed": bool(sp), **(await sp.fetch_state() if sp else {})})
 
 
 async def server_start(request: Request):
@@ -158,14 +158,14 @@ async def server_start(request: Request):
         await sp.start()
     except OSError as err:
         raise ApiError(500, str(err))
-    return ok({"managed": True, **sp.state()})
+    return ok({"managed": True, **await sp.fetch_state()})
 
 
 async def server_stop(request: Request):
     require_admin(request)
     sp = _local(request)
     await sp.stop()
-    return ok({"managed": True, **sp.state()})
+    return ok({"managed": True, **await sp.fetch_state()})
 
 
 # ── Mise à jour du panel ───────────────────────────────────────

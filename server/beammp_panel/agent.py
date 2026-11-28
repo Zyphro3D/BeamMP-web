@@ -36,13 +36,15 @@ def _error_from(res: httpx.Response) -> str:
 
 
 def can_restart(inst: InstanceConfig) -> bool:
-    return inst.agent is not None or bool(inst.server_exe)
+    return inst.agent is not None or bool(inst.server_exe) or inst.runner is not None
 
 
 def _asset(inst: InstanceConfig) -> str | None:
-    """Suffixe d'asset de mise à jour : celui de l'agent, ou celui du système en supervision locale."""
+    """Suffixe d'asset de mise à jour : supervision locale (Windows), conteneur « jeu », ou agent."""
     if inst.server_exe:
         return supervisor.asset_name() or None
+    if inst.runner:
+        return inst.runner.asset or supervisor.linux_asset() or None
     return inst.agent.asset if inst.agent else None
 
 
@@ -55,7 +57,7 @@ async def restart_via_agent(inst: InstanceConfig) -> tuple[bool, str | None]:
             return False, str(err)
         return True, None
     if not inst.agent:
-        return False, "beammp-agent non configuré pour cette instance (BEAMMP_AGENT_URL/TOKEN/SERVICE)"
+        return False, "Redémarrage non configuré pour cette instance (BEAMMP_AGENT_URL/TOKEN/SERVICE)"
     try:
         async with httpx.AsyncClient(timeout=35) as client:  # l'agent laisse 30 s à systemctl
             res = await client.post(
