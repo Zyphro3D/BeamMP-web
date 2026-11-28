@@ -38,12 +38,47 @@ SETTINGS = {
 _TIME_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
 
 
-def plugin_dir(inst: InstanceConfig) -> str:
+# BeamNG.Earth est aussi une carte du panel (#4521) : quand une autre carte est active, son plugin est rangé ici (BeamMP
+# charge tout ce qui est sous Server/, quelle que soit la carte) et son zip dans inactive_map/, comme toute carte.
+PARKED_PLUGIN_DIR = os.path.join("inactive_plugins", "BeamNGEarth")
+LEVEL = "beamng_earth"          # le niveau que le mod installe : Map = "/levels/beamng_earth/info.json"
+
+
+def _active_dir(inst: InstanceConfig) -> str:
     return os.path.join(inst.beammp.resources_path, PLUGIN_DIR)
+
+
+def _parked_dir(inst: InstanceConfig) -> str:
+    return os.path.join(inst.beammp.resources_path, PARKED_PLUGIN_DIR)
+
+
+def plugin_dir(inst: InstanceConfig) -> str:
+    """Où est le plugin : à sa place s'il y est (ou s'il n'est nulle part), sinon rangé. Réglages, packs et mises à
+    jour suivent donc le plugin où qu'il soit."""
+    active = _active_dir(inst)
+    if os.path.isfile(os.path.join(active, "main.lua")) or not os.path.isfile(os.path.join(_parked_dir(inst), "main.lua")):
+        return active
+    return _parked_dir(inst)
 
 
 def installed(inst: InstanceConfig) -> bool:
     return os.path.isfile(os.path.join(plugin_dir(inst), "main.lua"))
+
+
+def active(inst: InstanceConfig) -> bool:
+    """Plugin à sa place sous Server/ : BeamMP le charge."""
+    return os.path.isfile(os.path.join(_active_dir(inst), "main.lua"))
+
+
+def set_active(inst: InstanceConfig, on: bool) -> bool:
+    """Range (on=False) ou remet (on=True) le dossier du plugin. -> True si quelque chose a bougé. Jamais d'écrasement :
+    si les deux emplacements existent, rien ne bouge (à régler à la main)."""
+    src, dst = (_parked_dir(inst), _active_dir(inst)) if on else (_active_dir(inst), _parked_dir(inst))
+    if not os.path.isfile(os.path.join(src, "main.lua")) or os.path.exists(dst):
+        return False
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    os.replace(src, dst)
+    return True
 
 
 def _number(value: Any, lo: float, hi: float, integer: bool = False) -> bool:
@@ -317,7 +352,7 @@ def overview(inst: InstanceConfig, config_text: str) -> dict[str, Any]:
     """Tout ce que la page BeamNG.Earth du panel affiche (config_text : ServerConfig.toml ; sa clé n'en sort pas,
     seulement le fait qu'elle soit remplie)."""
     if not installed(inst):
-        return {"installed": False}
+        return {"installed": False, "active": False}
     main_lua = read_text(os.path.join(plugin_dir(inst), "main.lua"))
     base = defaults(main_lua)
     file, file_error = read_settings_file(inst)
@@ -335,6 +370,7 @@ def overview(inst: InstanceConfig, config_text: str) -> dict[str, Any]:
         listing = "earth"            # liste BeamNG.Earth, cachée de la liste BeamMP par le plugin
     return {
         "installed": True,
+        "active": active(inst),
         "supportsSettings": supports_settings(main_lua),
         "defaults": base,
         "file": file,

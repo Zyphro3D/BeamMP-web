@@ -111,6 +111,35 @@ def repair_map_ids(instances: list[InstanceConfig]) -> int:
     return fixed
 
 
+EARTH_DESCRIPTION = {"fr": "Le monde réel, généré pendant que tu roules (BeamNG.Earth).",
+                     "en": "The real world, generated while you drive (BeamNG.Earth)."}
+
+
+def ensure_earth_map(inst: InstanceConfig) -> bool:
+    """BeamNG.Earth installé : une entrée dans les cartes (créée une fois), active si `Map =` pointe sur son niveau.
+    -> True si elle vient d'être créée. Aucun fichier ne bouge ici : c'est « Activer » qui range et sort."""
+    from . import earth
+    from .earth_release import MOD
+    from .db import dumps, now_iso
+    if not earth.installed(inst) or db().one("SELECT id FROM mods WHERE instance_id = ? AND filename = ?", [inst.id, MOD]):
+        return False
+    m = re.search(r"^Map\s*=\s*[\"']?/?levels/([^/\"']+)", read_text(inst.beammp.config_path), re.M)
+    on = bool(m and m.group(1) == earth.LEVEL)
+    with db().transaction() as t:
+        if on:
+            t.run("UPDATE mods SET active = 0 WHERE type = 'map' AND instance_id = ?", [inst.id])
+        t.run("INSERT INTO mods (instance_id, name, type, filename, description, active, map_id, image, metadata, created_at) "
+              "VALUES (?, 'BeamNG.Earth', 'map', ?, ?, ?, ?, NULL, NULL, ?)",
+              [inst.id, MOD, dumps(EARTH_DESCRIPTION), int(on), earth.LEVEL, now_iso()])
+    log.info("Cartes : BeamNG.Earth ajouté à la liste (%s)", "active" if on else "inactive")
+    return True
+
+
+def is_earth_map(mod: dict[str, Any] | None) -> bool:
+    from .earth_release import MOD
+    return bool(mod) and mod.get("type") == "map" and mod.get("filename") == MOD
+
+
 def activate_map(inst: InstanceConfig, map_id: str, mod_id: int | None = None) -> tuple[bool, Any]:
     """Active une carte : range l'ancienne, sort la nouvelle, met à jour `Map =`.
 
@@ -140,7 +169,9 @@ def activate_map(inst: InstanceConfig, map_id: str, mod_id: int | None = None) -
 
     # Toutes les autres cartes actives, pas seulement la première : après un import
     # depuis le disque, deux cartes pouvaient l'être et l'ancienne restait dans Client/.
-    for current in db().all("SELECT * FROM mods WHERE type = 'map' AND active = 1 AND instance_id = ?", [inst.id]):
+    # Toutes les autres cartes dont le zip est dans Client/, actives en base ou non : une base réalignée sur `Map =`
+    # (status._active_map) pouvait laisser l'ancien zip dans Client/, téléchargé par les joueurs pour rien (#4521).
+    for current in db().all("SELECT * FROM mods WHERE type = 'map' AND instance_id = ?", [inst.id]):
         if current["id"] == new_map["id"] or not _has_file(current):
             continue
         src = os.path.join(client_dir, current["filename"])
@@ -157,6 +188,10 @@ def activate_map(inst: InstanceConfig, map_id: str, mod_id: int | None = None) -
         if os.path.exists(src):
             ensure_dir(client_dir)
             move_file(src, os.path.join(client_dir, new_map["filename"]))
+
+    # Le plugin de BeamNG.Earth suit sa carte : sous Server/ seulement quand Earth est la carte active.
+    from . import earth
+    earth.set_active(inst, is_earth_map(new_map))
 
     return True, db().one("SELECT * FROM mods WHERE id = ?", [new_map["id"]])
 

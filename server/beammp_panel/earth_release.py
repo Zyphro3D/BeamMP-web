@@ -42,7 +42,10 @@ _installed_cache: dict[str, tuple[tuple[int, float], str | None]] = {}
 
 
 def mod_path(inst: InstanceConfig) -> str:
-    return os.path.join(inst.beammp.resources_path, "Client", MOD)
+    """Le zip du mod : dans Client/ quand Earth est la carte active, dans inactive_map/ quand une autre l'est."""
+    client = os.path.join(inst.beammp.resources_path, "Client", MOD)
+    parked = os.path.join(inst.beammp.resources_path, "inactive_map", MOD)
+    return parked if not os.path.isfile(client) and os.path.isfile(parked) else client
 
 
 def plugin_path(inst: InstanceConfig) -> str:

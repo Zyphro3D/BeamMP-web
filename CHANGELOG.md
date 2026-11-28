@@ -32,6 +32,15 @@ dernière entrée de ce fichier.
 - **Le niveau est lu dans le zip** : à l'ajout d'une carte, le champ « identifiant »
   peut rester vide, le panel lit `levels/<nom>/` dans le zip. Au démarrage, les
   cartes déjà enregistrées sans identifiant le reçoivent de la même façon.
+- **BeamNG.Earth est une carte du panel** : il apparaît dans la liste des cartes
+  dès qu'il est installé. Activer une autre carte range son zip (`inactive_map/`)
+  et son plugin serveur (`inactive_plugins/`), que BeamMP ne charge plus ; le
+  réactiver les remet. La section BeamNG.Earth ne s'affiche que quand il est la
+  carte active ; rangé, ses réglages, ses packs et sa version restent intacts.
+  Il ne se supprime pas depuis la liste.
+- **Changement de carte** : tous les zips de cartes restés dans `Client/` sont
+  rangés, même ceux que la base ne croyait plus actifs (les joueurs les
+  téléchargeaient pour rien).
 - **« Activer » marche toujours** : la carte est désignée par son id (deux zips
   du même niveau ne sont plus confondus). Un identifiant absent ou faux est repris
   du zip ; un pack à plusieurs niveaux propose le choix ; un zip sans niveau dit

@@ -22,7 +22,7 @@ from .db import db, dumps, now_iso
 from .discord import notify_map_change, notify_mod_upload, notify_restart, notify_update
 from .files import delete_file, ensure_dir, read_text, tail_lines, write_text
 from .logwatch import active_alerts
-from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, level_of, map_levels, valid_map_id, read_config_entries,
+from .modstate import (ALLOWED_CONFIG_KEYS, activate_map, format_toml_value, is_earth_map, level_of, map_levels, valid_map_id, read_config_entries,
                        set_mod_active, set_toml_key)
 from .security import ApiError, limiter, require_admin, require_auth
 from .status import invalidate_cache
@@ -162,6 +162,8 @@ async def delete_mod(request: Request):
         raise ApiError(404, "Not found")
     if mod["is_official"]:
         raise ApiError(403, "Cannot delete an official mod/map")
+    if is_earth_map(mod):
+        raise ApiError(403, "BeamNG.Earth ne se supprime pas d'ici : active une autre carte pour le ranger")
     db().run("DELETE FROM mods WHERE id = ? AND instance_id = ?", [mod_id, inst.id])
     for sub in ("Client", "inactive_mod", "inactive_map"):
         delete_file(os.path.join(inst.beammp.resources_path, sub, mod["filename"]))

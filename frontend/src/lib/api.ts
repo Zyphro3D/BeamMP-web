@@ -302,6 +302,7 @@ export interface EarthRelease {
 }
 
 export interface EarthOverview {
+  active?: boolean                // plugin à sa place sous Server/ : Earth est la carte active (#4521)
   installed: boolean
   supportsSettings?: boolean
   defaults?: EarthSettings

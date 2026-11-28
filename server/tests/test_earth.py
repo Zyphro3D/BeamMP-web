@@ -42,7 +42,7 @@ def state(**over):
 
 def test_not_installed(admin):
     r = admin.get("/api/i/default/earth")
-    assert r.status_code == 200 and r.json() == {"installed": False}
+    assert r.status_code == 200 and r.json() == {"installed": False, "active": False}
     assert admin.put("/api/i/default/earth/settings", json={}).status_code == 404
 
 

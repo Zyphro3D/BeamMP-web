@@ -68,7 +68,8 @@ export function Dashboard() {
   useEffect(() => {
     const role = getStoredUser()?.role
     if (!instanceId || (role !== 'superadmin' && role !== 'admin')) { setEarth(false); return }
-    api.earth(instanceId).then(d => setEarth(d.installed)).catch(() => setEarth(false))
+    // Section visible seulement quand Earth est la carte active : rangé, son plugin ne tourne pas (#4521).
+    api.earth(instanceId).then(d => setEarth(d.installed && d.active !== false)).catch(() => setEarth(false))
   }, [instanceId])
 
   useEffect(() => {

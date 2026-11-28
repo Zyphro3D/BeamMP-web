@@ -291,6 +291,8 @@ def create_app(*, start_watchers: bool = True, frontend_dir: str | None = None) 
         create_initial_superadmin()
         try:
             await asyncio.to_thread(modstate.repair_map_ids, C.config.instances)
+            for inst in C.config.instances:
+                await asyncio.to_thread(modstate.ensure_earth_map, inst)
         except Exception:      # une réparation ratée ne doit jamais empêcher le panel de démarrer
             log.exception("Réparation des identifiants de carte impossible")
         await start_runtime()
