@@ -15,8 +15,13 @@ import httpx
 
 from . import supervisor
 from .config import InstanceConfig
+from .db import db
 
-GITHUB_RELEASES_URL = "https://api.github.com/repos/BeamMP/BeamMP-Server/releases/latest"
+# Toutes les releases (pas seulement « latest », qui ne renvoie que la dernière stable) : le canal de mise à jour
+# choisit dedans. Brouillons jamais proposés.
+GITHUB_RELEASES_URL = "https://api.github.com/repos/BeamMP/BeamMP-Server/releases?per_page=30"
+CHANNELS = ("stable", "prerelease", "pinned")
+VERSIONS_LISTED = 15
 
 # Cache court : l'API GitHub limite à 60 requêtes/h sans authentification.
 _update_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -70,6 +75,51 @@ def _semver(raw: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _key(version: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in version.split("."))
+
+
+def get_channel(inst: InstanceConfig) -> tuple[str, str | None]:
+    """Canal de mise à jour du serveur : (stable | prerelease | pinned, version épinglée). Stable par défaut."""
+    rows = {r["key"]: r["value"] for r in db().all(
+        "SELECT key, value FROM server_settings WHERE instance_id = ? AND key IN ('update_channel', 'update_version')",
+        [inst.id])}
+    channel = rows.get("update_channel", "stable")
+    if channel not in CHANNELS:
+        channel = "stable"
+    version = rows.get("update_version") if channel == "pinned" else None
+    return ("stable", None) if channel == "pinned" and not version else (channel, version)
+
+
+def set_channel(inst: InstanceConfig, channel: str, version: str | None) -> None:
+    with db().transaction() as t:
+        for key, value in (("update_channel", channel), ("update_version", version or "")):
+            t.run("INSERT INTO server_settings (instance_id, key, value) VALUES (?, ?, ?) "
+                  "ON CONFLICT(instance_id, key) DO UPDATE SET value = excluded.value", [inst.id, key, value])
+    _update_cache.pop(inst.id, None)
+
+
+def _usable(releases: list[dict[str, Any]], asset_name: str) -> list[dict[str, Any]]:
+    """Releases installables (pas de brouillon, version lisible, binaire de ce système avec son empreinte), plus récente d'abord."""
+    out = []
+    for r in releases if isinstance(releases, list) else []:
+        version = _semver(r.get("tag_name", ""))
+        asset = next((a for a in r.get("assets", []) if a.get("name") == asset_name), None)
+        if r.get("draft") or not version or not asset or not str(asset.get("digest") or "").startswith("sha256:"):
+            continue
+        out.append({**r, "_version": version, "_asset": asset})
+    return sorted(out, key=lambda r: _key(r["_version"]), reverse=True)
+
+
+def _target(usable: list[dict[str, Any]], channel: str, pinned: str | None) -> dict[str, Any] | None:
+    """Stable : la plus récente non préversion. Préversion : la plus récente, préversions comprises (une stable plus
+    récente l'emporte). Version précise : celle-là, même plus ancienne (retour arrière)."""
+    if channel == "pinned":
+        return next((r for r in usable if r["_version"] == pinned), None)
+    pool = usable if channel == "prerelease" else [r for r in usable if not r.get("prerelease")]
+    return pool[0] if pool else None
+
+
 def _disabled() -> dict[str, Any]:
     return {"enabled": False, "currentVersion": None, "latestVersion": None,
             "updateAvailable": False, "releaseUrl": None}
@@ -110,15 +160,24 @@ async def _fetch_update_info(inst: InstanceConfig) -> dict[str, Any]:
         return {**base, "error": f"GitHub API: HTTP {release_res.status_code}"}
 
     current = _semver(raw_version)
-    release = release_res.json()
-    latest = _semver(release.get("tag_name", ""))
     asset_name = f"BeamMP-Server.{_asset(inst)}"
-    asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
-    result = {**base, "currentVersion": current, "latestVersion": latest,
-              "releaseUrl": release.get("html_url")}
-    if not asset:
-        return {**result, "error": f'Aucun asset "{asset_name}" dans la dernière release'}
-    result["updateAvailable"] = bool(current and latest and current != latest)
+    usable = _usable(release_res.json(), asset_name)
+    channel, pinned = get_channel(inst)
+    target = _target(usable, channel, pinned)
+    stable = _target(usable, "stable", None)
+    result = {**base, "currentVersion": current, "channel": channel, "pinnedVersion": pinned,
+              "latestStable": stable["_version"] if stable else None,
+              "versions": [{"version": r["_version"], "prerelease": bool(r.get("prerelease")),
+                            "date": str(r.get("published_at") or "")[:10]} for r in usable[:VERSIONS_LISTED]]}
+    if not target:
+        why = (f"Version {pinned} introuvable (ou sans binaire {asset_name})" if channel == "pinned"
+               else f'Aucun asset "{asset_name}" dans les releases')
+        return {**result, "error": why}
+    latest = target["_version"]
+    result.update(latestVersion=latest, latestPrerelease=bool(target.get("prerelease")),
+                  releaseUrl=target.get("html_url"),
+                  updateAvailable=bool(current and current != latest),
+                  downgrade=bool(current and _key(latest) < _key(current)))
     return result
 
 
@@ -132,15 +191,17 @@ async def update_via_agent(inst: InstanceConfig) -> tuple[bool, str]:
         async with httpx.AsyncClient(timeout=10) as client:
             release_res = await client.get(GITHUB_RELEASES_URL)
     except httpx.HTTPError:
-        return False, "Impossible de contacter GitHub pour récupérer la dernière release"
+        return False, "Impossible de contacter GitHub pour récupérer les releases"
     if release_res.status_code >= 400:
-        return False, "Impossible de contacter GitHub pour récupérer la dernière release"
-    release = release_res.json()
+        return False, "Impossible de contacter GitHub pour récupérer les releases"
     asset_name = f"BeamMP-Server.{_asset(inst)}"
-    asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
-    digest = (asset or {}).get("digest") or ""
-    if not asset or not digest.startswith("sha256:"):
-        return False, f'Asset "{asset_name}" introuvable ou sans empreinte sha256 dans la dernière release'
+    channel, pinned = get_channel(inst)
+    release = _target(_usable(release_res.json(), asset_name), channel, pinned)
+    if not release:
+        return False, (f"Version {pinned} introuvable ou sans binaire {asset_name} avec empreinte sha256" if channel == "pinned"
+                       else f'Asset "{asset_name}" introuvable ou sans empreinte sha256 dans les releases')
+    asset = release["_asset"]
+    digest = asset["digest"]
 
     if local:
         try:

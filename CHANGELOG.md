@@ -6,6 +6,16 @@ dernière entrée de ce fichier.
 
 ## [À venir]
 
+### Mise à jour du serveur BeamMP
+
+- **Canal au choix** (Configuration → Mise à jour du serveur) : **Stable** (par
+  défaut, comme avant), **Préversion** (la plus récente, préversions comprises,
+  pour tester ce que BeamMP prépare) ou **Version précise** (n'importe quelle
+  release installable de la liste, y compris plus ancienne : le bouton devient
+  « Revenir à vX »). Le choix est gardé par instance ; les brouillons et les
+  releases sans binaire pour ce système ne sont jamais proposés, et l'empreinte
+  sha256 reste vérifiée comme avant.
+
 ### Cartes
 
 - **Le niveau est lu dans le zip** : à l'ajout d'une carte, le champ « identifiant »

@@ -16,7 +16,7 @@ from starlette.routing import Route
 
 from . import config as C
 from .activity import log_activity
-from .agent import can_restart, check_for_update, restart_via_agent, update_via_agent
+from .agent import CHANNELS, can_restart, check_for_update, restart_via_agent, set_channel, update_via_agent
 from .analyzer import analyze_upload, to_webp
 from .db import db, dumps, now_iso
 from .discord import notify_map_change, notify_mod_upload, notify_restart, notify_update
@@ -350,6 +350,28 @@ async def server_update_check(request: Request):
     return ok(await check_for_update(inst))
 
 
+async def server_update_channel(request: Request):
+    """Canal de mise à jour du serveur : stable, préversion, ou une version précise de la liste (retour arrière compris)."""
+    require_admin(request)
+    inst = instance_or_404(request.path_params["instanceId"])
+    body = await json_body(request)
+    channel, version = body.get("channel"), body.get("version")
+    if channel not in CHANNELS:
+        raise ApiError(400, "Canal inconnu (stable, prerelease ou pinned)")
+    if channel == "pinned":
+        info = await check_for_update(inst)
+        if not info["enabled"]:
+            raise ApiError(501, "Mise à jour non configurée pour cette instance")
+        if not isinstance(version, str) or version not in {v["version"] for v in info.get("versions", [])}:
+            raise ApiError(400, "Version introuvable parmi les releases installables")
+    else:
+        version = None
+    set_channel(inst, channel, version)
+    log_activity(inst.id, "server_update_channel",
+                 f"Canal de mise à jour du serveur : {channel}{' ' + version if version else ''}")
+    return ok(await check_for_update(inst))
+
+
 async def server_update(request: Request):
     require_admin(request)
     inst = instance_or_404(request.path_params["instanceId"])
@@ -381,4 +403,5 @@ routes = [
     Route("/api/i/{instanceId}/server/restart", server_restart, methods=["POST"]),
     Route("/api/i/{instanceId}/server/update-check", server_update_check),
     Route("/api/i/{instanceId}/server/update", server_update, methods=["POST"]),
+    Route("/api/i/{instanceId}/server/update-channel", server_update_channel, methods=["PUT"]),
 ]

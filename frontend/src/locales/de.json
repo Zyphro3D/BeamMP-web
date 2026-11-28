@@ -402,5 +402,12 @@
   "earth_map_privacy": "Nur für Admins sichtbar: Der Standort eines Spielers gehört ihm. Alle 5 Sekunden aktualisiert; Karte © OpenStreetMap-Mitwirkende, vom Panel weitergeleitet.",
   "choose_level_title": "Level wählen",
   "choose_level_text": "Dieses Zip enthält mehrere Levels. Wähle das, das der Server laden soll:",
-  "map_id_auto_hint": "Leer lassen: Das Level wird aus dem Zip gelesen (Ordner levels/<name>/)."
+  "map_id_auto_hint": "Leer lassen: Das Level wird aus dem Zip gelesen (Ordner levels/<name>/).",
+  "update_channel": "Update-Kanal",
+  "channel_stable": "Stabil",
+  "channel_prerelease": "Vorabversion (Tests)",
+  "channel_pinned": "Bestimmte Version",
+  "prerelease_tag": "Vorabversion",
+  "installed_tag": "installiert",
+  "install_downgrade": "Zurück zu"
 }

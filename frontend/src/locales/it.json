@@ -402,5 +402,12 @@
   "earth_map_privacy": "Visibile solo agli amministratori: la posizione di un giocatore gli appartiene. Aggiornata ogni 5 secondi; mappa © collaboratori di OpenStreetMap, inoltrata dal pannello.",
   "choose_level_title": "Scegli il livello",
   "choose_level_text": "Questo zip contiene più livelli. Scegli quello che il server deve caricare:",
-  "map_id_auto_hint": "Lascia vuoto: il livello viene letto dallo zip (cartella levels/<nome>/)."
+  "map_id_auto_hint": "Lascia vuoto: il livello viene letto dallo zip (cartella levels/<nome>/).",
+  "update_channel": "Canale di aggiornamento",
+  "channel_stable": "Stabile",
+  "channel_prerelease": "Pre-release (test)",
+  "channel_pinned": "Versione specifica",
+  "prerelease_tag": "pre-release",
+  "installed_tag": "installata",
+  "install_downgrade": "Torna a"
 }

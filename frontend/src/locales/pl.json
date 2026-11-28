@@ -402,5 +402,12 @@
   "earth_map_privacy": "Widoczne tylko dla administratorów: pozycja gracza należy do niego. Aktualizowane co 5 sekund; mapa © współtwórcy OpenStreetMap, przekazywana przez panel.",
   "choose_level_title": "Wybierz poziom",
   "choose_level_text": "To archiwum zip zawiera kilka poziomów. Wybierz ten, który serwer ma wczytać:",
-  "map_id_auto_hint": "Zostaw puste: poziom jest odczytywany z pliku zip (folder levels/<nazwa>/)."
+  "map_id_auto_hint": "Zostaw puste: poziom jest odczytywany z pliku zip (folder levels/<nazwa>/).",
+  "update_channel": "Kanał aktualizacji",
+  "channel_stable": "Stabilna",
+  "channel_prerelease": "Wersja przedpremierowa (testy)",
+  "channel_pinned": "Konkretna wersja",
+  "prerelease_tag": "przedpremierowa",
+  "installed_tag": "zainstalowana",
+  "install_downgrade": "Wróć do"
 }

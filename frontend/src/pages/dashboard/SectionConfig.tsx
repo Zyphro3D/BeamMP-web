@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, RotateCcw, ArrowUpCircle } from 'lucide-react'
-import { api, type UpdateCheck } from '../../lib/api'
+import { api, type UpdateChannel, type UpdateCheck } from '../../lib/api'
 import { useI18n } from '../../context/I18nContext'
 import { Toggle } from '../../components/ui/Toggle'
 import { BeamMPTextEditor } from '../../components/ui/BeamMPTextEditor'
@@ -60,6 +60,20 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
   useEffect(() => {
     api.checkServerUpdate(instanceId).then(setUpdateCheck).catch(() => {})
   }, [instanceId])
+
+  const changeChannel = async (channel: UpdateChannel, version?: string) => {
+    setUpdateError('')
+    if (channel === 'pinned' && !version) {
+      // Choisir « version précise » propose d'abord la version en service : rien ne s'installe tant qu'on n'en choisit pas une autre.
+      version = updateCheck?.currentVersion ?? updateCheck?.versions?.[0]?.version
+      if (!version) return
+    }
+    try {
+      setUpdateCheck(await api.setServerUpdateChannel(instanceId, channel, version))
+    } catch (e: unknown) {
+      setUpdateError(e instanceof Error ? e.message : t('error'))
+    }
+  }
 
   const installUpdate = async () => {
     setUpdating(true); setUpdateError('')
@@ -172,12 +186,34 @@ export function SectionConfig({ instanceId, canRestart, restarting, onRestart }:
                 <span className="text-zinc-600 font-mono">v{updateCheck.currentVersion}</span>
               )}
             </div>
+            {updateCheck.channel && (
+              <div className="grid gap-1.5">
+                <label htmlFor="update-channel" className="text-[11px] text-zinc-500">{t('update_channel')}</label>
+                <select id="update-channel" className="input text-xs py-1" value={updateCheck.channel} disabled={updating}
+                        onChange={e => changeChannel(e.target.value as UpdateChannel)}>
+                  <option value="stable">{t('channel_stable')}</option>
+                  <option value="prerelease">{t('channel_prerelease')}</option>
+                  <option value="pinned">{t('channel_pinned')}</option>
+                </select>
+                {updateCheck.channel === 'pinned' && (
+                  <select aria-label={t('channel_pinned')} className="input text-xs py-1 font-mono" disabled={updating}
+                          value={updateCheck.pinnedVersion ?? ''} onChange={e => changeChannel('pinned', e.target.value)}>
+                    {(updateCheck.versions ?? []).map(v => (
+                      <option key={v.version} value={v.version}>
+                        v{v.version}{v.prerelease ? ` · ${t('prerelease_tag')}` : ''}{v.version === updateCheck.currentVersion ? ` · ${t('installed_tag')}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
             {updateCheck.error ? (
               <p className="text-xs text-zinc-600">{updateCheck.error}</p>
             ) : updateCheck.updateAvailable ? (
               <button onClick={installUpdate} disabled={updating} className="btn-accent w-full justify-center disabled:opacity-40">
                 <ArrowUpCircle size={13} />
-                {updating ? t('updating') : `${t('install_update')} v${updateCheck.latestVersion}`}
+                {updating ? t('updating')
+                  : `${updateCheck.downgrade ? t('install_downgrade') : t('install_update')} v${updateCheck.latestVersion}${updateCheck.latestPrerelease ? ` (${t('prerelease_tag')})` : ''}`}
               </button>
             ) : (
               <p className="text-xs text-green-600 dark:text-green-500">{t('up_to_date')}</p>

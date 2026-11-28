@@ -158,6 +158,11 @@ export const api = {
     request<UpdateCheck>(`${i(instanceId)}/server/update-check`),
   updateServer: (instanceId: string) =>
     request<{ updated: boolean; version: string }>(`${i(instanceId)}/server/update`, { method: 'POST' }),
+  setServerUpdateChannel: (instanceId: string, channel: UpdateChannel, version?: string) =>
+    request<UpdateCheck>(`${i(instanceId)}/server/update-channel`, {
+      method: 'PUT',
+      body: JSON.stringify(version ? { channel, version } : { channel }),
+    }),
 
   // Public per-instance
   activeMods: (instanceId: string) => request<Mod[]>(`${i(instanceId)}/mods/active`),
@@ -331,13 +336,21 @@ export interface CriticalAlert {
   lastSeen:  number
 }
 
+export type UpdateChannel = 'stable' | 'prerelease' | 'pinned'
+
 export interface UpdateCheck {
-  enabled:         boolean
-  currentVersion:  string | null
-  latestVersion:   string | null
-  updateAvailable: boolean
-  releaseUrl:      string | null
-  error?:          string
+  enabled:           boolean
+  currentVersion:    string | null
+  latestVersion:     string | null
+  updateAvailable:   boolean
+  releaseUrl:        string | null
+  error?:            string
+  channel?:          UpdateChannel
+  pinnedVersion?:    string | null
+  latestStable?:     string | null
+  latestPrerelease?: boolean
+  downgrade?:        boolean
+  versions?:         { version: string; prerelease: boolean; date: string }[]
 }
 
 export interface ActivityEvent {

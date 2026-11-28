@@ -85,6 +85,14 @@ CREATE TABLE IF NOT EXISTS discord_settings (
   value       TEXT NOT NULL,
   PRIMARY KEY (instance_id, key)
 );
+
+-- Réglages du serveur BeamMP par instance (canal de mise à jour : stable, préversion ou version précise).
+CREATE TABLE IF NOT EXISTS server_settings (
+  instance_id TEXT NOT NULL,
+  key         TEXT NOT NULL,
+  value       TEXT NOT NULL,
+  PRIMARY KEY (instance_id, key)
+);
 """
 
 # Colonnes à décoder à la lecture, par table.
