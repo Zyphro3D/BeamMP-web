@@ -58,7 +58,16 @@ We will credit researchers in the release notes unless you request anonymity.
 - Filenames are sanitised: only `[a-zA-Z0-9._-]` characters, no path separators
 - File size is limited to 500 MB
 
-### Server restart
+### Game servers (« jeu » container, Linux)
+- BeamMP-Server instances run in a separate `jeu` container: host network, UID 1000, `cap_drop: ALL`,
+  `no-new-privileges`, no `docker.sock`, no sudo; the mod library is mounted read-only
+- The panel drives it over HTTP on port 3010, bound to the gateway of the panel's Docker network
+  (not reachable from the local network), with a random **Bearer token** (`BEAMMP_RUNNER_TOKEN`,
+  at least 32 characters, compared in constant time)
+- The panel only sends server identifiers (validated against a strict pattern), never paths or commands
+- Installations switched to this container no longer need the host agent or its sudo rule (both are removed)
+
+### Server restart (installations still on the systemd service)
 - The recommended mechanism is the **beammp-agent** (see `beammp-agent.py`)
   — a minimal Python daemon that runs on the host with a whitelist of allowed service names
 - Direct command execution (`BEAMMP_RESTART_CMD`) uses `execFile` (no shell) — immune to injection

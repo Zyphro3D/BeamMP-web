@@ -18,7 +18,7 @@ from beammp_panel.db import db
 from .conftest import login
 from .test_runner import make_exe
 
-KEY = "abcd1234-ef56-7890-abcd-1234567890ab"
+KEY = "abcd1234-ef56-7890-abcd-1234567890ab"  # gitleaks:allow (valeur de test)
 
 
 @pytest.fixture()
