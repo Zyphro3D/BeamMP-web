@@ -38,6 +38,16 @@ export const api = {
   // Global
   instances: () => request<InstanceInfo[]>('/api/instances'),
   info:      () => request<ServerInfo>('/api/info'),
+  instanceStatus: (instanceId: string) => request<ServerStatus>(`${i(instanceId)}/status`),
+
+  // Serveurs du panel (bouton « Ajouter un serveur »)
+  servers: () => request<ServerList>('/api/admin/servers'),
+  addServer: (name: string, port: number, authKey: string) =>
+    request<{ server: ManagedServer; started: boolean; error: string }>('/api/admin/servers', {
+      method: 'POST', body: JSON.stringify({ name, port, authKey }),
+    }),
+  removeServer: (id: string) =>
+    request<{ archived: string }>(`/api/admin/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   // Auth
   login: (username: string, password: string) =>
@@ -321,6 +331,26 @@ export interface InstanceInfo {
   id: string
   name: string
   canRestart: boolean
+}
+
+export interface ManagedServer {
+  id: string
+  name: string
+  port: number | null
+  origin: 'env' | 'panel'
+  removable: boolean
+  managed: boolean
+  running: boolean
+  wanted: boolean
+  error: string
+  unreachable: boolean
+}
+
+export interface ServerList {
+  canAdd: boolean
+  reason: string
+  nextPort: number
+  servers: ManagedServer[]
 }
 
 export interface ServerInfo {

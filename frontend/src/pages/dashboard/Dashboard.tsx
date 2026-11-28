@@ -16,6 +16,7 @@ import { SectionConsistency } from './SectionConsistency'
 import { SectionScanImport } from './SectionScanImport'
 import { SectionAdmin } from './SectionAdmin'
 import { SectionEarth } from './SectionEarth'
+import { SectionServers } from './SectionServers'
 
 // One entry per AdminSection — a new section that forgets to appear here is
 // a type error, not a silent fallback to the wrong title (which is exactly
@@ -32,6 +33,7 @@ const SECTION_TITLES: Record<AdminSection, string> = {
   import:      'nav_import',
   admin:       'nav_admin',
   earth:       'earth_title',
+  servers:     'servers_title',
 }
 
 export function Dashboard() {
@@ -48,13 +50,15 @@ export function Dashboard() {
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   const [earth, setEarth] = useState(false)
 
-  // Load instance list once
-  useEffect(() => {
+  // Liste des serveurs : au chargement, et après un ajout ou un retrait (section Serveurs)
+  const loadInstances = useCallback(() => {
     api.instances().then(list => {
       setInstances(list)
-      if (list.length > 0) setInstanceId(list[0].id)
+      // Serveur affiché retiré : retour au premier
+      setInstanceId(cur => (cur && list.some(i => i.id === cur)) ? cur : (list[0]?.id ?? ''))
     }).catch(console.error)
   }, [])
+  useEffect(() => { loadInstances() }, [loadInstances])
 
   const refresh = useCallback(() => {
     if (!instanceId) return
@@ -180,6 +184,7 @@ export function Dashboard() {
           {section === 'consistency'  && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionConsistency instanceId={instanceId} />}
           {section === 'import'       && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionScanImport instanceId={instanceId} onRefresh={refresh} />}
           {section === 'admin'        && user?.role === 'superadmin' && <SectionAdmin />}
+          {section === 'servers'      && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionServers onChanged={loadInstances} />}
           {section === 'earth'        && earth && (user?.role === 'superadmin' || user?.role === 'admin') && <SectionEarth instanceId={instanceId} canRestart={canRestart} restarting={restarting} onRestart={handleRestart} />}
         </main>
       </div>

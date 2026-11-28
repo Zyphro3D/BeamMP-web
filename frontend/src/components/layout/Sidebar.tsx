@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Package, Map, Users, Upload, Settings, LogOut, Shield, MessageSquare, ScanSearch, FolderInput, KeyRound, SlidersHorizontal, Globe2 } from 'lucide-react'
+import { LayoutDashboard, Package, Map, Users, Upload, Settings, LogOut, Shield, MessageSquare, ScanSearch, FolderInput, KeyRound, SlidersHorizontal, Globe2, Server } from 'lucide-react'
 import { useServerStatus } from '../../hooks/useServerStatus'
 import { getStoredUser, clearAuth } from '../../lib/auth'
 import { useNavigate } from 'react-router-dom'
@@ -13,7 +13,7 @@ import { ChangePasswordModal } from './ChangePasswordModal'
 
 export type AdminSection =
   | 'dashboard' | 'mods' | 'maps' | 'players'
-  | 'upload' | 'config' | 'presets' | 'admin' | 'consistency' | 'import' | 'earth'
+  | 'upload' | 'config' | 'presets' | 'admin' | 'consistency' | 'import' | 'earth' | 'servers'
 
 interface Props {
   section: AdminSection
@@ -104,6 +104,7 @@ export function Sidebar({ section, onSection, modCount, instanceId = 'default', 
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('presets', <SlidersHorizontal size={15} />, t('nav_presets'))}
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('consistency', <ScanSearch size={15} />, t('nav_consistency'))}
         {(user?.role === 'superadmin' || user?.role === 'admin') && nav('import', <FolderInput size={15} />, t('nav_import'))}
+        {(user?.role === 'superadmin' || user?.role === 'admin') && nav('servers', <Server size={15} />, t('servers_title'))}
         {user?.role === 'superadmin' && nav('admin', <Shield size={15} />, t('nav_admin'))}
 
         {info?.discordUrl && (

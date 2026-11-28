@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Users, Package, Coffee, MessageSquare, Map } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useServerStatus } from '../hooks/useServerStatus'
-import { api, type CatalogItem, type Mod, type ServerInfo } from '../lib/api'
+import { api, type CatalogItem, type InstanceInfo, type Mod, type ServerInfo, type ServerStatus } from '../lib/api'
 import { isAuthenticated } from '../lib/auth'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { LangToggle } from '../components/ui/LangToggle'
@@ -20,18 +20,33 @@ export function Home() {
   const auth = isAuthenticated()
   const { t, lang } = useI18n()
 
+  const [instances, setInstances] = useState<InstanceInfo[]>([])
+  const [others, setOthers] = useState<Record<string, ServerStatus>>({})
+
   useEffect(() => {
-    // Fetch first instance id, then load mods for that instance
     api.instances().then(list => {
-      const id = list[0]?.id ?? 'default'
-      setInstanceId(id)
-      api.activeMods(id).then(setMods).catch(() => {}).finally(() => setModsLoading(false))
-      api.catalog(id).then(setCatalog).catch(() => {})
-    }).catch(() => {
-      api.activeMods('default').then(setMods).catch(() => {}).finally(() => setModsLoading(false))
-    })
+      setInstances(list)
+      setInstanceId(list[0]?.id ?? 'default')
+    }).catch(() => {})
     api.info().then(setInfo).catch(() => {})
   }, [])
+
+  // Mods et catalogue du serveur affiché
+  useEffect(() => {
+    setModsLoading(true)
+    api.activeMods(instanceId).then(setMods).catch(() => setMods([])).finally(() => setModsLoading(false))
+    api.catalog(instanceId).then(setCatalog).catch(() => setCatalog([]))
+  }, [instanceId])
+
+  // Plusieurs serveurs : l'état de chacun pour les onglets (celui affiché suit le flux en direct)
+  useEffect(() => {
+    if (instances.length < 2) return
+    const poll = () => Promise.all(instances.map(i => api.instanceStatus(i.id).then(st => [i.id, st] as const).catch(() => null)))
+      .then(rows => setOthers(Object.fromEntries(rows.filter(r => r !== null))))
+    poll()
+    const timer = setInterval(poll, 30_000)
+    return () => clearInterval(timer)
+  }, [instances])
 
   // activeMods endpoint already filters active=true, so all returned items are active
   // La carte que le serveur charge vraiment (`Map =`, dans status.map) : la base peut en garder une autre marquée
@@ -101,6 +116,28 @@ export function Home() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+
+        {/* Plusieurs serveurs : un onglet chacun */}
+        {instances.length > 1 && (
+          <nav aria-label={t('servers_title')} className="flex flex-wrap gap-2">
+            {instances.map(inst => {
+              const st = inst.id === instanceId ? status : others[inst.id]
+              const selected = inst.id === instanceId
+              return (
+                <button key={inst.id} type="button" onClick={() => setInstanceId(inst.id)} aria-pressed={selected}
+                  className={`card px-3 py-2 flex items-center gap-2 text-sm transition-colors
+                              ${selected ? 'ring-2 ring-accent' : 'hover:bg-zinc-100 dark:hover:bg-white/5'}`}>
+                  <span className={`w-2 h-2 rounded-full ${st?.online ? 'bg-green-400' : 'bg-red-400'}`} aria-hidden />
+                  <span className="font-medium">{st?.serverName && st.serverName !== 'BeamMP Server' ? st.serverName : inst.name}</span>
+                  <span className="sr-only">{st?.online ? t('online') : t('offline')}</span>
+                  {st && st.maxPlayers > 0 && (
+                    <span className="text-[11px] text-zinc-500 font-mono">{st.playerCount}/{st.maxPlayers}</span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+        )}
 
         {/* Server description */}
         {info?.serverDescription && (
