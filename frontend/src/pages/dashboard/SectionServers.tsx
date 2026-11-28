@@ -60,6 +60,20 @@ export function SectionServers({ onChanged }: { onChanged: () => void }) {
     }
   }
 
+  const switchToRunner = async () => {
+    if (!confirm(t('servers_switch_confirm'))) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await api.switchToRunner()
+      setNotice(t('servers_switch_requested'))
+      await load()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const state = (s: ManagedServer) => {
     if (!s.managed) return <span className="badge-zinc">{t('servers_state_external')}</span>
     if (s.unreachable) return <span className="badge-red">{t('servers_state_unreachable')}</span>
@@ -100,7 +114,17 @@ export function SectionServers({ onChanged }: { onChanged: () => void }) {
 
       <div className="card p-4 space-y-3">
         <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{t('servers_add')}</p>
-        {list && !list.canAdd && <p className="text-sm text-zinc-600 dark:text-zinc-400">{list.reason}</p>}
+        {list && !list.canAdd && !list.canSwitch && !list.switchPending &&
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{list.reason}</p>}
+        {list?.switchPending && <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('servers_switch_pending')}</p>}
+        {list?.canSwitch && (
+          <div className="space-y-2">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('servers_switch_hint')}</p>
+            {isSuper
+              ? <button type="button" className="btn-accent" disabled={busy} onClick={switchToRunner}>{t('servers_switch')}</button>
+              : <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('servers_superadmin_only')}</p>}
+          </div>
+        )}
         {list?.canAdd && !isSuper && <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('servers_superadmin_only')}</p>}
         {list?.canAdd && isSuper && (
           <form onSubmit={add} className="space-y-3">

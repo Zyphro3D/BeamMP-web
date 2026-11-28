@@ -130,7 +130,13 @@ if [ "$FROM_PANEL" -eq 1 ]; then
     # Le panel ne peut demander qu'une version plus récente : pas de retour vers une version
     # signée mais ancienne (et peut-être vulnérable).
     current="$(installed_version)"
-    [ -n "$current" ] && version_lt "$current" "$v" || die "Version $v refusée : la version installée est $current"
+    # Seule exception : le bouton « Passer au conteneur jeu » relance la version installée (même
+    # paquet signé, aucun retour en arrière), pour que ce script-ci fasse la bascule.
+    if printf '%s' "$req" | grep -qE '"action": *"jeu"' && [ "$v" = "$current" ]; then
+        echo "Passage au conteneur « jeu » demandé (version $v réinstallée)"
+    else
+        [ -n "$current" ] && version_lt "$current" "$v" || die "Version $v refusée : la version installée est $current"
+    fi
 fi
 
 # Question posée sur le terminal même quand le script arrive par « curl | bash » (stdin = le script)
@@ -486,7 +492,7 @@ rollback() {
 # Conteneur « jeu » (BeamMP-Server, plusieurs serveurs) : posé à la première installation, et à la
 # mise à jour d'une installation dont le serveur tournait par un service systemd (migration :
 # même dossier, même port ; le service est arrêté une fois le panel à jour, rétabli en cas d'échec).
-JEU=0; MIGRATE=0; OLD_UNIT=""; WAS_ACTIVE=0
+JEU=0; MIGRATE=0; OLD_UNIT=""; OLD_DROPIN_DIR=""; WAS_ACTIVE=0
 # Serveur tenu par un service systemd simple : <dossier>/BeamMP-Server lancé dans son dossier,
 # sous l'uid 1000, et c'est bien le serveur que le panel lit (.env). Sinon, rien ne change.
 migratable() {
@@ -502,20 +508,26 @@ migratable() {
         || { echo "le panel lit $cfg, pas $wd/ServerConfig.toml"; return 1; }
     printf '%s' "$wd"
 }
+# Raison affichée par le panel (section Serveurs) quand la bascule n'est pas faite
+jeu_refus() { mkdir -p update; printf '%s\n' "$1" | head -c 400 > update/jeu-refus.txt; }
 if [ -n "$(env_get BEAMMP_RUNNER_TOKEN)" ]; then
     JEU=1
     d="$(env_get BEAMMP_SERVER_DIR)"; SERVER_DIR="${d:-$SERVER_DIR}"
 elif [ "$FIRST_INSTALL" -eq 1 ]; then
     JEU=1
 elif [ -n "$(env_get INSTANCES)" ]; then
-    warn "Plusieurs serveurs déclarés dans .env (INSTANCES) : fonctionnement inchangé, pas de bouton « Ajouter un serveur »"
+    WHY="plusieurs serveurs déclarés dans .env (INSTANCES)"
+    warn "Serveur laissé tel quel ($WHY) : pas de bouton « Ajouter un serveur »"
+    jeu_refus "$WHY"
 else
     OLD_UNIT="$(env_get BEAMMP_AGENT_SERVICE)"
     OLD_UNIT="${OLD_UNIT:-$SERVER_UNIT}"
+    OLD_DROPIN_DIR="/etc/systemd/system/${OLD_UNIT%.service}.service.d"
     if WHY="$(migratable "$OLD_UNIT")"; then
         JEU=1; MIGRATE=1; SERVER_DIR="$WHY"
     else
         warn "Serveur laissé tel quel ($WHY) : pas de bouton « Ajouter un serveur »"
+        jeu_refus "$WHY"
     fi
 fi
 
@@ -588,8 +600,13 @@ jeu_up() {
 # Service systemd remis en place si la bascule vers le conteneur « jeu » échoue
 undo_migration() {
     warn "$1 : le serveur reste sur le service $OLD_UNIT"
+    jeu_refus "$1 (retour au service $OLD_UNIT, détail dans update.log)"
     docker compose stop jeu >/dev/null 2>&1 || true
     cp -p "$TMP/env.avant-jeu" .env
+    if [ -f "$OLD_DROPIN_DIR/beammp-panel-jeu.conf" ]; then
+        mv "$OLD_DROPIN_DIR/beammp-panel-jeu.conf" "$TMP/"
+        systemctl daemon-reload
+    fi
     systemctl enable "$OLD_UNIT" >/dev/null 2>&1 || true
     [ "$WAS_ACTIVE" -eq 1 ] && systemctl start "$OLD_UNIT"
     docker compose up -d --force-recreate app
@@ -602,8 +619,14 @@ if [ "$JEU" -eq 1 ]; then
     if [ "$MIGRATE" -eq 1 ]; then
         status restart "Passage du serveur BeamMP dans le conteneur « jeu »"
         systemctl is-active --quiet "$OLD_UNIT" && WAS_ACTIVE=1
-        # Arrêté et désactivé : jamais deux serveurs sur le même port
+        # Arrêté et désactivé : jamais deux serveurs sur le même port. Un « systemctl restart » lancé par un
+        # autre outil le relancerait quand même, sur le même dossier : refusé par ce complément.
         systemctl disable --now "$OLD_UNIT" >/dev/null 2>&1
+        mkdir -p "$OLD_DROPIN_DIR"
+        printf '%s\n' "# Posé par BeamMP Panel (install.sh) : ce serveur tourne dans le conteneur « jeu »." \
+            "# Retirer ce fichier puis « systemctl daemon-reload » pour revenir au service." \
+            "[Unit]" "RefuseManualStart=yes" > "$OLD_DROPIN_DIR/beammp-panel-jeu.conf"
+        systemctl daemon-reload
     fi
     if [ "$MIGRATE" -eq 1 ] || [ "$(cat update/runner.sha 2>/dev/null)" != "$RUNNER_SHA" ] \
        || [ -z "$(docker compose ps -q --status running jeu 2>/dev/null)" ]; then
@@ -635,6 +658,7 @@ if [ "$JEU" -eq 1 ]; then
         if [ -f /etc/sudoers.d/beammp-agent ]; then
             mv /etc/sudoers.d/beammp-agent /etc/beammp-agent.sudoers.retire
         fi
+        rm -f update/jeu-refus.txt
         ok "Serveur BeamMP passé dans le conteneur « jeu » ($SERVER_DIR) ; $OLD_UNIT et beammp-agent désactivés"
     fi
 fi

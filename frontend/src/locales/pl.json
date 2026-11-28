@@ -446,5 +446,11 @@
   "servers_key_hint": "Każdy serwer potrzebuje własnego klucza:",
   "servers_archive_hint": "Usunięty serwer zachowuje folder w servers/_archives.",
   "activity_server_added": "Dodano serwer · {name} (port {port})",
-  "activity_server_removed": "Usunięto serwer · {name}"
+  "activity_server_removed": "Usunięto serwer · {name}",
+  "servers_switch": "Włącz dodawanie serwerów",
+  "servers_switch_confirm": "Serwer BeamMP zostanie przeniesiony do kontenera „gra”: uruchomi się ponownie (mniej niż minuta przerwy), panel również. Jeśli coś się nie uda, wszystko wróci do poprzedniego stanu. Kontynuować?",
+  "servers_switch_requested": "Przełączenie zlecone: panel uruchomi się ponownie za kilka minut.",
+  "servers_switch_pending": "Przełączanie w toku: panel uruchomi się ponownie za kilka minut.",
+  "servers_switch_hint": "Aby dodawać serwery, serwer BeamMP musi działać w kontenerze „gra” panelu zamiast w usłudze systemd. Przełączenie zachowuje jego folder, mody i port.",
+  "activity_server_switch": "Zlecono przejście do kontenera gry"
 }

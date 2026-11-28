@@ -446,5 +446,11 @@
   "servers_key_hint": "Ogni server ha bisogno della sua chiave:",
   "servers_archive_hint": "Un server rimosso conserva la sua cartella in servers/_archives.",
   "activity_server_added": "Server aggiunto · {name} (porta {port})",
-  "activity_server_removed": "Server rimosso · {name}"
+  "activity_server_removed": "Server rimosso · {name}",
+  "servers_switch": "Attiva l'aggiunta di server",
+  "servers_switch_confirm": "Il server BeamMP passerà nel container «gioco»: si riavvia (meno di un minuto di interruzione) e anche il pannello. In caso di errore, tutto torna come prima. Continuare?",
+  "servers_switch_requested": "Passaggio richiesto: il pannello si riavvia tra qualche minuto.",
+  "servers_switch_pending": "Passaggio in corso: il pannello si riavvia tra qualche minuto.",
+  "servers_switch_hint": "Per aggiungere server, il server BeamMP deve girare nel container «gioco» del pannello invece che nel suo servizio systemd. Il passaggio mantiene cartella, mod e porta.",
+  "activity_server_switch": "Passaggio al container di gioco richiesto"
 }

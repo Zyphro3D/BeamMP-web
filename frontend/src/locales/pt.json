@@ -446,5 +446,11 @@
   "servers_key_hint": "Cada servidor precisa da sua própria chave:",
   "servers_archive_hint": "Um servidor removido mantém a pasta em servers/_archives.",
   "activity_server_added": "Servidor adicionado · {name} (porta {port})",
-  "activity_server_removed": "Servidor removido · {name}"
+  "activity_server_removed": "Servidor removido · {name}",
+  "servers_switch": "Ativar a adição de servidores",
+  "servers_switch_confirm": "O servidor BeamMP vai passar para o contentor «jogo»: reinicia (menos de um minuto de interrupção) e o painel também. Se algo falhar, tudo volta ao que era. Continuar?",
+  "servers_switch_requested": "Mudança pedida: o painel reinicia dentro de alguns minutos.",
+  "servers_switch_pending": "Mudança em curso: o painel reinicia dentro de alguns minutos.",
+  "servers_switch_hint": "Para adicionar servidores, o servidor BeamMP tem de correr no contentor «jogo» do painel em vez do seu serviço systemd. A mudança mantém a pasta, os mods e a porta.",
+  "activity_server_switch": "Mudança para o contentor de jogo pedida"
 }

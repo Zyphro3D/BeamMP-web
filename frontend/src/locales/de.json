@@ -446,5 +446,11 @@
   "servers_key_hint": "Jeder Server braucht einen eigenen Schlüssel:",
   "servers_archive_hint": "Ein entfernter Server behält seinen Ordner in servers/_archives.",
   "activity_server_added": "Server hinzugefügt · {name} (Port {port})",
-  "activity_server_removed": "Server entfernt · {name}"
+  "activity_server_removed": "Server entfernt · {name}",
+  "servers_switch": "Hinzufügen von Servern aktivieren",
+  "servers_switch_confirm": "Der BeamMP-Server wird in den „Spiel“-Container verschoben: Er startet neu (weniger als eine Minute Ausfall), das Panel ebenfalls. Bei einem Fehler wird alles wiederhergestellt. Fortfahren?",
+  "servers_switch_requested": "Umstellung angefordert: Das Panel startet in wenigen Minuten neu.",
+  "servers_switch_pending": "Umstellung läuft: Das Panel startet in wenigen Minuten neu.",
+  "servers_switch_hint": "Um Server hinzuzufügen, muss der BeamMP-Server im „Spiel“-Container des Panels statt in seinem systemd-Dienst laufen. Ordner, Mods und Port bleiben erhalten.",
+  "activity_server_switch": "Wechsel in den Spiel-Container angefordert"
 }

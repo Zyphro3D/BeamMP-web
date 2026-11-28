@@ -115,3 +115,37 @@ def test_registry_ignores_bad_entries(env, monkeypatch):
     assert [e["id"] for e in servers.load_registry()] == ["ok"]
     (env / "data" / "servers.json").write_text("{pas du json")
     assert servers.load_registry() == []
+
+
+def test_switch_to_runner_request(env, monkeypatch):
+    """Installation Docker sur l'ancien service systemd : le bouton demande à install.sh la bascule."""
+    from beammp_panel import updater
+    upd = env / "update"
+    upd.mkdir()
+    monkeypatch.setattr(updater, "UPDATE_DIR", upd)
+    monkeypatch.setenv("BEAMMP_AGENT_URL", "http://127.0.0.1:4445")
+    monkeypatch.setenv("BEAMMP_AGENT_TOKEN", "x" * 32)
+    monkeypatch.setenv("BEAMMP_AGENT_SERVICE", "beammp.service")
+    C.set_config(C.load_config())
+    with TestClient(create_app()) as client:
+        admin = login(client)
+        assert admin.get("/api/admin/servers").json()["canSwitch"] is False     # pas installé par install.sh
+        (upd / "agent.json").write_text('{"agent": "systemd"}')
+        listing = admin.get("/api/admin/servers").json()
+        assert listing["canSwitch"] and not listing["canAdd"]
+
+        assert admin.post("/api/admin/servers/switch").status_code == 200
+        req = json.loads((upd / "request.json").read_text())
+        assert req["action"] == "jeu" and req["version"] == updater.VERSION
+        listing = admin.get("/api/admin/servers").json()
+        assert listing["switchPending"] and not listing["canSwitch"]
+        assert admin.post("/api/admin/servers/switch").status_code == 400       # une seule demande à la fois
+
+        # install.sh a refusé (service non conforme) : la raison remplace le bouton.
+        (upd / "request.json").rename(upd / "consommee.json")
+        (upd / "jeu-refus.txt").write_text("beammp.service tourne sous root, pas sous l'uid 1000\n")
+        listing = admin.get("/api/admin/servers").json()
+        assert not listing["canSwitch"] and "uid 1000" in listing["reason"]
+
+        db().run("UPDATE users SET role = 'admin' WHERE username = 'boss'")
+        assert admin.post("/api/admin/servers/switch").status_code == 403

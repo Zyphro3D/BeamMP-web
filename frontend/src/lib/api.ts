@@ -48,6 +48,7 @@ export const api = {
     }),
   removeServer: (id: string) =>
     request<{ archived: string }>(`/api/admin/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  switchToRunner: () => request<{ requested: boolean }>('/api/admin/servers/switch', { method: 'POST' }),
 
   // Auth
   login: (username: string, password: string) =>
@@ -349,6 +350,8 @@ export interface ManagedServer {
 export interface ServerList {
   canAdd: boolean
   reason: string
+  canSwitch: boolean
+  switchPending: boolean
   nextPort: number
   servers: ManagedServer[]
 }

@@ -471,5 +471,11 @@
   "servers_key_hint": "Each server needs its own key:",
   "servers_archive_hint": "A removed server keeps its folder in servers/_archives.",
   "activity_server_added": "Server added · {name} (port {port})",
-  "activity_server_removed": "Server removed · {name}"
+  "activity_server_removed": "Server removed · {name}",
+  "servers_switch": "Enable adding servers",
+  "servers_switch_confirm": "The BeamMP server will move into the \"game\" container: it restarts (less than a minute of downtime) and so does the panel. If anything fails, everything goes back as it was. Continue?",
+  "servers_switch_requested": "Switch requested: the panel restarts in a few minutes.",
+  "servers_switch_pending": "Switch in progress: the panel restarts in a few minutes.",
+  "servers_switch_hint": "To add servers, the BeamMP server must run in the panel's \"game\" container instead of its systemd service. The switch keeps its folder, mods and port.",
+  "activity_server_switch": "Switch to the game container requested"
 }

@@ -471,5 +471,11 @@
   "servers_key_hint": "Chaque serveur a sa propre clé :",
   "servers_archive_hint": "Un serveur retiré garde son dossier dans servers/_archives.",
   "activity_server_added": "Serveur ajouté · {name} (port {port})",
-  "activity_server_removed": "Serveur retiré · {name}"
+  "activity_server_removed": "Serveur retiré · {name}",
+  "servers_switch": "Activer l'ajout de serveurs",
+  "servers_switch_confirm": "Le serveur BeamMP va passer dans le conteneur « jeu » : il redémarre (coupure de moins d'une minute) et le panel aussi. En cas d'échec, tout revient comme avant. Continuer ?",
+  "servers_switch_requested": "Bascule demandée : le panel redémarre dans quelques minutes.",
+  "servers_switch_pending": "Bascule en cours : le panel redémarre dans quelques minutes.",
+  "servers_switch_hint": "Pour ajouter des serveurs, le serveur BeamMP doit tourner dans le conteneur « jeu » du panel au lieu de son service systemd. La bascule garde son dossier, ses mods et son port.",
+  "activity_server_switch": "Passage au conteneur « jeu » demandé"
 }

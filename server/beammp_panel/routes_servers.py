@@ -14,7 +14,7 @@ from starlette.requests import Request
 from starlette.routing import Route
 
 from . import config as C
-from . import servers, supervisor
+from . import servers, supervisor, updater
 from .activity import log_activity
 from .config import InstanceConfig
 from .security import ApiError, require_admin, require_superadmin
@@ -44,10 +44,29 @@ async def _describe(inst: InstanceConfig) -> dict:
 
 async def list_servers(request: Request):
     require_admin(request)
-    can, why = servers.can_add(_base())
+    base = _base()
+    can, why = servers.can_add(base)
+    # Installation Docker encore sur le service systemd (agent) : bascule proposée, sauf si install.sh
+    # l'a déjà refusée (raison affichée) ou si une demande est en attente.
+    refusal = "" if can else updater.runner_refusal()
+    can_switch = (not can and bool(base.agent) and len(C.config.instances) == 1 and updater.docker_mode()
+                  and not refusal and not updater.host_status()["pending"])
     items = await asyncio.gather(*(_describe(i) for i in C.config.instances))
-    return ok({"canAdd": can, "reason": why, "nextPort": servers.next_port(C.config.instances),
-               "servers": list(items)})
+    return ok({"canAdd": can, "reason": refusal or why, "canSwitch": can_switch,
+               "switchPending": not can and updater.host_status()["pending"],
+               "nextPort": servers.next_port(C.config.instances), "servers": list(items)})
+
+
+async def switch_to_runner(request: Request):
+    user = require_superadmin(request)
+    if servers.can_add(_base())[0]:
+        raise ApiError(409, "Le serveur tourne déjà dans le conteneur « jeu »")
+    try:
+        await asyncio.to_thread(updater.request_runner_switch)
+    except (ValueError, OSError) as err:
+        raise ApiError(400, str(err))
+    log_activity(_base().id, "server_switch", "Passage au conteneur « jeu » demandé", user=user.get("username"))
+    return ok({"requested": True})
 
 
 async def add_server(request: Request):
@@ -108,5 +127,6 @@ async def remove_server(request: Request):
 routes = [
     Route("/api/admin/servers", list_servers, methods=["GET"]),
     Route("/api/admin/servers", add_server, methods=["POST"]),
+    Route("/api/admin/servers/switch", switch_to_runner, methods=["POST"]),
     Route("/api/admin/servers/{instanceId}", remove_server, methods=["DELETE"]),
 ]

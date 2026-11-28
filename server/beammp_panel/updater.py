@@ -227,6 +227,30 @@ def request_host_update() -> dict[str, Any]:
     return public_state()
 
 
+def request_runner_switch() -> None:
+    """Docker : demande à l'hôte de relancer install.sh sur la version installée, pour faire tourner
+    le serveur dans le conteneur « jeu » (bouton « Ajouter un serveur »). Même paquet signé : ce
+    n'est pas un retour en arrière, et install.sh ne l'accepte que pour la version en place."""
+    if not docker_mode():
+        raise ValueError("bascule possible seulement pour une installation faite par install.sh")
+    parse(VERSION)
+    if (UPDATE_DIR / "request.json").is_file():
+        raise ValueError("une demande est déjà en attente")
+    tmp = UPDATE_DIR / f".request-{os.getpid()}.tmp"
+    tmp.write_text(json.dumps({"version": VERSION, "action": "jeu", "requested_at": int(time.time())}))
+    os.replace(tmp, UPDATE_DIR / "request.json")
+    with _lock:
+        STATE.update(phase="requested", error="")
+
+
+def runner_refusal() -> str:
+    """Raison écrite par install.sh quand il a laissé le serveur sur son service systemd."""
+    try:
+        return (UPDATE_DIR / "jeu-refus.txt").read_text(encoding="utf-8", errors="replace").strip()[:400]
+    except OSError:
+        return ""
+
+
 async def install() -> dict[str, Any]:
     """Télécharge et prépare la version annoncée (app.new) ; le redémarrage l'active."""
     if docker_mode():
